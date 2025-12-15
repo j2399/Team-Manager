@@ -7,6 +7,7 @@ import {
     LayoutDashboard, Users, LogOut, Settings, ChevronDown,
     Plus, MoreHorizontal, FolderKanban, Pencil, Trash2, User, GripVertical
 } from "lucide-react"
+import { motion } from "framer-motion"
 import { DiscordIcon } from "@/components/icons/DiscordIcon"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -36,7 +37,6 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { RemoveScroll } from "react-remove-scroll"
-import { triggerProjectNavTransition } from "@/components/ProjectNavTransition"
 import {
     Dialog,
     DialogContent,
@@ -220,13 +220,21 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                 ref={setNodeRef}
                 style={style}
                 className={cn(
-                    "group flex items-center gap-1 rounded-md transition-colors",
-                    isActive ? "bg-[var(--project-active-bg)]" : "hover:bg-[var(--project-hover-bg)]"
+                    "group relative flex items-center gap-1 rounded-md transition-colors",
+                    isActive ? "" : "hover:bg-[var(--project-hover-bg)]"
                 )}
             >
+                {isActive && (
+                    <motion.div
+                        layoutId="cupi-project-active-indicator"
+                        className="absolute inset-0 rounded-md pointer-events-none"
+                        style={{ backgroundColor: hexToRgba(projectColor, 0.16) }}
+                        transition={{ type: "spring", stiffness: 520, damping: 38, mass: 0.6 }}
+                    />
+                )}
                 <button
                     type="button"
-                    className="h-6 w-6 shrink-0 flex items-center justify-center rounded-md cursor-grab active:cursor-grabbing opacity-60 group-hover:opacity-100"
+                    className="relative z-10 h-6 w-6 shrink-0 flex items-center justify-center rounded-md cursor-grab active:cursor-grabbing opacity-60 group-hover:opacity-100"
                     style={{ color: projectColor }}
                     onClick={(e) => e.preventDefault()}
                     {...attributes}
@@ -238,10 +246,9 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                 <Link
                     href={`/dashboard/projects/${project.id}`}
                     className={cn(
-                        "flex-1 flex items-center rounded-md px-3 py-1.5 text-sm transition-colors truncate",
+                        "relative z-10 flex-1 flex items-center rounded-md px-3 py-1.5 text-sm transition-colors truncate",
                         isActive ? "font-medium" : "text-muted-foreground group-hover:text-foreground"
                     )}
-                    onClick={() => triggerProjectNavTransition(projectColor)}
                 >
                     <span className="truncate">{project.name}</span>
                 </Link>
@@ -250,7 +257,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 shrink-0 text-muted-foreground/50 hover:text-muted-foreground"
+                            className="relative z-10 h-6 w-6 shrink-0 text-muted-foreground/50 hover:text-muted-foreground"
                         >
                             <MoreHorizontal className="h-4 w-4" />
                         </Button>
