@@ -15,11 +15,11 @@ import { useState, useEffect, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
 import { Plus, ChevronDown, CheckCircle2, Trash2, Pencil } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { AnimatePresence, motion } from "framer-motion"
 
 import { PushDialog } from "@/features/pushes/PushDialog"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -670,7 +670,7 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
 
     return (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
-            <div className="flex flex-col h-full min-w-0 overflow-y-auto overflow-x-hidden">
+            <div className="flex flex-col h-full min-w-0 overflow-y-scroll overflow-x-hidden">
 
                 <div className="flex-1 p-4 space-y-4">
                     {pushes.length === 0 && (
@@ -694,80 +694,89 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
                         const pushColumns = getPushTasks(push.id)
                         const isComplete = isPushComplete(push.id)
                         const isCollapsed = collapsedPushes.has(push.id)
+                        const isOpen = !isCollapsed
+                        const contentId = `push-${push.id}-content`
 
                         return (
-                            <Collapsible
-                                key={push.id}
-                                open={!isCollapsed}
-                                onOpenChange={() => togglePushCollapse(push.id)}
-                                className="group"
-                            >
-                                <div className="w-full min-w-0 max-w-full rounded-lg border bg-card shadow-sm hover:shadow-md transition-shadow duration-200 data-[state=open]:shadow-sm">
-                                    <CollapsibleTrigger asChild>
-                                        <button className={`w-full flex items-center justify-between p-4 transition-colors rounded-t-lg group-data-[state=closed]:rounded-lg relative overflow-hidden ${isComplete ? 'bg-green-100 dark:bg-green-900/20 hover:bg-green-200/50 dark:hover:bg-green-900/30' : 'hover:bg-accent/50'}`}>
-                                            <div className="flex items-center gap-4">
-                                                <div className="flex items-center gap-3 flex-wrap">
-                                                    <span className="font-semibold text-lg tracking-tight">{push.name}</span>
-                                                    {isComplete && (
-                                                        <span className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-100 dark:bg-green-900/30 px-2.5 py-0.5 rounded-full ring-1 ring-inset ring-green-600/20">
-                                                            <CheckCircle2 className="w-3.5 h-3.5" />
-                                                            {push.endDate && push.endDate !== 'null' ? `Completed on ${new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : 'Completed!'}
-                                                        </span>
-                                                    )}
-                                                    {!isComplete && (
-                                                        <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
-                                                            <span className="bg-muted/50 px-2 py-0.5 rounded">
-                                                                {new Date(push.startDate).toLocaleDateString([], { month: 'short', day: 'numeric' })} - {push.endDate ? new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Ongoing'}
-                                                            </span>
-                                                            <span>•</span>
-                                                            <span>
-                                                                {push.completedCount} of {push.taskCount} tasks completed
-                                                            </span>
-                                                        </div>
-                                                    )}
+                            <div key={push.id} className="w-full min-w-0 max-w-full rounded-lg border bg-card shadow-sm hover:shadow-md transition-shadow duration-200">
+                                <button
+                                    type="button"
+                                    aria-expanded={isOpen}
+                                    aria-controls={contentId}
+                                    onClick={() => togglePushCollapse(push.id)}
+                                    className={`w-full flex items-center justify-between p-4 transition-colors ${isOpen ? "rounded-t-lg" : "rounded-lg"} relative overflow-hidden ${isComplete ? 'bg-green-100 dark:bg-green-900/20 hover:bg-green-200/50 dark:hover:bg-green-900/30' : 'hover:bg-accent/50'}`}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-3 flex-wrap">
+                                            <span className="font-semibold text-lg tracking-tight">{push.name}</span>
+                                            {isComplete && (
+                                                <span className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-100 dark:bg-green-900/30 px-2.5 py-0.5 rounded-full ring-1 ring-inset ring-green-600/20">
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    {push.endDate && push.endDate !== 'null' ? `Completed on ${new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : 'Completed!'}
+                                                </span>
+                                            )}
+                                            {!isComplete && (
+                                                <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
+                                                    <span className="bg-muted/50 px-2 py-0.5 rounded">
+                                                        {new Date(push.startDate).toLocaleDateString([], { month: 'short', day: 'numeric' })} - {push.endDate ? new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Ongoing'}
+                                                    </span>
+                                                    <span>•</span>
+                                                    <span>
+                                                        {push.completedCount} of {push.taskCount} tasks completed
+                                                    </span>
                                                 </div>
-                                            </div>
+                                            )}
+                                        </div>
+                                    </div>
 
-                                            <div className="flex items-center gap-4">
-                                                <div className="flex items-center gap-1">
-                                                    {isAdmin && (
-                                                        <>
-                                                            <div
-                                                                role="button"
-                                                                onClick={(e) => handleEditPush(e, push)}
-                                                                className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-primary/10 hover:text-primary transition-colors relative z-10"
-                                                                title="Edit Push"
-                                                            >
-                                                                <Pencil className="h-4 w-4" />
-                                                            </div>
-                                                            <div
-                                                                role="button"
-                                                                onClick={(e) => handleDeletePush(e, push.id)}
-                                                                className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors relative z-10"
-                                                                title="Delete Push"
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </div>
-                                                        </>
-                                                    )}
-                                                    <div className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors relative z-10">
-                                                        <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform duration-200 ${!isCollapsed ? 'rotate-180' : ''}`} />
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-1">
+                                            {isAdmin && (
+                                                <>
+                                                    <div
+                                                        role="button"
+                                                        onClick={(e) => handleEditPush(e, push)}
+                                                        className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-primary/10 hover:text-primary transition-colors relative z-10"
+                                                        title="Edit Push"
+                                                    >
+                                                        <Pencil className="h-4 w-4" />
                                                     </div>
-                                                </div>
-                                            </div>
-
-
-                                        </button>
-                                    </CollapsibleTrigger>
-                                    <CollapsibleContent>
-                                        <div className="p-4 pt-0 border-t bg-muted/10">
-                                            <div className="pt-4">
-                                                {renderPushBoard(pushColumns, push.id)}
+                                                    <div
+                                                        role="button"
+                                                        onClick={(e) => handleDeletePush(e, push.id)}
+                                                        className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors relative z-10"
+                                                        title="Delete Push"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </div>
+                                                </>
+                                            )}
+                                            <div className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors relative z-10">
+                                                <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
                                             </div>
                                         </div>
-                                    </CollapsibleContent>
-                                </div>
-                            </Collapsible>
+                                    </div>
+                                </button>
+
+                                <AnimatePresence initial={false}>
+                                    {isOpen && (
+                                        <motion.div
+                                            id={contentId}
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: "auto", opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                                            style={{ overflow: "hidden" }}
+                                        >
+                                            <div className="p-4 pt-0 border-t bg-muted/10 rounded-b-lg">
+                                                <div className="pt-4">
+                                                    {renderPushBoard(pushColumns, push.id)}
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
                         )
                     })
                     }

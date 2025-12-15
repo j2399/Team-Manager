@@ -54,7 +54,7 @@ export default async function DashboardLayout({
                     <NotificationBell />
                 </header>
 
-                <main className="flex-1 overflow-auto bg-muted/30">
+                <main className="flex-1 overflow-y-scroll overflow-x-hidden bg-muted/30">
                     {children}
                 </main>
             </div>
