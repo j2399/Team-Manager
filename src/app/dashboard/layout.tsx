@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Menu } from "lucide-react"
 import { NotificationBell } from "@/components/NotificationBell"
 import { ThemeClient } from "@/components/ThemeClient"
+import { ProjectNavTransition } from "@/components/ProjectNavTransition"
 
 import { Metadata } from 'next'
 
@@ -57,6 +58,7 @@ export default async function DashboardLayout({
 
                 <main className="flex-1 overflow-y-auto overflow-x-hidden bg-muted/30" style={{ scrollbarGutter: "stable" }}>
                     <ThemeClient userId={user.id} />
+                    <ProjectNavTransition />
                     {children}
                 </main>
             </div>

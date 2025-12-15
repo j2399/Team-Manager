@@ -36,6 +36,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { RemoveScroll } from "react-remove-scroll"
+import { triggerProjectNavTransition } from "@/components/ProjectNavTransition"
 import {
     Dialog,
     DialogContent,
@@ -240,6 +241,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                         "flex-1 flex items-center rounded-md px-3 py-1.5 text-sm transition-colors truncate",
                         isActive ? "font-medium" : "text-muted-foreground group-hover:text-foreground"
                     )}
+                    onClick={() => triggerProjectNavTransition(projectColor)}
                 >
                     <span className="truncate">{project.name}</span>
                 </Link>
