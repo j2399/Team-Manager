@@ -95,6 +95,19 @@ function hexToRgba(hex: string, alpha: number) {
     return `rgba(${r}, ${g}, ${b}, ${clampedAlpha})`
 }
 
+const PROJECT_COLOR_OPTIONS = [
+    "#ef4444", // red
+    "#f97316", // orange
+    "#f59e0b", // amber
+    "#22c55e", // green
+    "#14b8a6", // teal
+    "#06b6d4", // cyan
+    "#3b82f6", // blue
+    "#6366f1", // indigo
+    "#8b5cf6", // violet
+    "#ec4899", // pink
+] as const
+
 export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserData> } = {}) {
     const pathname = usePathname()
     const router = useRouter()
@@ -122,6 +135,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
     const [newProjectLeadId, setNewProjectLeadId] = React.useState("none")
     const [editLeadId, setEditLeadId] = React.useState<string>("none")
     const [selectedMemberIds, setSelectedMemberIds] = React.useState<string[]>([])
+    const [editColor, setEditColor] = React.useState<string>("#3b82f6")
 
     const isAdmin = userData.role === 'Admin' || userData.role === 'Team Lead'
 
@@ -287,6 +301,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
         if (editingProject) {
             setEditLeadId(editingProject.leadId || "none")
             setSelectedMemberIds(editingProject.members?.map(m => m.userId) || [])
+            setEditColor(editingProject.color || "#3b82f6")
         } else {
             setSelectedMemberIds([])
         }
@@ -373,7 +388,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
 	                body: JSON.stringify({
 	                    name: formData.get('name'),
 	                    description: formData.get('description'),
-	                    color: formData.get('color'),
+	                    color: editColor,
 	                    leadId: editLeadId === 'none' ? null : editLeadId,
 	                    memberIds: selectedMemberIds
 	                })
@@ -654,13 +669,23 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
 	                            </div>
 	                            <div className="grid gap-1.5">
 	                                <Label htmlFor="edit-color" className="text-xs">Color</Label>
-	                                <Input
-	                                    id="edit-color"
-	                                    name="color"
-	                                    type="color"
-	                                    defaultValue={editingProject?.color || "#3b82f6"}
-	                                    className="h-8 w-16 p-1"
-	                                />
+                                    <input type="hidden" name="color" value={editColor} />
+                                    <div className="grid grid-cols-10 gap-1.5">
+                                        {PROJECT_COLOR_OPTIONS.map((color) => (
+                                            <button
+                                                key={color}
+                                                type="button"
+                                                onClick={() => setEditColor(color)}
+                                                className={cn(
+                                                    "h-6 w-6 rounded-md ring-1 ring-border/60 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                                    editColor === color ? "ring-2 ring-foreground/70 scale-[1.02]" : "hover:scale-[1.02]"
+                                                )}
+                                                style={{ backgroundColor: color }}
+                                                aria-label={`Set project color to ${color}`}
+                                                title={color}
+                                            />
+                                        ))}
+                                    </div>
 	                            </div>
 	                            <div className="grid gap-1.5">
 	                                <Label className="text-xs">Project Lead</Label>
