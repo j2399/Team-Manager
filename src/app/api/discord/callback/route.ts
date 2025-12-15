@@ -96,14 +96,27 @@ export async function GET(request: Request) {
 
         if (user) {
             // EXISTING USER: Login & Skip Onboarding
+            const discordDisplayName: string = discordUser.global_name || discordUser.username
+            const nextUserData: {
+                avatar: string | null
+                discordId: string
+                hasOnboarded: true
+                name?: string
+            } = {
+                avatar: discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png` : null,
+                discordId: discordUser.id,
+                hasOnboarded: true // Auto-onboard returning users
+            }
+
+            // Only sync name from Discord if the user hasn't completed onboarding yet.
+            // Once a user customizes their name in CuPI, we should not overwrite it on re-login.
+            if (!user.hasOnboarded) {
+                nextUserData.name = discordDisplayName
+            }
+
             await prisma.user.update({
                 where: { id: user.id },
-                data: {
-                    name: discordUser.global_name || discordUser.username,
-                    avatar: discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png` : null,
-                    discordId: discordUser.id,
-                    hasOnboarded: true // Auto-onboard returning users
-                }
+                data: nextUserData
             })
 
             // Redirect to Workspaces

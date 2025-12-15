@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useTransition, useEffect } from "react"
+import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -14,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
 
 export function WorkspaceSelector({ user }: { user: any }) {
+    const router = useRouter()
     const [isPending, startTransition] = useTransition()
     const [createError, setCreateError] = useState<string | null>(null)
     const [joinError, setJoinError] = useState<string | null>(null)
@@ -22,6 +24,7 @@ export function WorkspaceSelector({ user }: { user: any }) {
 
     // Profile Edit State
     const [profileOpen, setProfileOpen] = useState(false)
+    const [displayName, setDisplayName] = useState(user.name || '')
     const [editName, setEditName] = useState(user.name || '')
     const [editSkills, setEditSkills] = useState<string[]>(user.skills || [])
     const [editInterests, setEditInterests] = useState(user.interests || '')
@@ -31,8 +34,6 @@ export function WorkspaceSelector({ user }: { user: any }) {
     // Delete Account State
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
     const [deleteConfirmation, setDeleteConfirmation] = useState("")
-
-    const displayName = user.name || ''
 
     // Custom notification state
     const [notification, setNotification] = useState<{
@@ -125,6 +126,8 @@ export function WorkspaceSelector({ user }: { user: any }) {
                 return
             }
 
+            setDisplayName(editName.trim())
+            router.refresh()
             setProfileOpen(false)
             setNotification({
                 title: "Profile Updated",

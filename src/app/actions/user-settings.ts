@@ -1,5 +1,7 @@
 "use server"
 
+import { revalidatePath } from "next/cache"
+import { cookies } from "next/headers"
 import prisma from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/auth"
 
@@ -24,6 +26,17 @@ export async function updateDisplayName(newName: string) {
             where: { id: user.id },
             data: { name: newName.trim() }
         })
+
+        // Keep workspace-scoped names in sync with the user's display name.
+        await prisma.workspaceMember.updateMany({
+            where: { userId: user.id },
+            data: { name: newName.trim() }
+        })
+
+        revalidatePath('/dashboard')
+        revalidatePath('/dashboard/settings')
+        revalidatePath('/dashboard/members')
+        revalidatePath('/workspaces')
 
         return { success: true }
     } catch (error) {
@@ -81,8 +94,6 @@ export async function updateDiscordChannel(channelId: string) {
     }
 }
 
-import { cookies } from "next/headers"
-
 export async function deleteAccount() {
     const user = await getCurrentUser()
     if (!user) return { error: "Not authenticated" }
@@ -121,8 +132,6 @@ export async function deleteAccount() {
         return { error: "Failed to delete account" }
     }
 }
-
-import { revalidatePath } from "next/cache"
 
 export async function updateUserDeepDetails(skills: string[], interests: string) {
     const user = await getCurrentUser()
