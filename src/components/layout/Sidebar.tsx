@@ -130,8 +130,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
     const [isChatExpanded, setIsChatExpanded] = React.useState(false)
     const createProjectDialogContentRef = React.useRef<HTMLDivElement | null>(null)
     const editProjectDialogContentRef = React.useRef<HTMLDivElement | null>(null)
-    const [isSettingsSpinning, setIsSettingsSpinning] = React.useState(false)
-    const settingsSpinTimeoutRef = React.useRef<number | null>(null)
+    const [settingsSpinNonce, setSettingsSpinNonce] = React.useState(0)
 
     // Form state for editing
     const [newProjectLeadId, setNewProjectLeadId] = React.useState("none")
@@ -163,14 +162,6 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
         const interval = setInterval(fetchUserData, 2000)
         return () => clearInterval(interval)
     }, [fetchUserData])
-
-    React.useEffect(() => {
-        return () => {
-            if (settingsSpinTimeoutRef.current) {
-                window.clearTimeout(settingsSpinTimeoutRef.current)
-            }
-        }
-    }, [])
 
     // Fetch projects with lead info
     const fetchProjects = React.useCallback(() => {
@@ -459,16 +450,16 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                         aria-label="Workspace settings"
                         title="Settings"
                         onClick={() => {
-                            setIsSettingsSpinning(true)
-                            if (settingsSpinTimeoutRef.current) {
-                                window.clearTimeout(settingsSpinTimeoutRef.current)
-                            }
-                            settingsSpinTimeoutRef.current = window.setTimeout(() => {
-                                setIsSettingsSpinning(false)
-                            }, 700)
+                            setSettingsSpinNonce((n) => n + 1)
                         }}
                     >
-                        <Settings className={cn("h-4 w-4 text-muted-foreground", isSettingsSpinning && "animate-spin")} />
+                        <Settings
+                            key={settingsSpinNonce}
+                            className={cn(
+                                "h-4 w-4 text-muted-foreground",
+                                settingsSpinNonce > 0 && "motion-safe:animate-[cupi-gear-impulse_1200ms_ease-out_both]"
+                            )}
+                        />
                     </Link>
                 </Button>
             </div>

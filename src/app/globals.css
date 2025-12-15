@@ -168,3 +168,21 @@
 .animate-highlight-fade {
   animation: highlight-fade 2s ease-out forwards;
 }
+
+@keyframes cupi-gear-impulse {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  18% {
+    transform: rotate(540deg);
+  }
+
+  45% {
+    transform: rotate(660deg);
+  }
+
+  100% {
+    transform: rotate(720deg);
+  }
+}
