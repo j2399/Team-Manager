@@ -201,7 +201,7 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                 </div>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-hidden">
+            <div className="flex-1 min-h-0">
                 {view === 'kanban' ? (
                     board ? (
                         <Board

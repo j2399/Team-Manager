@@ -68,7 +68,7 @@ export function Column({ column, projectId, onEditTask, onAddTask, isDoneColumn,
     return (
         <div
             ref={setDroppableRef}
-            className={`flex w-full flex-col rounded-lg p-3 transition-all min-h-[150px] md:min-h-0 md:h-full ${getBgClass()} ${isDropDisabled ? 'opacity-50' : ''}`}
+            className={`flex w-full min-w-0 flex-col rounded-lg p-3 transition-all min-h-[150px] ${getBgClass()} ${isDropDisabled ? 'opacity-50' : ''}`}
         >
             <div className="flex items-center gap-2 mb-3 px-1">
                 <h3 className={`font-medium text-sm ${isDoneColumn ? 'text-emerald-700' : ''}`}>{column.name}</h3>
@@ -86,7 +86,7 @@ export function Column({ column, projectId, onEditTask, onAddTask, isDoneColumn,
                 )}
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-2 px-2 pb-2 pt-1">
+            <div className="space-y-2 px-2 pb-2 pt-1">
                 <SortableContext items={column.tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
                     {column.tasks.map(task => (
                         <TaskCard

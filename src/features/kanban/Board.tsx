@@ -641,29 +641,31 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
     }
 
     const renderPushBoard = (pushColumns: ColumnData[], pushId: string | null) => (
-        <div className="w-full min-w-0 overflow-x-auto pb-4 custom-scrollbar overscroll-x-contain">
-            <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:min-w-max min-h-[200px] md:min-h-[300px]">
-                {pushColumns.sort((a, b) => a.order - b.order).map(col => (
-                    <div key={`${pushId || 'backlog'}-${col.id}`} className="w-full md:w-[320px] md:shrink-0 min-w-0">
-                        <Column
-                            column={col}
-                            projectId={projectId}
-                            users={users}
-                            onEditTask={setPreviewingTask}
-                            onAddTask={(col.name === 'Todo' || col.name === 'To Do') ? () => {
-                                setCreatingColumnId(col.id)
-                                setCreatingPushId(pushId)
-                            } : undefined}
-                            isDoneColumn={col.name === 'Done'}
-                            isReviewColumn={col.name === 'Review'}
-                            userRole={userRole}
-                            isFlashing={flashingColumnId === `${pushId || 'backlog'}::${col.id}`}
-                            pushId={pushId}
-                            highlightTaskId={highlightTaskId}
-                            currentUserId={userId}
-                        />
-                    </div>
-                ))}
+        <div className="w-full min-w-0 pb-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {pushColumns
+                    .sort((a, b) => a.order - b.order)
+                    .map((col) => (
+                        <div key={`${pushId || 'backlog'}-${col.id}`} className="min-w-0">
+                            <Column
+                                column={col}
+                                projectId={projectId}
+                                users={users}
+                                onEditTask={setPreviewingTask}
+                                onAddTask={(col.name === 'Todo' || col.name === 'To Do') ? () => {
+                                    setCreatingColumnId(col.id)
+                                    setCreatingPushId(pushId)
+                                } : undefined}
+                                isDoneColumn={col.name === 'Done'}
+                                isReviewColumn={col.name === 'Review'}
+                                userRole={userRole}
+                                isFlashing={flashingColumnId === `${pushId || 'backlog'}::${col.id}`}
+                                pushId={pushId}
+                                highlightTaskId={highlightTaskId}
+                                currentUserId={userId}
+                            />
+                        </div>
+                    ))}
             </div>
         </div>
     )
@@ -671,11 +673,10 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
     return (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
             <div
-                className="flex flex-col h-full min-w-0 overflow-y-scroll overflow-x-hidden"
-                style={{ scrollbarGutter: "stable" }}
+                className="flex flex-col min-w-0"
             >
 
-                <div className="flex-1 p-4 space-y-4">
+                <div className="p-4 space-y-4">
                     {pushes.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-[50vh] text-muted-foreground border-2 border-dashed rounded-xl m-4 bg-muted/10">
                             <p className="text-lg font-medium">No pushes yet...</p>
@@ -766,7 +767,7 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
                                     className="grid transition-[grid-template-rows] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
                                     style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
                                 >
-                                    <div className="min-h-0 overflow-hidden">
+                                    <div className={`min-h-0 ${isOpen ? "overflow-visible" : "overflow-hidden"}`}>
                                         <div className={`p-4 pt-0 border-t bg-muted/10 rounded-b-lg transition-opacity duration-150 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
                                             <div className="pt-4">
                                                 {renderPushBoard(pushColumns, push.id)}

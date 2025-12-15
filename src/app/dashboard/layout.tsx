@@ -54,7 +54,7 @@ export default async function DashboardLayout({
                     <NotificationBell />
                 </header>
 
-                <main className="flex-1 overflow-y-scroll overflow-x-hidden bg-muted/30" style={{ scrollbarGutter: "stable" }}>
+                <main className="flex-1 overflow-y-auto overflow-x-hidden bg-muted/30" style={{ scrollbarGutter: "stable" }}>
                     {children}
                 </main>
             </div>
