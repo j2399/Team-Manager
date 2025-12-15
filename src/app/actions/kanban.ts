@@ -2,8 +2,9 @@
 
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import { notifyTaskCreated, notifyTaskCompleted, notifyTaskSubmittedForReview, notifyTaskUpdated } from '@/lib/discord'
+import { sendDiscordNotification } from '@/lib/discord'
 import { getCurrentUser } from '@/lib/auth'
+import { appUrl } from '@/lib/appUrl'
 
 type CreateTaskInput = {
     title: string
@@ -123,27 +124,41 @@ export async function createTask(input: CreateTaskInput) {
             })
         }
 
-        // Get project name and workspace ID for Discord notification
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { name: true, workspaceId: true }
-        })
+        // Discord: ping only when someone is assigned
+        const assignedIds = Array.from(new Set([
+            ...(assigneeId && assigneeId !== "" ? [assigneeId] : []),
+            ...(input.assigneeIds || []),
+        ]))
 
-        // Send Discord notification
-        if (project) {
-            let webhookUrl: string | null = null
-            if (project.workspaceId) {
+        if (assignedIds.length > 0) {
+            const project = await prisma.project.findUnique({
+                where: { id: projectId },
+                select: { id: true, name: true, workspaceId: true }
+            })
+
+            if (project?.workspaceId) {
                 const workspace = await prisma.workspace.findUnique({
                     where: { id: project.workspaceId },
                     select: { discordChannelId: true }
                 })
-                webhookUrl = workspace?.discordChannelId || null
-            }
+                const webhookUrl = workspace?.discordChannelId || null
 
-            try {
-                await notifyTaskCreated(task.title, project.name, task.assignee?.name, task.assignee?.discordId, webhookUrl)
-            } catch (err) {
-                console.error('Discord notifyTaskCreated failed:', err)
+                if (webhookUrl) {
+                    const assignedUsers = await prisma.user.findMany({
+                        where: { id: { in: assignedIds }, discordId: { not: null } },
+                        select: { discordId: true }
+                    })
+                    const mentions = assignedUsers.map((u) => (u.discordId ? `<@${u.discordId}>` : "")).filter(Boolean).join(" ")
+
+                    if (mentions) {
+                        const projectLink = appUrl(`/dashboard/projects/${projectId}?task=${task.id}`)
+                        await sendDiscordNotification(
+                            `${mentions}\nYou were assigned: **${task.title}**\nProject: **${project.name}**\n${projectLink}`,
+                            undefined,
+                            webhookUrl
+                        )
+                    }
+                }
             }
         }
 
@@ -244,31 +259,31 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
         // Revalidate the project path to update the UI
         revalidatePath(`/dashboard/projects/${projectId}`)
 
-        // Send Discord notification based on column
-        const projectName = updatedTask.column?.board?.project?.name || 'Unknown Project'
-        const workspaceId = updatedTask.column?.board?.project?.workspaceId
-        const userName = user?.name || 'Someone'
-
-        let webhookUrl: string | null = null
-        if (workspaceId) {
-            const workspace = await prisma.workspace.findUnique({
-                where: { id: workspaceId },
-                select: { discordChannelId: true }
+        // Discord: only ping when task is moved into Review (ping the project lead)
+        if (targetColumnName === 'Review') {
+            const project = await prisma.project.findUnique({
+                where: { id: projectId },
+                select: {
+                    name: true,
+                    workspaceId: true,
+                    lead: { select: { name: true, discordId: true } }
+                }
             })
-            webhookUrl = workspace?.discordChannelId || null
-        }
 
-        if (targetColumnName === 'Done') {
-            try {
-                await notifyTaskCompleted(updatedTask.title, projectName, userName, user.discordId, webhookUrl)
-            } catch (err) {
-                console.error('Discord notifyTaskCompleted failed:', err)
-            }
-        } else if (targetColumnName === 'Review') {
-            try {
-                await notifyTaskSubmittedForReview(updatedTask.title, projectName, userName, user.discordId, webhookUrl)
-            } catch (err) {
-                console.error('Discord notifyTaskSubmittedForReview failed:', err)
+            if (project?.workspaceId && project.lead?.discordId) {
+                const workspace = await prisma.workspace.findUnique({
+                    where: { id: project.workspaceId },
+                    select: { discordChannelId: true }
+                })
+                const webhookUrl = workspace?.discordChannelId || null
+                if (webhookUrl) {
+                    const dashboardLink = appUrl('/dashboard')
+                    await sendDiscordNotification(
+                        `<@${project.lead.discordId}>\n**${updatedTask.title}** was moved to **Review**.\n${dashboardLink}`,
+                        undefined,
+                        webhookUrl
+                    )
+                }
             }
         }
 
@@ -290,7 +305,8 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
         const task = await prisma.task.findUnique({
             where: { id: taskId },
             include: {
-                column: { include: { board: { include: { project: { select: { name: true, workspaceId: true } } } } } },
+                assignees: { select: { userId: true } },
+                column: { include: { board: { include: { project: { select: { id: true, name: true, workspaceId: true } } } } } },
                 assignee: { select: { name: true } }
             }
         })
@@ -315,6 +331,11 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
         // Track all changes
         const changes: Array<{ field: string; oldValue: string; newValue: string }> = []
         const activityLogs: Array<{ action: string; field: string; oldValue: string; newValue: string; changedBy: string; changedByName: string }> = []
+
+        const oldAssignedIds = new Set<string>([
+            ...(task.assigneeId ? [task.assigneeId] : []),
+            ...task.assignees.map((a) => a.userId),
+        ])
 
         // Get old assignee name for comparison
         const oldAssigneeName = task.assignee?.name || 'Unassigned'
@@ -398,6 +419,18 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
             }
         }
 
+        const nextAssignedIds = new Set<string>([...oldAssignedIds])
+        if (input.assigneeIds !== undefined) {
+            nextAssignedIds.clear()
+            for (const id of input.assigneeIds) nextAssignedIds.add(id)
+        }
+        if (input.assigneeId !== undefined) {
+            if (task.assigneeId) nextAssignedIds.delete(task.assigneeId)
+            if (input.assigneeId && input.assigneeId !== "") nextAssignedIds.add(input.assigneeId)
+        }
+
+        const newlyAssignedIds = Array.from(nextAssignedIds).filter((id) => !oldAssignedIds.has(id))
+
         // Update task
         await prisma.task.update({
             where: { id: taskId },
@@ -429,6 +462,38 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
             }
         }
 
+        // Discord: only ping when someone is newly assigned
+        if (newlyAssignedIds.length > 0) {
+            const workspaceId = task.column?.board?.project?.workspaceId
+            const projectName = task.column?.board?.project?.name || 'Unknown Project'
+            const projectId = task.column?.board?.project?.id
+
+            if (workspaceId && projectId) {
+                const workspace = await prisma.workspace.findUnique({
+                    where: { id: workspaceId },
+                    select: { discordChannelId: true }
+                })
+                const webhookUrl = workspace?.discordChannelId || null
+
+                if (webhookUrl) {
+                    const assignedUsers = await prisma.user.findMany({
+                        where: { id: { in: newlyAssignedIds }, discordId: { not: null } },
+                        select: { discordId: true }
+                    })
+                    const mentions = assignedUsers.map((u) => (u.discordId ? `<@${u.discordId}>` : "")).filter(Boolean).join(" ")
+
+                    if (mentions) {
+                        const projectLink = appUrl(`/dashboard/projects/${projectId}?task=${taskId}`)
+                        await sendDiscordNotification(
+                            `${mentions}\nYou were assigned: **${task.title}**\nProject: **${projectName}**\n${projectLink}`,
+                            undefined,
+                            webhookUrl
+                        )
+                    }
+                }
+            }
+        }
+
         // Create activity logs
         if (activityLogs.length > 0) {
             // Get task title for activity logs
@@ -447,19 +512,7 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
                 }))
             })
 
-            // Notify admins if there are changes
-            if (changes.length > 0 && task.column?.board?.project?.workspaceId) {
-                const workspaceId = task.column.board.project.workspaceId
-
-                const workspace = await prisma.workspace.findUnique({
-                    where: { id: workspaceId },
-                    select: { discordChannelId: true }
-                })
-                const webhookUrl = workspace?.discordChannelId || null
-
-                const projectName = task.column?.board?.project?.name || 'Unknown Project'
-                await notifyTaskUpdated(task.title, projectName, user.name || 'Unknown', changes, webhookUrl)
-            }
+            // Discord notifications intentionally limited to assignment/review/chat mention pings.
         }
 
         if (task?.column?.board?.projectId) {

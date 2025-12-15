@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import prisma from '@/lib/prisma'
-import { notifyUserJoined } from '@/lib/discord'
 
 export async function POST(request: Request) {
     try {
@@ -79,13 +78,9 @@ export async function POST(request: Request) {
             path: '/',
         })
 
-        // Send Discord notification
-        notifyUserJoined(name.trim())
-
         return NextResponse.json({ success: true, userId: user.id })
     } catch (error) {
         console.error('Registration error:', error)
         return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
     }
 }
-

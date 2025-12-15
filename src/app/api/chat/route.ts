@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { appUrl } from '@/lib/appUrl'
 
 export async function GET(request: Request) {
     try {
@@ -113,7 +114,8 @@ export async function POST(request: Request) {
 
             // 3. Send to Discord
             // We prepend the author name
-            const finalMessage = `**[Chat] ${user.name || 'User'}:** ${discordContent}`
+            const workspaceLink = appUrl('/dashboard')
+            const finalMessage = `**[Chat] ${user.name || 'User'}:** ${discordContent}\n${workspaceLink}`
 
             // Only send if it has mentions (User asked: "only bring chats to the discrod if they at somehting")
             if (hasMentions && workspace?.discordChannelId) {
