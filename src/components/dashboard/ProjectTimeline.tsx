@@ -76,57 +76,108 @@ export function ProjectTimeline({ tasks }: ProjectTimelineProps) {
 
             <div className="space-y-4">
                 {Object.values(byProject).map(project => (
-                    <div key={project.id} className="border rounded-md bg-card overflow-hidden">
-                        <div className="bg-muted/30 px-3 py-1.5 border-b flex justify-between items-center">
-                            <span className="text-[10px] font-semibold">{project.name}</span>
-                        </div>
-                        <div className="p-2 relative bg-muted/10">
-                            {/* Grid lines could go here */}
-
-                            {/* Today Marker */}
-                            {todayPos !== null && todayPos >= 0 && todayPos <= 100 && (
-                                <div
-                                    className="absolute top-0 bottom-0 w-px bg-red-400 z-10 pointer-events-none opacity-50 dashed-line"
-                                    style={{ left: `${todayPos}%` }}
-                                >
-                                    <div className="w-1.5 h-1.5 bg-red-400 rounded-full -ml-[2px] -mt-[3px]" />
+                    project.id !== 'unknown' ? (
+                        <Link
+                            key={project.id}
+                            href={`/dashboard/projects/${project.id}?view=gantt`}
+                            className="block"
+                        >
+                            <div className="border rounded-md bg-card overflow-hidden hover:bg-muted/30 transition-colors">
+                                <div className="bg-muted/30 px-3 py-1.5 border-b flex justify-between items-center">
+                                    <span className="text-[10px] font-semibold">{project.name}</span>
+                                    <Calendar className="h-3 w-3 text-muted-foreground" />
                                 </div>
-                            )}
-
-                            <div className="space-y-1">
-                                {project.tasks.slice(0, 8).map(task => { // Limit to 8 tasks per project to save space
-                                    const left = getPosition(new Date(task.startDate!))
-                                    const right = getPosition(new Date(task.endDate!))
-                                    const width = Math.max(right - left, 2) // Minimum width
-
-                                    // Color by push or default blue
-                                    const barColor = task.push?.color || '#3b82f6' // Default blue-500 hex
-
-                                    return (
-                                        <div key={task.id} className="relative h-4 flex items-center group">
-                                            {/* Bar */}
-                                            <div
-                                                className="absolute h-2 rounded-full opacity-80 hover:opacity-100 transition-opacity cursor-pointer shadow-sm"
-                                                style={{
-                                                    left: `${left}%`,
-                                                    width: `${width}%`,
-                                                    backgroundColor: barColor
-                                                }}
-                                                title={`${task.title} (${task.push?.name || 'No Push'})`}
-                                            />
-                                            {/* Label - visible on hover or if space permits? Keeps it minimal */}
-                                            <span
-                                                className="absolute text-[8px] text-muted-foreground truncate w-24 pl-1"
-                                                style={{ left: `${left + width}%` }}
-                                            >
-                                                {task.title}
-                                            </span>
+                                <div className="p-2 relative bg-muted/10">
+                                    {/* Today Marker */}
+                                    {todayPos !== null && todayPos >= 0 && todayPos <= 100 && (
+                                        <div
+                                            className="absolute top-0 bottom-0 w-px bg-red-400 z-10 pointer-events-none opacity-50 dashed-line"
+                                            style={{ left: `${todayPos}%` }}
+                                        >
+                                            <div className="w-1.5 h-1.5 bg-red-400 rounded-full -ml-[2px] -mt-[3px]" />
                                         </div>
-                                    )
-                                })}
+                                    )}
+
+                                    <div className="space-y-1">
+                                        {project.tasks.slice(0, 8).map(task => { // Limit to 8 tasks per project to save space
+                                            const left = getPosition(new Date(task.startDate!))
+                                            const right = getPosition(new Date(task.endDate!))
+                                            const width = Math.max(right - left, 2) // Minimum width
+
+                                            // Color by push or default blue
+                                            const barColor = task.push?.color || '#3b82f6' // Default blue-500 hex
+
+                                            return (
+                                                <div key={task.id} className="relative h-4 flex items-center">
+                                                    {/* Bar */}
+                                                    <div
+                                                        className="absolute h-2 rounded-full opacity-80 hover:opacity-100 transition-opacity shadow-sm"
+                                                        style={{
+                                                            left: `${left}%`,
+                                                            width: `${width}%`,
+                                                            backgroundColor: barColor
+                                                        }}
+                                                        title={`${task.title} (${task.push?.name || 'No Push'})`}
+                                                    />
+                                                    {/* Label */}
+                                                    <span
+                                                        className="absolute text-[8px] text-muted-foreground truncate w-24 pl-1"
+                                                        style={{ left: `${left + width}%` }}
+                                                    >
+                                                        {task.title}
+                                                    </span>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        </Link>
+                    ) : (
+                        <div key={project.id} className="border rounded-md bg-card overflow-hidden">
+                            <div className="bg-muted/30 px-3 py-1.5 border-b flex justify-between items-center">
+                                <span className="text-[10px] font-semibold">{project.name}</span>
+                            </div>
+                            <div className="p-2 relative bg-muted/10">
+                                {todayPos !== null && todayPos >= 0 && todayPos <= 100 && (
+                                    <div
+                                        className="absolute top-0 bottom-0 w-px bg-red-400 z-10 pointer-events-none opacity-50 dashed-line"
+                                        style={{ left: `${todayPos}%` }}
+                                    >
+                                        <div className="w-1.5 h-1.5 bg-red-400 rounded-full -ml-[2px] -mt-[3px]" />
+                                    </div>
+                                )}
+                                <div className="space-y-1">
+                                    {project.tasks.slice(0, 8).map(task => {
+                                        const left = getPosition(new Date(task.startDate!))
+                                        const right = getPosition(new Date(task.endDate!))
+                                        const width = Math.max(right - left, 2)
+                                        const barColor = task.push?.color || '#3b82f6'
+
+                                        return (
+                                            <div key={task.id} className="relative h-4 flex items-center">
+                                                <div
+                                                    className="absolute h-2 rounded-full opacity-80 shadow-sm"
+                                                    style={{
+                                                        left: `${left}%`,
+                                                        width: `${width}%`,
+                                                        backgroundColor: barColor
+                                                    }}
+                                                    title={`${task.title} (${task.push?.name || 'No Push'})`}
+                                                />
+                                                <span
+                                                    className="absolute text-[8px] text-muted-foreground truncate w-24 pl-1"
+                                                    style={{ left: `${left + width}%` }}
+                                                >
+                                                    {task.title}
+                                                </span>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )
                 ))}
             </div>
         </div>

@@ -126,8 +126,18 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
 
     const handleClosePreview = () => {
         setPreviewTask(null)
-        // Clean URL
-        window.history.replaceState({}, '', `/dashboard/projects/${project.id}`)
+        const nextParams = new URLSearchParams(searchParams.toString())
+        nextParams.delete('task')
+
+        if (view === 'gantt') nextParams.set('view', 'gantt')
+        else nextParams.delete('view')
+
+        const query = nextParams.toString()
+        window.history.replaceState(
+            {},
+            '',
+            query ? `/dashboard/projects/${project.id}?${query}` : `/dashboard/projects/${project.id}`
+        )
     }
 
     return (
@@ -241,7 +251,18 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                         onOpenChange={(open) => {
                             if (!open) {
                                 setEditTask(null)
-                                window.history.replaceState({}, '', `/dashboard/projects/${project.id}`)
+                                const nextParams = new URLSearchParams(searchParams.toString())
+                                nextParams.delete('task')
+
+                                if (view === 'gantt') nextParams.set('view', 'gantt')
+                                else nextParams.delete('view')
+
+                                const query = nextParams.toString()
+                                window.history.replaceState(
+                                    {},
+                                    '',
+                                    query ? `/dashboard/projects/${project.id}?${query}` : `/dashboard/projects/${project.id}`
+                                )
                             }
                         }}
                     />
