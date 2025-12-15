@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/auth"
+import { sendDiscordNotification } from "@/lib/discord"
 
 export async function updateDisplayName(newName: string) {
     const user = await getCurrentUser()
@@ -36,14 +37,51 @@ export async function updateDiscordChannel(channelId: string) {
     const user = await getCurrentUser()
     if (!user || !user.workspaceId) return { error: "Not authenticated" }
 
-    if (user.role !== 'Admin') {
+    const canManageDiscord = user.role === 'Admin' || user.role === 'Team Lead'
+    if (!canManageDiscord) {
         return { error: "Only admins can change this setting" }
     }
 
+    const trimmed = channelId.trim()
+    if (!trimmed) {
+        try {
+            await prisma.workspace.update({
+                where: { id: user.workspaceId },
+                data: { discordChannelId: null }
+            })
+            return { success: true }
+        } catch (error) {
+            console.error("Update Discord channel error:", error)
+            return { error: "Failed to update Discord channel" }
+        }
+    }
+
+    let webhookUrl: string
     try {
+        const parsed = new URL(trimmed)
+        const hostnameOk = /(^|\.)discord(app)?\.com$/.test(parsed.hostname)
+        const pathOk = parsed.pathname.includes("/api/webhooks/")
+        if (parsed.protocol !== "https:" || !hostnameOk || !pathOk) {
+            return { error: "Please enter a valid Discord webhook URL" }
+        }
+        webhookUrl = parsed.toString()
+    } catch {
+        return { error: "Please enter a valid Discord webhook URL" }
+    }
+
+    try {
+        const pinged = await sendDiscordNotification(
+            "✅ CuPI Platform connected. Notifications will be sent to this channel.",
+            undefined,
+            webhookUrl
+        )
+        if (!pinged) {
+            return { error: "Couldn't ping that webhook. Double-check the URL and try again." }
+        }
+
         await prisma.workspace.update({
             where: { id: user.workspaceId },
-            data: { discordChannelId: channelId.trim() || null }
+            data: { discordChannelId: webhookUrl }
         })
 
         return { success: true }

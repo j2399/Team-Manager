@@ -25,7 +25,8 @@ export async function POST() {
                             include: {
                                 project: {
                                     select: {
-                                        name: true
+                                        name: true,
+                                        workspaceId: true
                                     }
                                 }
                             }
@@ -40,18 +41,36 @@ export async function POST() {
             }
         })
 
+        const workspaceIds = Array.from(new Set(
+            overdueTasks
+                .map((t) => t.column?.board?.project?.workspaceId)
+                .filter((id): id is string => Boolean(id))
+        ))
+
+        const workspaces = workspaceIds.length
+            ? await prisma.workspace.findMany({
+                where: { id: { in: workspaceIds } },
+                select: { id: true, discordChannelId: true }
+            })
+            : []
+
+        const webhookByWorkspaceId = new Map(workspaces.map((w) => [w.id, w.discordChannelId]))
+
         // Send notifications for each overdue task
         const notifications = overdueTasks.map(async (task) => {
             if (!task.endDate) return
             
             const daysOverdue = Math.ceil((now.getTime() - task.endDate.getTime()) / (1000 * 60 * 60 * 24))
             const projectName = task.column?.board?.project?.name || 'Unknown Project'
+            const workspaceId = task.column?.board?.project?.workspaceId
+            const webhookUrl = workspaceId ? webhookByWorkspaceId.get(workspaceId) : null
             
             await notifyTaskOverdue(
                 task.title,
                 projectName,
                 daysOverdue,
-                task.assignee?.name
+                task.assignee?.name,
+                webhookUrl
             )
         })
 
@@ -69,5 +88,4 @@ export async function POST() {
         )
     }
 }
-
 

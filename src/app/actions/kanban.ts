@@ -140,7 +140,11 @@ export async function createTask(input: CreateTaskInput) {
                 webhookUrl = workspace?.discordChannelId || null
             }
 
-            notifyTaskCreated(task.title, project.name, task.assignee?.name, task.assignee?.discordId, webhookUrl)
+            try {
+                await notifyTaskCreated(task.title, project.name, task.assignee?.name, task.assignee?.discordId, webhookUrl)
+            } catch (err) {
+                console.error('Discord notifyTaskCreated failed:', err)
+            }
         }
 
         revalidatePath(`/dashboard/projects/${projectId}`)
@@ -255,9 +259,17 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
         }
 
         if (targetColumnName === 'Done') {
-            notifyTaskCompleted(updatedTask.title, projectName, userName, user.discordId, webhookUrl)
+            try {
+                await notifyTaskCompleted(updatedTask.title, projectName, userName, user.discordId, webhookUrl)
+            } catch (err) {
+                console.error('Discord notifyTaskCompleted failed:', err)
+            }
         } else if (targetColumnName === 'Review') {
-            notifyTaskSubmittedForReview(updatedTask.title, projectName, userName, user.discordId, webhookUrl)
+            try {
+                await notifyTaskSubmittedForReview(updatedTask.title, projectName, userName, user.discordId, webhookUrl)
+            } catch (err) {
+                console.error('Discord notifyTaskSubmittedForReview failed:', err)
+            }
         }
 
         return { success: true }
