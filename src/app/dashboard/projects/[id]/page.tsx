@@ -151,6 +151,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
             project={{
                 id: project.id,
                 name: project.name,
+                color: project.color,
                 lead: project.lead
             }}
             board={board}
@@ -159,4 +160,3 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         />
     )
 }
-

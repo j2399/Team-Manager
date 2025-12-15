@@ -16,6 +16,7 @@ import { useToast } from "@/components/ui/use-toast"
 type Project = {
     id: string
     name: string
+    color?: string | null
 }
 
 export function ProjectSelect({
@@ -97,9 +98,15 @@ export function ProjectSelect({
                             <Checkbox
                                 checked={selectedProjectIds.includes(project.id)}
                             />
-                            <Label className="text-sm font-normal cursor-pointer flex-1">
-                                {project.name}
-                            </Label>
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <span
+                                    className="h-2 w-2 rounded-full shrink-0 ring-1 ring-border/50"
+                                    style={{ backgroundColor: project.color || "#3b82f6" }}
+                                />
+                                <Label className="text-sm font-normal cursor-pointer flex-1 truncate">
+                                    {project.name}
+                                </Label>
+                            </div>
                         </div>
                     ))}
                     {allProjects.length === 0 && (
@@ -122,4 +129,3 @@ export function ProjectSelect({
         </Popover>
     )
 }
-

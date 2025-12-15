@@ -55,6 +55,7 @@ type ProjectContentProps = {
     project: {
         id: string
         name: string
+        color?: string | null
         lead: { id: string; name: string } | null
     }
     board: {
@@ -133,16 +134,20 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
         <div className="flex flex-col h-full">
             <div className="shrink-0 border-b bg-background">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 p-3">
-                    <div className="flex items-center gap-2 md:gap-3">
-                        <Button variant="ghost" size="icon" asChild className="h-7 w-7 shrink-0">
-                            <Link href="/dashboard">
-                                <ArrowLeft className="w-4 h-4" />
-                            </Link>
-                        </Button>
-                        <h1 className="text-base md:text-lg font-semibold truncate">{project.name}</h1>
-                        {canManagePushes && view === 'kanban' && (
-                            <Button
-                                variant="outline"
+	                    <div className="flex items-center gap-2 md:gap-3">
+	                        <Button variant="ghost" size="icon" asChild className="h-7 w-7 shrink-0">
+	                            <Link href="/dashboard">
+	                                <ArrowLeft className="w-4 h-4" />
+	                            </Link>
+	                        </Button>
+	                        <div
+	                            className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-border/50"
+	                            style={{ backgroundColor: project.color || "#3b82f6" }}
+	                        />
+	                        <h1 className="text-base md:text-lg font-semibold truncate">{project.name}</h1>
+	                        {canManagePushes && view === 'kanban' && (
+	                            <Button
+	                                variant="outline"
                                 size="sm"
                                 className="h-7 px-2 md:px-3 shrink-0"
                                 onClick={() => setShowPushDialog(true)}

@@ -47,6 +47,7 @@ model Project {
   id          String   @id @default(cuid())
   name        String
   description String?
+  color       String   @default("#3b82f6")
   lead        User?    @relation("ProjectLead", fields: [leadId], references: [id], onDelete: SetNull)
   leadId      String?
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)

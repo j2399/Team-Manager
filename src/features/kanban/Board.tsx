@@ -683,8 +683,13 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
                     {[...pushes].sort((a, b) => {
                         const aComplete = isPushComplete(a.id)
                         const bComplete = isPushComplete(b.id)
-                        if (aComplete === bComplete) return 0
-                        return aComplete ? 1 : -1
+                        if (aComplete !== bComplete) return aComplete ? 1 : -1
+
+                        const aStart = new Date(a.startDate).getTime()
+                        const bStart = new Date(b.startDate).getTime()
+                        if (aStart !== bStart) return aStart - bStart
+
+                        return a.id.localeCompare(b.id)
                     }).map(push => {
                         const pushColumns = getPushTasks(push.id)
                         const isComplete = isPushComplete(push.id)

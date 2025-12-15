@@ -47,7 +47,13 @@ export async function PATCH(
 
         const { id } = await params
         const body = await request.json()
-        const { name, description, difficulty, leadId, memberIds } = body
+        const { name, description, leadId, memberIds, color } = body
+
+        const normalizedColor = typeof color === "string"
+            ? (color.trim().startsWith("#") ? color.trim().toLowerCase() : `#${color.trim().toLowerCase()}`)
+            : null
+        const isValidColor = normalizedColor ? /^#([0-9a-f]{6}|[0-9a-f]{3})$/.test(normalizedColor) : false
+        const colorUpdate = isValidColor ? { color: normalizedColor as string } : {}
 
         const project = await prisma.$transaction(async (tx) => {
             const updatedProject = await tx.project.update({
@@ -55,8 +61,8 @@ export async function PATCH(
                 data: {
                     ...(name !== undefined && { name }),
                     ...(description !== undefined && { description }),
-                    ...(difficulty !== undefined && { difficulty }),
-                    ...(leadId !== undefined && { leadId })
+                    ...(leadId !== undefined && { leadId }),
+                    ...colorUpdate
                 }
             })
 
@@ -164,6 +170,4 @@ export async function DELETE(
         return NextResponse.json({ error: 'Failed' }, { status: 500 })
     }
 }
-
-
 

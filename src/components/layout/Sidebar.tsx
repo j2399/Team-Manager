@@ -44,6 +44,7 @@ type Project = {
     id: string
     name: string
     description: string | null
+    color?: string | null
     leadId: string | null
     lead: { id: string; name: string } | null
     members: { userId: string }[]
@@ -241,16 +242,17 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
         const formData = new FormData(e.currentTarget)
 
         try {
-            const res = await fetch(`/api/projects/${editingProject.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: formData.get('name'),
-                    description: formData.get('description'),
-                    leadId: editLeadId === 'none' ? null : editLeadId,
-                    memberIds: selectedMemberIds
-                })
-            })
+	            const res = await fetch(`/api/projects/${editingProject.id}`, {
+	                method: 'PATCH',
+	                headers: { 'Content-Type': 'application/json' },
+	                body: JSON.stringify({
+	                    name: formData.get('name'),
+	                    description: formData.get('description'),
+	                    color: formData.get('color'),
+	                    leadId: editLeadId === 'none' ? null : editLeadId,
+	                    memberIds: selectedMemberIds
+	                })
+	            })
             if (res.ok) {
                 fetchProjects()
                 setEditingProject(null)
@@ -338,19 +340,23 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                                     projects.map(project => {
                                         const isActive = pathname === `/dashboard/projects/${project.id}`
                                         return (
-                                            <div key={project.id} className="group flex items-center gap-1">
-                                                <Link
-                                                    href={`/dashboard/projects/${project.id}`}
-                                                    className={cn(
-                                                        "flex-1 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-muted truncate",
-                                                        isActive ? "bg-muted font-medium" : "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    {project.name}
-                                                </Link>
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button
+	                                            <div key={project.id} className="group flex items-center gap-1">
+	                                                <Link
+	                                                    href={`/dashboard/projects/${project.id}`}
+	                                                    className={cn(
+	                                                        "flex-1 flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-muted truncate",
+	                                                        isActive ? "bg-muted font-medium" : "text-muted-foreground"
+	                                                    )}
+	                                                >
+	                                                    <span
+	                                                        className="h-2 w-2 rounded-full shrink-0 ring-1 ring-border/50"
+	                                                        style={{ backgroundColor: project.color || "#3b82f6" }}
+	                                                    />
+	                                                    <span className="truncate">{project.name}</span>
+	                                                </Link>
+	                                                <DropdownMenu>
+	                                                    <DropdownMenuTrigger asChild>
+	                                                        <Button
                                                             variant="ghost"
                                                             size="icon"
                                                             className="h-6 w-6 shrink-0 text-muted-foreground/50 hover:text-muted-foreground"
@@ -547,19 +553,29 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                                     className="h-8 text-sm"
                                 />
                             </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="edit-description" className="text-xs">Description</Label>
-                                <Textarea
-                                    id="edit-description"
-                                    name="description"
-                                    defaultValue={editingProject?.description || ''}
-                                    className="text-sm min-h-[60px]"
-                                />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label className="text-xs">Project Lead</Label>
-                                <Select value={editLeadId} onValueChange={setEditLeadId}>
-                                    <SelectTrigger className="h-8 text-sm">
+	                            <div className="grid gap-1.5">
+	                                <Label htmlFor="edit-description" className="text-xs">Description</Label>
+	                                <Textarea
+	                                    id="edit-description"
+	                                    name="description"
+	                                    defaultValue={editingProject?.description || ''}
+	                                    className="text-sm min-h-[60px]"
+	                                />
+	                            </div>
+	                            <div className="grid gap-1.5">
+	                                <Label htmlFor="edit-color" className="text-xs">Color</Label>
+	                                <Input
+	                                    id="edit-color"
+	                                    name="color"
+	                                    type="color"
+	                                    defaultValue={editingProject?.color || "#3b82f6"}
+	                                    className="h-8 w-16 p-1"
+	                                />
+	                            </div>
+	                            <div className="grid gap-1.5">
+	                                <Label className="text-xs">Project Lead</Label>
+	                                <Select value={editLeadId} onValueChange={setEditLeadId}>
+	                                    <SelectTrigger className="h-8 text-sm">
                                         <SelectValue placeholder="Select lead" />
                                     </SelectTrigger>
                                     <SelectContent>

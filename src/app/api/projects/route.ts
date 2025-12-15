@@ -3,6 +3,27 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 
+const PROJECT_COLORS = [
+    "#ef4444", // red
+    "#f97316", // orange
+    "#f59e0b", // amber
+    "#22c55e", // green
+    "#14b8a6", // teal
+    "#06b6d4", // cyan
+    "#3b82f6", // blue
+    "#6366f1", // indigo
+    "#8b5cf6", // violet
+    "#ec4899", // pink
+]
+
+function normalizeHexColor(value: unknown): string | null {
+    if (typeof value !== "string") return null
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    const hex = trimmed.startsWith("#") ? trimmed.toLowerCase() : `#${trimmed.toLowerCase()}`
+    return /^#([0-9a-f]{6}|[0-9a-f]{3})$/.test(hex) ? hex : null
+}
+
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url)
@@ -24,6 +45,7 @@ export async function GET(request: Request) {
                 id: true,
                 name: true,
                 description: true,
+                color: true,
                 leadId: includeLead,
                 lead: includeLead ? { select: { id: true, name: true } } : false,
                 members: { select: { userId: true, user: { select: { name: true } } } }
@@ -45,7 +67,7 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json()
-        const { name, description, leadId, memberIds } = body
+        const { name, description, leadId, memberIds, color } = body
 
         if (!name || name.trim().length === 0) {
             return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -57,10 +79,18 @@ export async function POST(request: Request) {
 
         // Create project with default board and columns
         const project = await prisma.$transaction(async (tx) => {
+            const normalizedColor = normalizeHexColor(color)
+            const generatedColor = normalizedColor
+                ? normalizedColor
+                : PROJECT_COLORS[
+                (await tx.project.count({ where: { workspaceId: user.workspaceId } })) % PROJECT_COLORS.length
+                ]
+
             const p = await tx.project.create({
                 data: {
                     name,
                     description: description || null,
+                    color: generatedColor,
                     leadId: leadId || null,
                     workspaceId: user.workspaceId
                 }

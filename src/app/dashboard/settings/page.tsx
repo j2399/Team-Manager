@@ -54,8 +54,9 @@ export default async function SettingsPage() {
     })
 
     const allProjects = await prisma.project.findMany({
-        select: { id: true, name: true },
-        orderBy: { name: 'asc' }
+        where: { workspaceId: user.workspaceId || 'non-existent-id' },
+        select: { id: true, name: true, color: true },
+        orderBy: { createdAt: 'desc' }
     })
 
     const isAdmin = user.role === 'Admin' || user.role === 'Team Lead'

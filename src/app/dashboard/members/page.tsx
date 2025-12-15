@@ -36,8 +36,9 @@ export default async function MembersPage() {
     })
 
     const allProjects = await prisma.project.findMany({
-        select: { id: true, name: true },
-        orderBy: { name: 'asc' }
+        where: { workspaceId: currentUser.workspaceId || 'non-existent-id' },
+        select: { id: true, name: true, color: true },
+        orderBy: { createdAt: 'desc' }
     })
 
     return (
