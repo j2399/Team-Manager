@@ -19,6 +19,7 @@ import {
     Pencil, Calendar, User, Clock,
     Paperclip, Send, FileText, Upload, Reply, X, Download, Maximize2, Trash2, CheckCircle, XCircle, ChevronDown
 } from "lucide-react"
+import { getInitials } from "@/lib/utils"
 
 type Task = {
     id: string
@@ -111,7 +112,7 @@ const CommentNode = ({ comment, depth = 0, userRole, currentUserId, onReply, onD
 
             <div className="group flex gap-3">
                 <div className="shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary ring-2 ring-background z-10">
-                    {(comment.authorName || 'U').charAt(0).toUpperCase()}
+                    {getInitials(comment.authorName)}
                 </div>
 
                 <div className="flex-1 min-w-0">

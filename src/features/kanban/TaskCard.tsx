@@ -4,7 +4,7 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ArrowLeft, ArrowRight, Clock, CalendarDays, CheckCircle2, Lock } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, getInitials } from "@/lib/utils"
 import { Slider } from "@/components/ui/slider"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { updateTaskProgress } from "@/app/actions/kanban"
@@ -272,7 +272,7 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
                 {/* Avatar */}
                 <Avatar className="h-6 w-6 border text-[10px] shrink-0">
                     <AvatarFallback className="bg-primary/5 text-primary">
-                        {task.assignee?.name?.charAt(0) || "?"}
+                        {getInitials(task.assignee?.name)}
                     </AvatarFallback>
                 </Avatar>
             </div>
