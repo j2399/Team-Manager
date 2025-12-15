@@ -111,6 +111,7 @@ const PROJECT_COLOR_OPTIONS = [
 export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserData> } = {}) {
     const pathname = usePathname()
     const router = useRouter()
+    const isProjectDetail = pathname.startsWith("/dashboard/projects/") && pathname !== "/dashboard/projects"
     const [userData, setUserData] = React.useState<UserData>(() => ({
         name: initialUserData?.name ?? "User",
         role: initialUserData?.role ?? "Member",
@@ -121,7 +122,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
     const [projects, setProjects] = React.useState<Project[]>([])
     const [leadCandidates, setLeadCandidates] = React.useState<UserCandidate[]>([])
     const [allUsers, setAllUsers] = React.useState<UserCandidate[]>([])
-    const [projectsOpen, setProjectsOpen] = React.useState(true)
+    const [projectsOpen, setProjectsOpen] = React.useState(() => !isProjectDetail)
     const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
     const [editingProject, setEditingProject] = React.useState<Project | null>(null)
     const [deleteConfirm, setDeleteConfirm] = React.useState<Project | null>(null)
@@ -295,6 +296,10 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
         fetchProjects()
         fetchUsers()
     }, [fetchProjects, fetchUsers])
+
+    React.useEffect(() => {
+        if (isProjectDetail) setProjectsOpen(false)
+    }, [isProjectDetail])
 
     // When editing project changes, update the lead id state
     React.useEffect(() => {
@@ -554,7 +559,6 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                     <form onSubmit={handleCreate}>
                         <DialogHeader>
                             <DialogTitle>New Project</DialogTitle>
-                            <DialogDescription>Create a new project</DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-3 py-4">
                             <div className="grid gap-1.5">
@@ -644,7 +648,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                 <DialogContent ref={editProjectDialogContentRef} className="sm:max-w-md">
                     <form onSubmit={handleUpdate}>
                         <DialogHeader>
-                            <DialogTitle>Edit Project</DialogTitle>
+                            <DialogTitle className="sr-only">Edit Project</DialogTitle>
                         </DialogHeader>
                         <div className="grid gap-3 py-4">
                             <div className="grid gap-1.5">

@@ -184,11 +184,6 @@ export default async function SettingsPage() {
             {/* Workspace Settings */}
             {workspace && (
                 <section className="space-y-6">
-                    <div>
-                        <h2 className="text-lg font-semibold mb-1">Workspace</h2>
-                        <p className="text-sm text-muted-foreground">Configuration for {workspace.name}.</p>
-                    </div>
-
                     <div className="space-y-6 max-w-2xl">
                         <div className="space-y-2">
                             <Label className="text-sm font-medium">Invite Code</Label>
@@ -206,7 +201,6 @@ export default async function SettingsPage() {
                         <Separator className="my-4 border-dashed opacity-50" />
 
                         <div className="space-y-2">
-                            <Label className="text-sm font-medium">Discord Integration</Label>
                             <DiscordChannelSettings
                                 initialChannelId={workspace.discordChannelId}
                                 isAdmin={isAdmin}
@@ -217,7 +211,6 @@ export default async function SettingsPage() {
                     {/* Danger Zone */}
                     {isAdmin && (
                         <div className="mt-8 pt-6 border-t border-red-100 dark:border-red-900/30">
-                            <h3 className="text-sm font-semibold text-red-600 mb-2">Danger Zone</h3>
                             <DeleteWorkspace workspaceId={user.workspaceId!} workspaceName={workspace.name} />
                         </div>
                     )}

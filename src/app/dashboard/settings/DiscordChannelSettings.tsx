@@ -52,9 +52,6 @@ export function DiscordChannelSettings({ initialChannelId, isAdmin }: DiscordCha
                     </span>
                 )}
             </div>
-            <p className="text-xs text-muted-foreground mb-2">
-                Used for Discord bot notifications. {!isAdmin && "Only admins can edit this."}
-            </p>
 
             {isEditing && isAdmin ? (
                 <div className="flex items-center gap-2">
