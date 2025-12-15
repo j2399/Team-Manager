@@ -38,7 +38,7 @@ export function DeleteWorkspace({ workspaceId, workspaceName }: { workspaceId: s
         <Card className="border-red-200 bg-red-50/50">
             <CardHeader>
                 <CardTitle className="text-base text-red-900 flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4" /> Danger Zone
+                    <AlertTriangle className="h-4 w-4" /> Delete Workspace
                 </CardTitle>
                 <CardDescription className="text-red-700">
                     Irreversible actions for this workspace.
