@@ -14,6 +14,7 @@ model User {
   discordId String?  @unique
   avatar    String?
   role      String   @default("Member") // Admin, Team Lead, Member
+  themePreference String @default("system") // system, light, dark
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
   workspaceId String?
   subteams  Subteam[]

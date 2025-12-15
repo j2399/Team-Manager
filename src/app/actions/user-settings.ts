@@ -5,6 +5,28 @@ import { cookies } from "next/headers"
 import prisma from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/auth"
 
+export async function updateThemePreference(themePreference: "system" | "light" | "dark") {
+    const user = await getCurrentUser()
+    if (!user) return { error: "Not authenticated" }
+
+    try {
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { themePreference }
+        })
+
+        revalidatePath('/')
+        revalidatePath('/workspaces')
+        revalidatePath('/dashboard')
+        revalidatePath('/dashboard/settings')
+
+        return { success: true }
+    } catch (error) {
+        console.error("Update theme preference error:", error)
+        return { error: "Failed to update theme preference" }
+    }
+}
+
 export async function updateDisplayName(newName: string) {
     const user = await getCurrentUser()
     if (!user) return { error: "Not authenticated" }

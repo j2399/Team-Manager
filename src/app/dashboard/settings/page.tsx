@@ -6,6 +6,7 @@ import { DeleteWorkspace } from "./DeleteWorkspace"
 import { CopyButton } from "./CopyButton"
 import { DiscordChannelSettings } from "./DiscordChannelSettings"
 import { DisplayNameSettings } from "./DisplayNameSettings"
+import { ThemeSettings } from "./ThemeSettings"
 import prisma from "@/lib/prisma"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
@@ -75,6 +76,7 @@ export default async function SettingsPage() {
             <section className="space-y-6">
                 <div className="space-y-4 max-w-xl">
                     <DisplayNameSettings initialName={user.name || ''} />
+                    <ThemeSettings initialPreference={(user as any).themePreference ?? "system"} />
                     <div className="grid gap-2">
                         <Label>Role</Label>
                         <Input defaultValue={user.role} disabled className="bg-muted" />

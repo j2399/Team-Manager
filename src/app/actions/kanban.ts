@@ -4,14 +4,39 @@ import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { sendDiscordNotification } from '@/lib/discord'
 import { getCurrentUser } from '@/lib/auth'
-import { formatDistanceToNowStrict } from 'date-fns'
+import { differenceInCalendarDays } from 'date-fns'
+
+function parseDateOnlyStart(dateStr: string) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim())
+    if (!match) return null
+    const year = Number(match[1])
+    const monthIndex = Number(match[2]) - 1
+    const day = Number(match[3])
+    return new Date(year, monthIndex, day, 0, 0, 0, 0)
+}
+
+function parseDateInput(dateStr: string, mode: "startOfDay" | "endOfDay") {
+    const dateOnly = parseDateOnlyStart(dateStr)
+    if (dateOnly) {
+        if (mode === "endOfDay") {
+            dateOnly.setHours(23, 59, 59, 999)
+        }
+        return dateOnly
+    }
+    return new Date(dateStr)
+}
 
 function formatDueLine(due: Date | null) {
     if (!due) return 'It has no due date'
     const now = new Date()
-    const distance = formatDistanceToNowStrict(due, { roundingMethod: 'floor' })
-    if (due.getTime() < now.getTime()) return `It is overdue by ${distance}`
-    return `It is due in ${distance}`
+
+    const daysLeft = differenceInCalendarDays(due, now)
+    if (daysLeft < 0) {
+        const daysOver = Math.abs(daysLeft)
+        return `It is overdue by ${daysOver} day${daysOver === 1 ? '' : 's'}`
+    }
+    if (daysLeft === 0) return 'It is due today'
+    return `It is due in ${daysLeft} day${daysLeft === 1 ? '' : 's'}`
 }
 
 type CreateTaskInput = {
@@ -84,8 +109,8 @@ export async function createTask(input: CreateTaskInput) {
             requireAttachment: input.requireAttachment !== undefined ? input.requireAttachment : true,
             enableProgress: input.enableProgress !== undefined ? input.enableProgress : false,
             progress: input.progress || 0,
-            startDate: startDate ? new Date(startDate) : null,
-            endDate: endDate ? new Date(endDate) : null,
+            startDate: startDate ? parseDateInput(startDate, "startOfDay") : null,
+            endDate: endDate ? parseDateInput(endDate, "endOfDay") : null,
             push: pushId ? { connect: { id: pushId } } : undefined
         }
 
@@ -159,7 +184,7 @@ export async function createTask(input: CreateTaskInput) {
 	                    const mentions = assignedUsers.map((u) => (u.discordId ? `<@${u.discordId}>` : "")).filter(Boolean).join(" ")
 
 	                    if (mentions) {
-	                        const dueDate = endDate ? new Date(endDate) : null
+	                        const dueDate = endDate ? parseDateInput(endDate, "endOfDay") : null
 	                        await sendDiscordNotification(
 	                            "",
 	                            [{
@@ -454,8 +479,8 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
             data: {
                 description: input.description !== undefined ? (input.description || null) : undefined,
                 assigneeId: input.assigneeId !== undefined ? (input.assigneeId && input.assigneeId !== "" ? input.assigneeId : null) : undefined,
-                startDate: input.startDate !== undefined ? (input.startDate ? new Date(input.startDate) : null) : undefined,
-                endDate: input.endDate !== undefined ? (input.endDate ? new Date(input.endDate) : null) : undefined,
+                startDate: input.startDate !== undefined ? (input.startDate ? parseDateInput(input.startDate, "startOfDay") : null) : undefined,
+                endDate: input.endDate !== undefined ? (input.endDate ? parseDateInput(input.endDate, "endOfDay") : null) : undefined,
                 requireAttachment: input.requireAttachment !== undefined ? input.requireAttachment : undefined,
                 enableProgress: input.enableProgress !== undefined ? input.enableProgress : undefined,
                 progress: input.progress !== undefined ? input.progress : undefined
@@ -502,7 +527,7 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
 	                    if (mentions) {
 	                        const dueDate =
 	                            input.endDate !== undefined
-	                                ? (input.endDate ? new Date(input.endDate) : null)
+	                                ? (input.endDate ? parseDateInput(input.endDate, "endOfDay") : null)
 	                                : (task.endDate ?? null)
 	                        await sendDiscordNotification(
 	                            "",
