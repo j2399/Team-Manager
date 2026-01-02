@@ -131,6 +131,14 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
     const createProjectDialogContentRef = React.useRef<HTMLDivElement | null>(null)
     const editProjectDialogContentRef = React.useRef<HTMLDivElement | null>(null)
     const [settingsSpinNonce, setSettingsSpinNonce] = React.useState(0)
+    const previousPathRef = React.useRef<string>('/dashboard')
+
+    // Track previous path for settings toggle
+    React.useEffect(() => {
+        if (pathname !== '/dashboard/settings') {
+            previousPathRef.current = pathname
+        }
+    }, [pathname])
 
     // Form state for editing
     const [newProjectLeadId, setNewProjectLeadId] = React.useState("none")
@@ -439,29 +447,30 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                 <h1 className="text-sm font-semibold truncate pl-4 pr-12 w-full min-w-0">
                     {userData.workspaceName ?? ""}
                 </h1>
-                <Button
-                    asChild
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-10 w-10 rounded-none hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                <button
+                    type="button"
+                    className="absolute right-0 top-0 h-10 w-10 flex items-center justify-center hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none"
+                    aria-label="Workspace settings"
+                    title="Settings"
+                    onClick={(e) => {
+                        e.preventDefault()
+                        setSettingsSpinNonce((n) => n + 1)
+                        if (pathname === '/dashboard/settings') {
+                            // Toggle back to previous page
+                            router.push(previousPathRef.current)
+                        } else {
+                            router.push('/dashboard/settings')
+                        }
+                    }}
                 >
-                    <Link
-                        href="/dashboard/settings"
-                        aria-label="Workspace settings"
-                        title="Settings"
-                        onClick={() => {
-                            setSettingsSpinNonce((n) => n + 1)
-                        }}
-                    >
-                        <Settings
-                            key={settingsSpinNonce}
-                            className={cn(
-                                "h-4 w-4 text-muted-foreground hover:text-foreground transition-colors",
-                                settingsSpinNonce > 0 && "motion-safe:animate-[cupi-gear-impulse_1200ms_ease-out_both]"
-                            )}
-                        />
-                    </Link>
-                </Button>
+                    <Settings
+                        key={settingsSpinNonce}
+                        className={cn(
+                            "h-4 w-4 text-muted-foreground hover:text-foreground transition-colors",
+                            settingsSpinNonce > 0 && "motion-safe:animate-[cupi-gear-impulse_1200ms_ease-out_both]"
+                        )}
+                    />
+                </button>
             </div>
 
             <div className={cn(
