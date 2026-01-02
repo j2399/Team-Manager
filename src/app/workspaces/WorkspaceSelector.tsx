@@ -171,7 +171,7 @@ export function WorkspaceSelector({ user }: { user: any }) {
                     <div className="flex items-center gap-2">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-zinc-500 hover:text-zinc-900">
+                                <Button variant="ghost" size="icon" className="text-zinc-500 hover:text-zinc-900 border border-zinc-200">
                                     <Settings className="w-5 h-5" />
                                 </Button>
                             </DropdownMenuTrigger>
@@ -181,6 +181,27 @@ export function WorkspaceSelector({ user }: { user: any }) {
                                 <DropdownMenuItem onClick={() => setProfileOpen(true)}>
                                     <UserIcon className="w-4 h-4 mr-2" /> Edit Profile
                                 </DropdownMenuItem>
+
+                                {/* Dark Mode Submenu */}
+                                <DropdownMenuLabel>Appearance</DropdownMenuLabel>
+                                <DropdownMenuItem onClick={() => {
+                                    document.documentElement.classList.remove('dark')
+                                    localStorage.setItem('cupi_theme', 'light')
+                                    router.refresh()
+                                }}>
+                                    Light
+                                    {(!document.documentElement.classList.contains('dark')) && <CheckCircle className="w-3 h-3 ml-auto opacity-50" />}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => {
+                                    document.documentElement.classList.add('dark')
+                                    localStorage.setItem('cupi_theme', 'dark')
+                                    router.refresh()
+                                }}>
+                                    Dark
+                                    {(document.documentElement.classList.contains('dark')) && <CheckCircle className="w-3 h-3 ml-auto opacity-50" />}
+                                </DropdownMenuItem>
+
+                                <DropdownMenuSeparator />
                                 <DropdownMenuItem onClick={() => {
                                     fetch('/api/auth/logout', { method: 'POST' })
                                         .then(() => window.location.href = '/')
@@ -203,10 +224,10 @@ export function WorkspaceSelector({ user }: { user: any }) {
                 </div>
 
                 <div className="flex flex-wrap gap-2 md:gap-3">
-                    <Button onClick={() => setCreateOpen(true)} variant="outline" className="gap-2 shadow-sm flex-1 md:flex-none text-sm">
+                    <Button onClick={() => setCreateOpen(true)} variant="outline" className="gap-2 shadow-sm flex-1 md:flex-none text-sm text-zinc-900 border-zinc-200 hover:bg-zinc-100 font-medium">
                         <Plus className="w-4 h-4" /> Create
                     </Button>
-                    <Button onClick={() => setJoinOpen(true)} variant="outline" className="gap-2 shadow-sm flex-1 md:flex-none text-sm">
+                    <Button onClick={() => setJoinOpen(true)} variant="outline" className="gap-2 shadow-sm flex-1 md:flex-none text-sm text-zinc-900 border-zinc-200 hover:bg-zinc-100 font-medium">
                         <Users className="w-4 h-4" /> Join
                     </Button>
                 </div>
