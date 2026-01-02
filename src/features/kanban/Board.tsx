@@ -788,13 +788,13 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
                                     aria-expanded={isOpen}
                                     aria-controls={contentId}
                                     onClick={() => togglePushCollapse(push.id)}
-                                    className={`w-full flex items-center justify-between p-4 transition-colors ${isOpen ? "rounded-t-lg" : "rounded-lg"} relative overflow-hidden ${isComplete ? 'bg-green-100 dark:bg-green-900/20 hover:bg-green-200/50 dark:hover:bg-green-900/30' : 'hover:bg-accent/50'}`}
+                                    className={`w-full flex items-center justify-between p-4 transition-colors ${isOpen ? "rounded-t-lg" : "rounded-lg"} relative overflow-hidden ${isComplete ? 'bg-green-100 dark:bg-green-900/20 hover:bg-green-200/50 dark:hover:bg-green-900/30' : 'hover:bg-accent/50 dark:hover:bg-accent/20'}`}
                                 >
                                     <div className="flex items-center gap-4">
                                         <div className="flex items-center gap-3 flex-wrap">
                                             <span className="font-semibold text-lg tracking-tight">{push.name}</span>
                                             {isComplete && (
-                                                <span className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-100 dark:bg-green-900/30 px-2.5 py-0.5 rounded-full ring-1 ring-inset ring-green-600/20">
+                                                <span className="flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2.5 py-0.5 rounded-full ring-1 ring-inset ring-green-600/20 dark:ring-green-400/20">
                                                     <CheckCircle2 className="w-3.5 h-3.5" />
                                                     {push.endDate && push.endDate !== 'null' ? `Completed on ${new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : 'Completed!'}
                                                 </span>

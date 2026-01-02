@@ -63,7 +63,12 @@ const getTaskDuration = (start: Date | string, end: Date | string) => {
 }
 
 export function ProjectGanttChart({ tasks, projectId, pushes = [] }: ProjectGanttChartProps) {
-    const tasksWithDates = tasks.filter(t => t.startDate && t.endDate && t.push)
+    const tasksWithDates = tasks.filter(t => t.startDate).map(t => {
+        const start = new Date(t.startDate!)
+        // Default to 1 day if no end date
+        const end = t.endDate ? new Date(t.endDate) : new Date(start.getTime() + 24 * 60 * 60 * 1000)
+        return { ...t, startDate: start, endDate: end }
+    })
 
     if (tasksWithDates.length === 0) {
         return (

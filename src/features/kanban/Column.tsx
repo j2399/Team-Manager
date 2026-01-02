@@ -71,8 +71,8 @@ export function Column({ column, projectId, onEditTask, onAddTask, isDoneColumn,
             className={`flex h-full w-full min-w-0 flex-col rounded-lg p-3 transition-all min-h-[150px] ${getBgClass()} ${isDropDisabled ? 'opacity-50' : ''}`}
         >
             <div className="flex items-center gap-2 mb-3 px-1">
-                <h3 className={`font-medium text-sm ${isDoneColumn ? 'text-emerald-700' : ''}`}>{column.name}</h3>
-                <span className={`text-xs ${isDoneColumn ? 'text-emerald-600' : 'text-muted-foreground'}`}>{column.tasks.length}</span>
+                <h3 className={`font-medium text-sm ${isDoneColumn ? 'text-emerald-700 dark:text-emerald-400' : ''}`}>{column.name}</h3>
+                <span className={`text-xs ${isDoneColumn ? 'text-emerald-600 dark:text-emerald-500/80' : 'text-muted-foreground'}`}>{column.tasks.length}</span>
                 {isDropDisabled && <Lock className="w-3 h-3 text-muted-foreground" />}
                 {(column.name === 'Todo' || column.name === 'To Do') && onAddTask && (
                     <Button

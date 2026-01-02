@@ -215,19 +215,19 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
                 onClick={() => onClick?.(task)}
                 className={cn(
                     "group relative flex flex-col gap-1.5 p-3 rounded-lg border transition-colors transition-shadow duration-200",
-                    "bg-emerald-50/40 border-emerald-100 hover:border-emerald-200 hover:shadow-sm",
+                    "bg-emerald-50/40 border-emerald-100 hover:border-emerald-200 hover:shadow-sm dark:bg-emerald-900/10 dark:border-emerald-900/30 dark:hover:border-emerald-800/50",
                     isDragDisabled ? 'cursor-default' : 'cursor-grab'
                 )}
             >
                 <div className="flex items-start justify-between gap-2">
-                    <h4 className="text-xs font-medium text-emerald-950/80 leading-snug line-clamp-2">
+                    <h4 className="text-xs font-medium text-emerald-950/80 dark:text-emerald-100/80 leading-snug line-clamp-2">
                         {task.title}
                     </h4>
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
                 </div>
 
                 {completedDateStr && (
-                    <div className="flex items-center gap-1 text-[10px] text-emerald-600/70">
+                    <div className="flex items-center gap-1 text-[10px] text-emerald-600/70 dark:text-emerald-400/60">
                         <CalendarDays className="w-3 h-3" />
                         <span>Completed {completedDateStr}</span>
                     </div>
