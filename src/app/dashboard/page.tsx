@@ -321,9 +321,9 @@ export default async function DashboardPage() {
                         <CardHeader className="pb-2 px-4 pt-4 shrink-0">
                             <div className="flex items-center justify-between">
                                 <CardTitle className="text-sm flex items-center gap-2">
-                                    <Clock className="h-4 w-4 text-orange-500" />Pending Review
+                                    <Clock className="h-4 w-4" />Pending Review
                                 </CardTitle>
-                                <Badge variant="secondary" className="bg-orange-100 text-orange-700">{pendingReviewTasksWithDetails.length}</Badge>
+                                <Badge variant="secondary">{pendingReviewTasksWithDetails.length}</Badge>
                             </div>
                         </CardHeader>
                         <CardContent className="flex-1 min-h-0 p-3 pt-0 overflow-hidden">
