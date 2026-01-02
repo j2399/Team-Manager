@@ -260,20 +260,16 @@ export default async function DashboardPage() {
 
     return (
         <div className="h-full flex flex-col p-4 gap-4">
-            {/* Header */}
-            <div className="flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-4">
-                    <h1 className="text-2xl font-semibold">Dashboard</h1>
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#57F287]" title="Discord Connected" />
-                </div>
-                {overdueTasks > 0 && (
+            {/* Header - only show if there are overdue tasks */}
+            {overdueTasks > 0 && (
+                <div className="flex items-center justify-end shrink-0">
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1 text-red-500">
                             <AlertCircle className="h-4 w-4" />{overdueTasks} overdue
                         </span>
                     </div>
-                )}
-            </div>
+                </div>
+            )}
 
             {/* Main Content - Mobile: stack, Desktop: grid - NO HORIZONTAL SCROLL */}
             <div className="flex-1 min-h-0 flex flex-col lg:grid gap-4 lg:grid-cols-12 overflow-y-auto overflow-x-hidden">
