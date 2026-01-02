@@ -123,6 +123,7 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
                         dueDate: task.dueDate,
                         assignee: task.assignee,
                         column: task.column,
+                        columnId: null,
                         createdAt: task.createdAt || undefined,
                         updatedAt: task.updatedAt || undefined
                     }}
