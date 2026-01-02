@@ -87,7 +87,7 @@ export function PendingReviewTask({ task }: PendingReviewTaskProps) {
                         <span>{task.column.board.project.name}</span>
                     )}
                     {task.reviewSince && (
-                        <span className="inline-flex items-center gap-1 text-orange-600">
+                        <span className="inline-flex items-center gap-1 text-orange-600 dark:text-orange-400">
                             <Clock className="h-3 w-3" />
                             Waiting {formatWaitTime(task.reviewSince)}
                         </span>

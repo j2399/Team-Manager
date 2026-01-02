@@ -46,7 +46,7 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
 
     return (
         <>
-            <div className={`border rounded-lg bg-card hover:bg-accent/50 transition-colors ${isOverdue ? 'border-red-300 bg-red-50/50' : ''}`}>
+            <div className={`border rounded-lg bg-card hover:bg-accent/50 transition-colors ${isOverdue ? 'border-red-300 bg-red-50/50 dark:border-red-900/50 dark:bg-red-900/10' : ''}`}>
                 {/* Header with title */}
                 <div className="p-3 pb-2 flex items-start gap-2">
                     <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
@@ -76,7 +76,7 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
                         </div>
                     </div>
                     {isOverdue && (
-                        <Badge variant="destructive" className="text-[9px] h-4 px-1 shrink-0 ml-auto">
+                        <Badge variant="destructive" className="text-[9px] h-4 px-1 shrink-0 ml-auto dark:bg-red-900/30 dark:text-red-200 dark:hover:bg-red-900/50">
                             <Clock className="w-2.5 h-2.5 mr-0.5" />
                             Overdue
                         </Badge>
@@ -110,7 +110,7 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
                         </Button>
                     )}
                 </div>
-            </div>
+            </div >
 
             {showTaskPreview && (
                 <TaskPreview
@@ -133,7 +133,8 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
                     onEdit={() => { }}
                     projectId={task.column?.board?.project?.id || ''}
                 />
-            )}
+            )
+            }
         </>
     )
 }
