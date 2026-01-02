@@ -166,7 +166,7 @@ export function NotificationBell() {
                                 <div
                                     key={notification.id}
                                     onClick={() => handleNotificationClick(notification)}
-                                    className={`flex gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors ${!notification.read ? 'bg-blue-50/50' : ''
+                                    className={`flex gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors ${!notification.read ? 'bg-muted/30 dark:bg-muted/20' : ''
                                         }`}
                                 >
                                     <div className="shrink-0 mt-0.5">
@@ -184,7 +184,7 @@ export function NotificationBell() {
                                         </p>
                                     </div>
                                     {!notification.read && (
-                                        <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0 mt-1.5" />
+                                        <div className="w-2 h-2 rounded-full bg-muted-foreground/50 shrink-0 mt-1.5" />
                                     )}
                                 </div>
                             ))}

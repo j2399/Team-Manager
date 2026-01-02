@@ -450,7 +450,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                 <button
                     type="button"
                     className={cn(
-                        "absolute right-0.5 top-0.5 h-9 w-9 flex items-center justify-center rounded-md focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none transition-colors",
+                        "absolute right-1 top-1 h-8 w-8 flex items-center justify-center rounded-md focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none transition-colors",
                         pathname === '/dashboard/settings' ? "bg-muted" : "hover:bg-muted/50"
                     )}
                     aria-label="Workspace settings"
