@@ -91,8 +91,8 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
 
     const fetchMembers = React.useCallback(async () => {
         try {
-            // Using leads endpoint for now as it returns users, ideally specific endpoint for all members
-            const res = await fetch('/api/users?role=leads')
+            // Fetch all users for mentions
+            const res = await fetch('/api/users')
             if (res.ok) {
                 const data = await res.json()
                 if (Array.isArray(data)) {

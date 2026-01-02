@@ -199,7 +199,7 @@ export function ProjectGanttChart({ tasks, projectId, pushes = [] }: ProjectGant
                             {dayColumns.map((day, i) => (
                                 <div
                                     key={i}
-                                    className={`absolute top-0 h-full flex flex-col items-center justify-center border-r ${day.isToday ? 'bg-blue-100' : day.isWeekend ? 'bg-muted/40' : 'bg-background'
+                                    className={`absolute top-0 h-full flex flex-col items-center justify-center border-r ${day.isToday ? 'bg-blue-100 dark:bg-blue-900/30' : day.isWeekend ? 'bg-muted/40' : 'bg-background'
                                         }`}
                                     style={{ left: `${day.pos}%`, width: `${day.width}%` }}
                                 >
