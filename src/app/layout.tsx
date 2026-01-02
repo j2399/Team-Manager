@@ -33,27 +33,41 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Blocking script to prevent theme flash - runs before any CSS */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
                   var theme = localStorage.getItem('cupi_theme');
-                  var isDark = theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                  var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                  var isDark = theme === 'dark' || (theme !== 'light' && prefersDark);
+                  
+                  var root = document.documentElement;
                   if (isDark) {
-                    document.documentElement.classList.add('dark');
-                    document.documentElement.style.colorScheme = 'dark';
-                    document.documentElement.style.backgroundColor = '#0f0f0f';
+                    root.classList.add('dark');
+                    root.style.colorScheme = 'dark';
                   } else {
-                    document.documentElement.style.backgroundColor = '#ffffff';
+                    root.classList.remove('dark');
+                    root.style.colorScheme = 'light';
                   }
                 } catch (e) {}
               })();
             `,
           }}
         />
+        {/* Inline critical CSS to set background before external CSS loads */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              html { background-color: #ffffff; }
+              html.dark { background-color: #0f0f0f; }
+              body { background-color: inherit; }
+            `,
+          }}
+        />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background`}>
         <ThemeClient />
         {children}
       </body>
