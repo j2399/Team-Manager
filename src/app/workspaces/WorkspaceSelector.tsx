@@ -178,7 +178,7 @@ export function WorkspaceSelector({ user }: { user: any }) {
                     <div className="flex items-center gap-2">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="group/gear text-muted-foreground hover:text-foreground hover:bg-transparent">
+                                <Button variant="ghost" size="icon" className="group/gear text-muted-foreground hover:text-foreground hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0">
                                     <Settings className="w-5 h-5 group-hover/gear:motion-safe:animate-[cupi-gear-impulse_1200ms_ease-out_both]" />
                                 </Button>
                             </DropdownMenuTrigger>

@@ -383,17 +383,17 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
         const formData = new FormData(e.currentTarget)
 
         try {
-	            const res = await fetch(`/api/projects/${editingProject.id}`, {
-	                method: 'PATCH',
-	                headers: { 'Content-Type': 'application/json' },
-	                body: JSON.stringify({
-	                    name: formData.get('name'),
-	                    description: formData.get('description'),
-	                    color: editColor,
-	                    leadId: editLeadId === 'none' ? null : editLeadId,
-	                    memberIds: selectedMemberIds
-	                })
-	            })
+            const res = await fetch(`/api/projects/${editingProject.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: formData.get('name'),
+                    description: formData.get('description'),
+                    color: editColor,
+                    leadId: editLeadId === 'none' ? null : editLeadId,
+                    memberIds: selectedMemberIds
+                })
+            })
             if (res.ok) {
                 fetchProjects()
                 setEditingProject(null)
@@ -443,7 +443,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                     asChild
                     variant="ghost"
                     size="icon"
-                    className="absolute right-0 top-0 h-10 w-10 rounded-none"
+                    className="absolute right-0 top-0 h-10 w-10 rounded-none hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                 >
                     <Link
                         href="/dashboard/settings"
@@ -456,7 +456,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                         <Settings
                             key={settingsSpinNonce}
                             className={cn(
-                                "h-4 w-4 text-muted-foreground",
+                                "h-4 w-4 text-muted-foreground hover:text-foreground transition-colors",
                                 settingsSpinNonce > 0 && "motion-safe:animate-[cupi-gear-impulse_1200ms_ease-out_both]"
                             )}
                         />
@@ -499,24 +499,24 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                                     <Plus className="h-4 w-4" />
                                 </Button>
                             </div>
-	                            <CollapsibleContent className="pl-6 mt-1 space-y-1">
-	                                {projects.length === 0 ? (
-	                                    <p className="text-sm text-muted-foreground px-3 py-1">No projects yet</p>
-	                                ) : (
-	                                    <DndContext
-	                                        sensors={sensors}
-	                                        collisionDetection={closestCenter}
-	                                        onDragEnd={handleProjectDragEnd}
-	                                    >
-	                                        <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-	                                            {projects.map((project) => (
-	                                                <SortableProjectRow key={project.id} project={project} />
-	                                            ))}
-	                                        </SortableContext>
-	                                    </DndContext>
-	                                )}
-	                            </CollapsibleContent>
-	                        </Collapsible>
+                            <CollapsibleContent className="pl-6 mt-1 space-y-1">
+                                {projects.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground px-3 py-1">No projects yet</p>
+                                ) : (
+                                    <DndContext
+                                        sensors={sensors}
+                                        collisionDetection={closestCenter}
+                                        onDragEnd={handleProjectDragEnd}
+                                    >
+                                        <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+                                            {projects.map((project) => (
+                                                <SortableProjectRow key={project.id} project={project} />
+                                            ))}
+                                        </SortableContext>
+                                    </DndContext>
+                                )}
+                            </CollapsibleContent>
+                        </Collapsible>
 
                         {/* Other Nav Items */}
                     </nav>
@@ -616,27 +616,27 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                                     <PopoverContent className="w-[200px] p-0" align="start">
                                         <RemoveScroll shards={[createProjectDialogContentRef]}>
                                             <div className="max-h-[200px] overflow-y-auto overscroll-contain p-1">
-                                            {allUsers.map(user => {
-                                                const isLead = user.id === newProjectLeadId
-                                                return (
-                                                    <div
-                                                        key={user.id}
-                                                        className={cn(
-                                                            "flex items-center space-x-2 px-2 py-1.5 rounded-sm",
-                                                            isLead ? "opacity-50 pointer-events-none" : "hover:bg-accent cursor-pointer"
-                                                        )}
-                                                        onClick={() => !isLead && toggleMember(user.id)}
-                                                    >
-                                                        <Checkbox
-                                                            checked={isLead || selectedMemberIds.includes(user.id)}
-                                                            disabled={isLead}
-                                                        />
-                                                        <div className="text-sm flex-1">
-                                                            {user.name} {isLead && <span className="text-xs text-muted-foreground ml-1">(Lead)</span>}
+                                                {allUsers.map(user => {
+                                                    const isLead = user.id === newProjectLeadId
+                                                    return (
+                                                        <div
+                                                            key={user.id}
+                                                            className={cn(
+                                                                "flex items-center space-x-2 px-2 py-1.5 rounded-sm",
+                                                                isLead ? "opacity-50 pointer-events-none" : "hover:bg-accent cursor-pointer"
+                                                            )}
+                                                            onClick={() => !isLead && toggleMember(user.id)}
+                                                        >
+                                                            <Checkbox
+                                                                checked={isLead || selectedMemberIds.includes(user.id)}
+                                                                disabled={isLead}
+                                                            />
+                                                            <div className="text-sm flex-1">
+                                                                {user.name} {isLead && <span className="text-xs text-muted-foreground ml-1">(Lead)</span>}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                )
-                                            })}
+                                                    )
+                                                })}
                                             </div>
                                         </RemoveScroll>
                                     </PopoverContent>
@@ -670,39 +670,39 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                                     className="h-8 text-sm"
                                 />
                             </div>
-	                            <div className="grid gap-1.5">
-	                                <Label htmlFor="edit-description" className="text-xs">Description</Label>
-	                                <Textarea
-	                                    id="edit-description"
-	                                    name="description"
-	                                    defaultValue={editingProject?.description || ''}
-	                                    className="text-sm min-h-[60px]"
-	                                />
-	                            </div>
-	                            <div className="grid gap-1.5">
-	                                <Label htmlFor="edit-color" className="text-xs">Color</Label>
-                                    <input type="hidden" name="color" value={editColor} />
-                                    <div className="grid grid-cols-10 gap-1.5">
-                                        {PROJECT_COLOR_OPTIONS.map((color) => (
-                                            <button
-                                                key={color}
-                                                type="button"
-                                                onClick={() => setEditColor(color)}
-                                                className={cn(
-                                                    "h-6 w-6 rounded-md ring-1 ring-border/60 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                                                    editColor === color ? "ring-2 ring-foreground/70 scale-[1.02]" : "hover:scale-[1.02]"
-                                                )}
-                                                style={{ backgroundColor: color }}
-                                                aria-label={`Set project color to ${color}`}
-                                                title={color}
-                                            />
-                                        ))}
-                                    </div>
-	                            </div>
-	                            <div className="grid gap-1.5">
-	                                <Label className="text-xs">Project Lead</Label>
-	                                <Select value={editLeadId} onValueChange={setEditLeadId}>
-	                                    <SelectTrigger className="h-8 text-sm">
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="edit-description" className="text-xs">Description</Label>
+                                <Textarea
+                                    id="edit-description"
+                                    name="description"
+                                    defaultValue={editingProject?.description || ''}
+                                    className="text-sm min-h-[60px]"
+                                />
+                            </div>
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="edit-color" className="text-xs">Color</Label>
+                                <input type="hidden" name="color" value={editColor} />
+                                <div className="grid grid-cols-10 gap-1.5">
+                                    {PROJECT_COLOR_OPTIONS.map((color) => (
+                                        <button
+                                            key={color}
+                                            type="button"
+                                            onClick={() => setEditColor(color)}
+                                            className={cn(
+                                                "h-6 w-6 rounded-md ring-1 ring-border/60 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                                                editColor === color ? "ring-2 ring-foreground/70 scale-[1.02]" : "hover:scale-[1.02]"
+                                            )}
+                                            style={{ backgroundColor: color }}
+                                            aria-label={`Set project color to ${color}`}
+                                            title={color}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="grid gap-1.5">
+                                <Label className="text-xs">Project Lead</Label>
+                                <Select value={editLeadId} onValueChange={setEditLeadId}>
+                                    <SelectTrigger className="h-8 text-sm">
                                         <SelectValue placeholder="Select lead" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -731,27 +731,27 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                                     <PopoverContent className="w-[200px] p-0" align="start">
                                         <RemoveScroll shards={[editProjectDialogContentRef]}>
                                             <div className="max-h-[200px] overflow-y-auto overscroll-contain p-1">
-                                            {allUsers.map(user => {
-                                                const isLead = user.id === editLeadId
-                                                return (
-                                                    <div
-                                                        key={user.id}
-                                                        className={cn(
-                                                            "flex items-center space-x-2 px-2 py-1.5 rounded-sm",
-                                                            isLead ? "opacity-50 pointer-events-none" : "hover:bg-accent cursor-pointer"
-                                                        )}
-                                                        onClick={() => !isLead && toggleMember(user.id)}
-                                                    >
-                                                        <Checkbox
-                                                            checked={isLead || selectedMemberIds.includes(user.id)}
-                                                            disabled={isLead}
-                                                        />
-                                                        <div className="text-sm flex-1">
-                                                            {user.name} {isLead && <span className="text-xs text-muted-foreground ml-1">(Lead)</span>}
+                                                {allUsers.map(user => {
+                                                    const isLead = user.id === editLeadId
+                                                    return (
+                                                        <div
+                                                            key={user.id}
+                                                            className={cn(
+                                                                "flex items-center space-x-2 px-2 py-1.5 rounded-sm",
+                                                                isLead ? "opacity-50 pointer-events-none" : "hover:bg-accent cursor-pointer"
+                                                            )}
+                                                            onClick={() => !isLead && toggleMember(user.id)}
+                                                        >
+                                                            <Checkbox
+                                                                checked={isLead || selectedMemberIds.includes(user.id)}
+                                                                disabled={isLead}
+                                                            />
+                                                            <div className="text-sm flex-1">
+                                                                {user.name} {isLead && <span className="text-xs text-muted-foreground ml-1">(Lead)</span>}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                )
-                                            })}
+                                                    )
+                                                })}
                                             </div>
                                         </RemoveScroll>
                                     </PopoverContent>
