@@ -52,7 +52,7 @@ const formatDate = (d: Date | string | null | undefined) => {
     return dateObj.toISOString().split('T')[0]
 }
 
-export function TaskDialog({ columnId, projectId, pushId, users, task, open: externalOpen, onOpenChange }: {
+export function TaskDialog({ columnId, projectId, pushId, users, task, open: externalOpen, onOpenChange, onTaskCreated, onTaskUpdated, onTaskDeleted }: {
     columnId?: string
     projectId: string
     pushId?: string | null
@@ -60,6 +60,9 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     task?: TaskType | null
     open?: boolean
     onOpenChange?: (open: boolean) => void
+    onTaskCreated?: (task: any) => void
+    onTaskUpdated?: (task: any) => void
+    onTaskDeleted?: (taskId: string) => void
 }) {
     const [internalOpen, setInternalOpen] = useState(false)
     const isControlled = externalOpen !== undefined
@@ -227,6 +230,10 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                         })
                     }
 
+                    if (result.task && onTaskUpdated) {
+                        onTaskUpdated(result.task)
+                    }
+
                     handleClose()
                 } else {
                     const result = await createTask({
@@ -249,12 +256,12 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                     }
 
                     // Upload instructions file for new task
-                    if (instructionsFile && result.taskId) {
+                    if (instructionsFile && result.task?.id) {
                         setIsUploadingInstructions(true)
                         const formData = new FormData()
                         formData.append('file', instructionsFile)
 
-                        const uploadRes = await fetch(`/api/tasks/${result.taskId}/instructions`, {
+                        const uploadRes = await fetch(`/api/tasks/${result.task.id}/instructions`, {
                             method: 'POST',
                             body: formData
                         })
@@ -273,6 +280,10 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                     setStartDate(today)
                     setEndDate("")
                     setInstructionsFile(null)
+                    if (result.task && onTaskCreated) {
+                        onTaskCreated(result.task)
+                    }
+
                     handleClose()
                 }
             } catch (err) {
@@ -291,6 +302,9 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 if (result?.error) {
                     setError(result.error)
                 } else {
+                    if (onTaskDeleted && task) {
+                        onTaskDeleted(task.id)
+                    }
                     setShowDeleteConfirm(false)
                     handleClose()
                 }
@@ -423,42 +437,42 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                         <PopoverContent className="w-[260px] p-0" align="start">
                                             <RemoveScroll shards={[dialogContentRef]}>
                                                 <div className="max-h-[240px] overflow-y-auto overscroll-contain p-1">
-                                                {users.filter(u => u.isProjectMember).map(u => (
-                                                    <div
-                                                        key={u.id}
-                                                        className="flex items-center space-x-2 px-2 py-1.5 hover:bg-accent rounded-sm cursor-pointer"
-                                                        onClick={() => toggleAssignee(u.id)}
-                                                    >
-                                                        <Checkbox
-                                                            checked={assigneeIds.includes(u.id)}
-                                                        />
-                                                        <div className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 flex justify-between">
-                                                            <span>{u.name}</span>
-                                                            <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Member</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-
-                                                {users.some(u => !u.isProjectMember) && (
-                                                    <>
-                                                        <div className="h-px bg-border my-1" />
-                                                        <p className="px-2 py-1.5 text-xs text-muted-foreground font-medium">Other Users</p>
-                                                        {users.filter(u => !u.isProjectMember).map(u => (
-                                                            <div
-                                                                key={u.id}
-                                                                className="flex items-center space-x-2 px-2 py-1.5 hover:bg-accent rounded-sm cursor-pointer"
-                                                                onClick={() => toggleAssignee(u.id)}
-                                                            >
-                                                                <Checkbox
-                                                                    checked={assigneeIds.includes(u.id)}
-                                                                />
-                                                                <div className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1">
-                                                                    {u.name}
-                                                                </div>
+                                                    {users.filter(u => u.isProjectMember).map(u => (
+                                                        <div
+                                                            key={u.id}
+                                                            className="flex items-center space-x-2 px-2 py-1.5 hover:bg-accent rounded-sm cursor-pointer"
+                                                            onClick={() => toggleAssignee(u.id)}
+                                                        >
+                                                            <Checkbox
+                                                                checked={assigneeIds.includes(u.id)}
+                                                            />
+                                                            <div className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1 flex justify-between">
+                                                                <span>{u.name}</span>
+                                                                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Member</span>
                                                             </div>
-                                                        ))}
-                                                    </>
-                                                )}
+                                                        </div>
+                                                    ))}
+
+                                                    {users.some(u => !u.isProjectMember) && (
+                                                        <>
+                                                            <div className="h-px bg-border my-1" />
+                                                            <p className="px-2 py-1.5 text-xs text-muted-foreground font-medium">Other Users</p>
+                                                            {users.filter(u => !u.isProjectMember).map(u => (
+                                                                <div
+                                                                    key={u.id}
+                                                                    className="flex items-center space-x-2 px-2 py-1.5 hover:bg-accent rounded-sm cursor-pointer"
+                                                                    onClick={() => toggleAssignee(u.id)}
+                                                                >
+                                                                    <Checkbox
+                                                                        checked={assigneeIds.includes(u.id)}
+                                                                    />
+                                                                    <div className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1">
+                                                                        {u.name}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </>
+                                                    )}
                                                 </div>
                                             </RemoveScroll>
                                         </PopoverContent>

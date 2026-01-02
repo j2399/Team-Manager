@@ -523,10 +523,8 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
             }
 
             // Only refresh if both operations succeeded
-            if (success) {
-                router.refresh()
-            } else {
-                // Revert on failure (optional, but good practice)
+            if (!success) {
+                // Revert on failure
                 setColumns(board.columns)
             }
         } catch (error) {
@@ -597,7 +595,7 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
             router.refresh()
         } else {
             triggerConfetti('review', reviewDialog.dropPosition)
-            router.refresh()
+            // router.refresh() // Removed to prevent flicker
         }
         setReviewDialog(null)
         setIsDragging(false)
@@ -655,7 +653,7 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
         }
 
         await saveToServer(doneMoveDialog.taskId, doneMoveDialog.toColumnId)
-        router.refresh()
+        // router.refresh() // Removed to prevent flicker
         setDoneMoveDialog(null)
         setIsDragging(false)
     }
@@ -749,6 +747,43 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
             </div>
         </div>
     )
+
+    const handleTaskCreated = (newTask: Task) => {
+        setColumns(prev => prev.map(col => {
+            if (col.id === newTask.columnId) {
+                return { ...col, tasks: [...col.tasks, newTask] }
+            }
+            return col
+        }))
+    }
+
+    const handleTaskUpdated = (updatedTask: Task) => {
+        setColumns(prev => prev.map(col => {
+            const existingTaskIndex = col.tasks.findIndex(t => t.id === updatedTask.id)
+
+            if (col.id === updatedTask.columnId) {
+                if (existingTaskIndex !== -1) {
+                    const newTasks = [...col.tasks]
+                    newTasks[existingTaskIndex] = updatedTask
+                    return { ...col, tasks: newTasks }
+                } else {
+                    return { ...col, tasks: [...col.tasks, updatedTask] }
+                }
+            } else {
+                if (existingTaskIndex !== -1) {
+                    return { ...col, tasks: col.tasks.filter(t => t.id !== updatedTask.id) }
+                }
+            }
+            return col
+        }))
+    }
+
+    const handleTaskDeleted = (taskId: string) => {
+        setColumns(prev => prev.map(col => ({
+            ...col,
+            tasks: col.tasks.filter(t => t.id !== taskId)
+        })))
+    }
 
     return (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
@@ -890,6 +925,7 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
                         setEditingTask(previewingTask)
                         setPreviewingTask(null)
                     }}
+                    onTaskUpdated={handleTaskUpdated}
                 />
             )}
 
@@ -902,10 +938,10 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
                     open={true}
                     onOpenChange={(open) => {
                         if (open) return
-                        const pushId = editingTask.push?.id
                         setEditingTask(null)
-                        if (pushId) void loadPushTasks(pushId)
                     }}
+                    onTaskUpdated={handleTaskUpdated}
+                    onTaskDeleted={handleTaskDeleted}
                 />
             )}
 
@@ -919,11 +955,10 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
                     open={true}
                     onOpenChange={(open) => {
                         if (open) return
-                        const pushId = creatingPushId
                         setCreatingColumnId(null)
                         setCreatingPushId(null)
-                        if (pushId) void loadPushTasks(pushId)
                     }}
+                    onTaskCreated={handleTaskCreated}
                 />
             )}
 

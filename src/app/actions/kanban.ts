@@ -122,7 +122,12 @@ export async function createTask(input: CreateTaskInput) {
         const task = await prisma.task.create({
             data: taskData,
             include: {
-                assignee: { select: { name: true, discordId: true } }
+                assignee: { select: { id: true, name: true, discordId: true } },
+                assignees: { include: { user: { select: { id: true, name: true } } } },
+                push: { select: { id: true, name: true, color: true, status: true } },
+                attachments: { select: { id: true, createdAt: true } },
+                comments: { select: { createdAt: true } },
+                activityLogs: { select: { changedByName: true, createdAt: true } }
             }
         })
 
@@ -134,6 +139,20 @@ export async function createTask(input: CreateTaskInput) {
                     userId: userId
                 }))
             })
+
+            // Re-fetch to get the assignees relation populated correctly
+            const updatedTask = await prisma.task.findUnique({
+                where: { id: task.id },
+                include: {
+                    assignee: { select: { id: true, name: true, discordId: true } },
+                    assignees: { include: { user: { select: { id: true, name: true } } } },
+                    push: { select: { id: true, name: true, color: true, status: true } },
+                    attachments: { select: { id: true, createdAt: true } },
+                    comments: { select: { createdAt: true } },
+                    activityLogs: { select: { changedByName: true, createdAt: true } }
+                }
+            })
+            if (updatedTask) Object.assign(task, updatedTask)
         }
 
 
@@ -181,27 +200,27 @@ export async function createTask(input: CreateTaskInput) {
                         where: { id: { in: assignedIds }, discordId: { not: null } },
                         select: { discordId: true }
                     })
-	                    const mentions = assignedUsers.map((u) => (u.discordId ? `<@${u.discordId}>` : "")).filter(Boolean).join(" ")
+                    const mentions = assignedUsers.map((u) => (u.discordId ? `<@${u.discordId}>` : "")).filter(Boolean).join(" ")
 
-	                    if (mentions) {
-	                        const dueDate = endDate ? parseDateInput(endDate, "endOfDay") : null
-	                        await sendDiscordNotification(
-	                            "",
-	                            [{
-	                                title: "📌 Task Assignment",
-	                                description: `${mentions}, you have been assigned **${task.title}** in project **${project.name}**\n${formatDueLine(dueDate)}`,
-	                                color: 0x5865F2,
-	                                timestamp: new Date().toISOString(),
-	                            }],
-	                            webhookUrl
-	                        )
-	                    }
-	                }
-	            }
+                    if (mentions) {
+                        const dueDate = endDate ? parseDateInput(endDate, "endOfDay") : null
+                        await sendDiscordNotification(
+                            "",
+                            [{
+                                title: "📌 Task Assignment",
+                                description: `${mentions}, you have been assigned **${task.title}** in project **${project.name}**\n${formatDueLine(dueDate)}`,
+                                color: 0x5865F2,
+                                timestamp: new Date().toISOString(),
+                            }],
+                            webhookUrl
+                        )
+                    }
+                }
+            }
         }
 
         revalidatePath(`/dashboard/projects/${projectId}`)
-        return { success: true, taskId: task.id }
+        return { success: true, task }
     } catch (error) {
         console.error("Create task error:", error)
         // Return the actual error message for debugging
@@ -266,7 +285,12 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
             where: { id: taskId },
             data: { columnId },
             include: {
-                assignee: { select: { name: true, discordId: true } },
+                assignee: { select: { id: true, name: true, discordId: true } },
+                assignees: { include: { user: { select: { id: true, name: true } } } },
+                push: { select: { id: true, name: true, color: true, status: true } },
+                attachments: { select: { id: true, createdAt: true } },
+                comments: { select: { createdAt: true } },
+                activityLogs: { select: { changedByName: true, createdAt: true } },
                 column: {
                     include: {
                         board: {
@@ -313,23 +337,23 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
                     where: { id: project.workspaceId },
                     select: { discordChannelId: true }
                 })
-	                const webhookUrl = workspace?.discordChannelId || null
-	                if (webhookUrl) {
-	                    await sendDiscordNotification(
-	                        "",
-	                        [{
-	                            title: "🔍 Needs Review",
-	                            description: `<@${project.lead.discordId}>, **${updatedTask.title}** needs review`,
-	                            color: 0xFEE75C,
-	                            timestamp: new Date().toISOString(),
-	                        }],
-	                        webhookUrl
-	                    )
-	                }
-	            }
-	        }
+                const webhookUrl = workspace?.discordChannelId || null
+                if (webhookUrl) {
+                    await sendDiscordNotification(
+                        "",
+                        [{
+                            title: "🔍 Needs Review",
+                            description: `<@${project.lead.discordId}>, **${updatedTask.title}** needs review`,
+                            color: 0xFEE75C,
+                            timestamp: new Date().toISOString(),
+                        }],
+                        webhookUrl
+                    )
+                }
+            }
+        }
 
-        return { success: true }
+        return { success: true, task: updatedTask }
     } catch (e) {
         console.error("Update task error:", e)
         const errorMessage = e instanceof Error ? e.message : 'Unknown error'
@@ -522,27 +546,27 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
                         where: { id: { in: newlyAssignedIds }, discordId: { not: null } },
                         select: { discordId: true }
                     })
-	                    const mentions = assignedUsers.map((u) => (u.discordId ? `<@${u.discordId}>` : "")).filter(Boolean).join(" ")
+                    const mentions = assignedUsers.map((u) => (u.discordId ? `<@${u.discordId}>` : "")).filter(Boolean).join(" ")
 
-	                    if (mentions) {
-	                        const dueDate =
-	                            input.endDate !== undefined
-	                                ? (input.endDate ? parseDateInput(input.endDate, "endOfDay") : null)
-	                                : (task.endDate ?? null)
-	                        await sendDiscordNotification(
-	                            "",
-	                            [{
-	                                title: "📌 Task Assignment",
-	                                description: `${mentions}, you have been assigned **${task.title}** in project **${projectName}**\n${formatDueLine(dueDate)}`,
-	                                color: 0x5865F2,
-	                                timestamp: new Date().toISOString(),
-	                            }],
-	                            webhookUrl
-	                        )
-	                    }
-	                }
-	            }
-	        }
+                    if (mentions) {
+                        const dueDate =
+                            input.endDate !== undefined
+                                ? (input.endDate ? parseDateInput(input.endDate, "endOfDay") : null)
+                                : (task.endDate ?? null)
+                        await sendDiscordNotification(
+                            "",
+                            [{
+                                title: "📌 Task Assignment",
+                                description: `${mentions}, you have been assigned **${task.title}** in project **${projectName}**\n${formatDueLine(dueDate)}`,
+                                color: 0x5865F2,
+                                timestamp: new Date().toISOString(),
+                            }],
+                            webhookUrl
+                        )
+                    }
+                }
+            }
+        }
 
         // Create activity logs
         if (activityLogs.length > 0) {
@@ -565,11 +589,24 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
             // Discord notifications intentionally limited to assignment/review/chat mention pings.
         }
 
+        // Fetch completely updated task for UI update
+        const updatedTask = await prisma.task.findUnique({
+            where: { id: taskId },
+            include: {
+                assignee: { select: { id: true, name: true, discordId: true } },
+                assignees: { include: { user: { select: { id: true, name: true } } } },
+                push: { select: { id: true, name: true, color: true, status: true } },
+                attachments: { select: { id: true, createdAt: true } },
+                comments: { select: { createdAt: true } },
+                activityLogs: { select: { changedByName: true, createdAt: true } }
+            }
+        })
+
         if (task?.column?.board?.projectId) {
             revalidatePath(`/dashboard/projects/${task.column.board.projectId}`)
         }
 
-        return { success: true }
+        return { success: true, task: updatedTask }
     } catch (e) {
         console.error("Update details error:", e)
         const errorMessage = e instanceof Error ? e.message : 'Unknown error'

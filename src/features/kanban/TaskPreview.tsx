@@ -34,6 +34,7 @@ type Task = {
     instructionsFileName?: string | null
     assignee?: { id?: string; name: string } | null
     column?: { name: string } | null
+    columnId: string | null
     createdAt?: Date | string | null
     updatedAt?: Date | string | null
     assignees?: { user: { id: string; name: string } }[]
@@ -75,6 +76,7 @@ type TaskPreviewProps = {
     onOpenChange: (open: boolean) => void
     onEdit: () => void
     projectId: string
+    onTaskUpdated?: (task: Task) => void
 }
 
 const formatTimeAgo = (date: string) => {
@@ -244,7 +246,7 @@ const buildCommentTree = (comments: Comment[]): CommentWithReplies[] => {
     return rootComments
 }
 
-export function TaskPreview({ task, open, onOpenChange, onEdit, projectId }: TaskPreviewProps) {
+export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTaskUpdated }: TaskPreviewProps) {
     const router = useRouter()
     const [comments, setComments] = useState<Comment[]>([])
     const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -710,8 +712,10 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId }: Tas
             if (result.error) {
                 alert(result.error)
             } else {
+                if (result.task && onTaskUpdated) {
+                    onTaskUpdated(result.task)
+                }
                 onOpenChange(false)
-                router.refresh()
             }
         } catch (error) {
             console.error('Failed to accept task:', error)
@@ -743,8 +747,10 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId }: Tas
             if (result.error) {
                 alert(result.error)
             } else {
+                if (result.task && onTaskUpdated) {
+                    onTaskUpdated(result.task)
+                }
                 onOpenChange(false)
-                router.refresh()
             }
         } catch (error) {
             console.error('Failed to deny task:', error)
