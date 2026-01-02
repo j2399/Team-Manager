@@ -64,7 +64,7 @@ export default async function SettingsPage() {
     const canChangeRoles = isAdmin
 
     return (
-        <div className="flex flex-col gap-10 p-6 max-w-4xl mx-auto w-full pb-20">
+        <div className="flex flex-col gap-10 p-6 max-w-4xl mx-auto w-full pb-20 animate-in slide-in-from-left-4 duration-300 ease-out">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
                 <p className="text-muted-foreground mt-2 text-sm">Manage your account, team, and workspace preferences.</p>
