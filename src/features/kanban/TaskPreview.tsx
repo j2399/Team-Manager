@@ -197,6 +197,11 @@ const isImageFile = (filename: string) => {
     return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext || '')
 }
 
+const isSvgFile = (filename: string) => {
+    const ext = filename.toLowerCase().split('.').pop()
+    return ext === 'svg'
+}
+
 const isPdfFile = (filename: string) => {
     const ext = filename.toLowerCase().split('.').pop()
     return ext === 'pdf'
@@ -879,7 +884,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId }: Tas
                                                             <img
                                                                 src={instructionsFile.url}
                                                                 alt="Instructions"
-                                                                className="w-full max-h-32 object-contain"
+                                                                className={`w-full max-h-32 object-contain ${isSvgFile(instructionsFile.name) ? 'dark:bg-white dark:rounded dark:p-1' : ''}`}
                                                             />
                                                         ) : isPdfFile(instructionsFile.name) ? (
                                                             <div className="h-32 flex items-center justify-center bg-white">
@@ -969,7 +974,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId }: Tas
                                             }
                                             if (isImageFile(a.name)) {
                                                 return (
-                                                    <div key={a.id} className="relative group bg-muted/50 rounded overflow-hidden border border-muted shrink-0 w-24 h-24 flex-shrink-0">
+                                                    <div key={a.id} className={`relative group bg-muted/50 rounded overflow-hidden border border-muted shrink-0 w-24 h-24 flex-shrink-0 ${isSvgFile(a.name) ? 'dark:bg-white' : ''}`}>
                                                         <img
                                                             src={a.url}
                                                             alt={a.name}
@@ -1207,7 +1212,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId }: Tas
                         <DialogHeader className="sr-only">
                             <DialogTitle>Enlarged Image</DialogTitle>
                         </DialogHeader>
-                        <div className="relative">
+                        <div className={`relative ${isSvgFile(enlargedImage.name) ? 'dark:bg-white dark:rounded-lg dark:p-2' : ''}`}>
                             <img
                                 src={enlargedImage.url}
                                 alt="Enlarged"
@@ -1246,7 +1251,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId }: Tas
                         </DialogHeader>
                         <div className="flex-1 min-h-0 overflow-auto bg-muted/30">
                             {isImageFile(instructionsFile.name) ? (
-                                <div className="p-4 flex items-center justify-center min-h-full">
+                                <div className={`p-4 flex items-center justify-center min-h-full ${isSvgFile(instructionsFile.name) ? 'dark:bg-white dark:rounded-lg dark:m-4' : ''}`}>
                                     <img
                                         src={instructionsFile.url}
                                         alt="Instructions"
