@@ -193,16 +193,20 @@ export function WorkspaceSelector({ user }: { user: any }) {
                                 <DropdownMenuLabel>Appearance</DropdownMenuLabel>
                                 <DropdownMenuItem onClick={() => {
                                     document.documentElement.classList.remove('dark')
+                                    document.documentElement.style.colorScheme = 'light'
+                                    // Save to both global and user-specific keys for sync
                                     localStorage.setItem('cupi_theme', 'light')
-                                    router.refresh()
+                                    if (user.id) localStorage.setItem(`cupi_theme:${user.id}`, 'light')
                                 }}>
                                     Light
                                     {(!document.documentElement.classList.contains('dark')) && <CheckCircle className="w-3 h-3 ml-auto opacity-50" />}
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => {
                                     document.documentElement.classList.add('dark')
+                                    document.documentElement.style.colorScheme = 'dark'
+                                    // Save to both global and user-specific keys for sync
                                     localStorage.setItem('cupi_theme', 'dark')
-                                    router.refresh()
+                                    if (user.id) localStorage.setItem(`cupi_theme:${user.id}`, 'dark')
                                 }}>
                                     Dark
                                     {(document.documentElement.classList.contains('dark')) && <CheckCircle className="w-3 h-3 ml-auto opacity-50" />}

@@ -56,17 +56,21 @@ export default function RootLayout({
             `,
           }}
         />
-        {/* Inline critical CSS to set background before external CSS loads */}
+        {/* Inline critical CSS to set backgrounds before external CSS loads */}
         <style
           dangerouslySetInnerHTML={{
             __html: `
-              html { background-color: #ffffff; }
-              html.dark { background-color: #0f0f0f; }
-              body { background-color: inherit; }
-              /* Prevent card flash */
-              html.dark [class*="bg-card"], 
-              html.dark [class*="bg-background"] { background-color: #1c1c1c; }
-              html.dark [class*="border-border"] { border-color: #383838; }
+              /* Light mode defaults */
+              html { background-color: #ffffff; color: #262626; }
+              
+              /* Dark mode overrides - must match globals.css .dark values */
+              html.dark { background-color: #0f0f0f; color: #ededed; }
+              html.dark [class*="bg-card"] { background-color: rgba(28, 28, 28, 0.8) !important; }
+              html.dark [class*="bg-background"] { background-color: #0f0f0f !important; }
+              html.dark [class*="bg-muted"] { background-color: #292929 !important; }
+              html.dark [class*="bg-accent"] { background-color: #2e2e2e !important; }
+              
+              body { background-color: inherit; color: inherit; }
             `,
           }}
         />

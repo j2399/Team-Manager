@@ -21,12 +21,13 @@ function applyThemePreference(pref: ThemePreference) {
 
 export function AppearanceSettings({ userId }: { userId: string }) {
     const rootKey = "cupi_theme"
+    const userKey = `cupi_theme:${userId}`
 
     const [preference, setPreference] = useState<ThemePreference>("system")
 
     useEffect(() => {
         try {
-            const pref = (window.localStorage.getItem(rootKey) || "system") as ThemePreference
+            const pref = (window.localStorage.getItem(userKey) || window.localStorage.getItem(rootKey) || "system") as ThemePreference
             if (pref === "system" || pref === "light" || pref === "dark") {
                 setPreference(pref)
                 applyThemePreference(pref)
@@ -35,12 +36,13 @@ export function AppearanceSettings({ userId }: { userId: string }) {
             // ignore
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [])
+    }, [userId])
 
     const setAndPersist = (next: ThemePreference) => {
         setPreference(next)
         applyThemePreference(next)
         try {
+            window.localStorage.setItem(userKey, next)
             window.localStorage.setItem(rootKey, next)
         } catch {
             // ignore

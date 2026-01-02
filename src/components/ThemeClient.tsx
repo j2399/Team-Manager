@@ -19,10 +19,12 @@ function applyThemePreference(pref: ThemePreference) {
 export function ThemeClient({ userId }: { userId?: string | null }) {
     useEffect(() => {
         const rootKey = "cupi_theme"
+        const userKey = userId ? `cupi_theme:${userId}` : null
 
         const readPref = (): ThemePreference => {
             try {
-                const pref = window.localStorage.getItem(rootKey) as ThemePreference
+                const userPref = userKey ? window.localStorage.getItem(userKey) : null
+                const pref = (userPref || window.localStorage.getItem(rootKey) || "system") as ThemePreference
                 if (pref === "system" || pref === "light" || pref === "dark") return pref
                 return "system"
             } catch {
