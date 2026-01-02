@@ -78,10 +78,10 @@ export function NotificationBell() {
 
     const getIcon = (type: string) => {
         switch (type) {
-            case 'member_joined': return <User className="h-4 w-4 text-blue-500" />
-            case 'task_due': return <Clock className="h-4 w-4 text-orange-500" />
-            case 'task_assigned': return <FileText className="h-4 w-4 text-green-500" />
-            default: return <Bell className="h-4 w-4 text-gray-500" />
+            case 'member_joined': return <User className="h-4 w-4 text-muted-foreground" />
+            case 'task_due': return <Clock className="h-4 w-4 text-muted-foreground" />
+            case 'task_assigned': return <FileText className="h-4 w-4 text-muted-foreground" />
+            default: return <Bell className="h-4 w-4 text-muted-foreground" />
         }
     }
 
