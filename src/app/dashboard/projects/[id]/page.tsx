@@ -34,7 +34,38 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                 select: {
                     id: true,
                     name: true,
-                    columns: { select: { id: true, name: true, order: true }, orderBy: { order: "asc" } }
+                    columns: {
+                        select: {
+                            id: true,
+                            name: true,
+                            order: true,
+                            tasks: {
+                                select: {
+                                    id: true,
+                                    title: true,
+                                    columnId: true,
+                                    startDate: true,
+                                    endDate: true,
+                                    updatedAt: true,
+                                    push: {
+                                        select: {
+                                            id: true,
+                                            name: true,
+                                            color: true,
+                                            status: true
+                                        }
+                                    },
+                                    assignee: {
+                                        select: {
+                                            id: true,
+                                            name: true
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        orderBy: { order: "asc" }
+                    }
                 }
             }
         }
@@ -50,7 +81,12 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         ...boardData,
         columns: boardData.columns.map(col => ({
             ...col,
-            tasks: []
+            tasks: col.tasks.map(t => ({
+                ...t,
+                startDate: t.startDate ? t.startDate.toISOString() : null,
+                endDate: t.endDate ? t.endDate.toISOString() : null,
+                updatedAt: t.updatedAt ? t.updatedAt.toISOString() : null
+            }))
         }))
     } : null
 

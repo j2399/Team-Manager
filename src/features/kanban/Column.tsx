@@ -56,12 +56,11 @@ export function Column({ column, projectId, onEditTask, onAddTask, isDoneColumn,
         disabled: isDropDisabled
     })
 
-    // Background color based on column type and drag state
     const getBgClass = () => {
-        if (isDoneColumn) return 'bg-emerald-50/50'
+        if (isDoneColumn) return 'bg-emerald-50/50 dark:bg-emerald-900/10'
         if (isFlashing) return 'bg-red-100 ring-4 ring-red-400 animate-pulse'
-        if (isReviewColumn && isOver) return 'bg-gray-200 ring-2 ring-gray-400'
-        if (isReviewColumn) return 'bg-gray-100/80'
+        if (isReviewColumn && isOver) return 'bg-gray-200 ring-2 ring-gray-400 dark:bg-gray-800'
+        if (isReviewColumn) return 'bg-gray-100/80 dark:bg-gray-800/40'
         return 'bg-muted/50'
     }
 
