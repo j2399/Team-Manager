@@ -155,23 +155,23 @@ export function WorkspaceSelector({ user }: { user: any }) {
     return (
         <div className="w-full max-w-5xl space-y-6 md:space-y-8 animate-in fade-in zoom-in-95 duration-500 px-4 md:px-0">
             {/* Header */}
-            <div className="flex flex-col gap-4 md:gap-6 pb-4 md:pb-6 border-b border-zinc-200">
+            <div className="flex flex-col gap-4 md:gap-6 pb-4 md:pb-6 border-b border-border">
                 <div className="flex items-center gap-3 md:gap-4">
-                    <Avatar className="h-12 w-12 md:h-16 md:w-16 border-2 border-white shadow-lg">
+                    <Avatar className="h-12 w-12 md:h-16 md:w-16 border-2 border-background shadow-lg">
                         <AvatarImage src={user.avatar} />
                         <AvatarFallback>{displayName?.[0]}</AvatarFallback>
                     </Avatar>
                     <div className="space-y-0.5 md:space-y-1 flex-1">
-                        <h2 className="text-xl md:text-3xl font-bold tracking-tight text-zinc-900">Your Workspaces</h2>
+                        <h2 className="text-xl md:text-3xl font-bold tracking-tight text-foreground">Your Workspaces</h2>
                         <div className="flex items-center gap-2">
-                            <p className="text-sm md:text-base text-zinc-500 font-medium">Welcome back, {displayName}</p>
+                            <p className="text-sm md:text-base text-muted-foreground font-medium">Welcome back, {displayName}</p>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-2">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="text-zinc-500 hover:text-zinc-900 border border-zinc-200">
+                                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground border border-border">
                                     <Settings className="w-5 h-5" />
                                 </Button>
                             </DropdownMenuTrigger>
@@ -224,41 +224,42 @@ export function WorkspaceSelector({ user }: { user: any }) {
                 </div>
 
                 <div className="flex flex-wrap gap-2 md:gap-3">
-                    <Button onClick={() => setCreateOpen(true)} variant="outline" className="gap-2 shadow-sm flex-1 md:flex-none text-sm text-zinc-900 border-zinc-200 hover:bg-zinc-100 font-medium">
+                    <Button onClick={() => setCreateOpen(true)} variant="outline" className="gap-2 shadow-sm flex-1 md:flex-none text-sm text-foreground bg-background border-border hover:bg-accent hover:text-accent-foreground font-medium">
                         <Plus className="w-4 h-4" /> Create
                     </Button>
-                    <Button onClick={() => setJoinOpen(true)} variant="outline" className="gap-2 shadow-sm flex-1 md:flex-none text-sm text-zinc-900 border-zinc-200 hover:bg-zinc-100 font-medium">
+                    <Button onClick={() => setJoinOpen(true)} variant="outline" className="gap-2 shadow-sm flex-1 md:flex-none text-sm text-foreground bg-background border-border hover:bg-accent hover:text-accent-foreground font-medium">
                         <Users className="w-4 h-4" /> Join
                     </Button>
                 </div>
             </div>
 
             {/* Grid */}
+            {/* Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                 {user.memberships?.map((m: any) => (
                     <Card
                         key={m.workspaceId}
-                        className={`group cursor-pointer transition-all hover:shadow-xl border-2 border-transparent hover:border-zinc-200 bg-white relative overflow-hidden`}
+                        className={`group cursor-pointer transition-all hover:shadow-xl border-2 border-transparent hover:border-border bg-card relative overflow-hidden`}
                         onClick={() => handleSwitch(m.workspaceId)}
                     >
-                        <div className="absolute inset-0 bg-gradient-to-br from-transparent to-zinc-50/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="absolute inset-0 bg-gradient-to-br from-transparent to-accent/50 opacity-0 group-hover:opacity-100 transition-opacity" />
                         <CardContent className="p-6 relative">
                             <div className="flex items-start justify-between mb-4">
-                                <div className={`p-3 rounded-xl bg-zinc-100 text-zinc-600 transition-transform group-hover:scale-110`}>
+                                <div className={`p-3 rounded-xl bg-accent text-accent-foreground transition-transform group-hover:scale-110`}>
                                     {m.role === 'Admin' ? <Building2 className="w-6 h-6" /> : <Users className="w-6 h-6" />}
                                 </div>
-                                <ArrowRight className="w-5 h-5 text-zinc-300 group-hover:text-zinc-900 -translate-x-2 group-hover:translate-x-0 opacity-0 group-hover:opacity-100 transition-all" />
+                                <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground -translate-x-2 group-hover:translate-x-0 opacity-0 group-hover:opacity-100 transition-all" />
                             </div>
 
-                            <CardTitle className="text-xl font-bold text-zinc-900 mb-1">{m.workspace.name}</CardTitle>
-                            <p className="text-sm text-zinc-500 mb-6 font-medium">{m.role}</p>
+                            <CardTitle className="text-xl font-bold text-card-foreground mb-1">{m.workspace.name}</CardTitle>
+                            <p className="text-sm text-muted-foreground mb-6 font-medium">{m.role}</p>
 
-                            <div className="flex items-center gap-4 text-xs font-medium text-zinc-400 border-t pt-4">
-                                <span className="flex items-center gap-1.5 hover:text-zinc-600 transition-colors">
+                            <div className="flex items-center gap-4 text-xs font-medium text-muted-foreground/70 border-t border-border pt-4">
+                                <span className="flex items-center gap-1.5 hover:text-muted-foreground transition-colors">
                                     <Users className="w-3.5 h-3.5" />
                                     {m.workspace._count?.members || 1} Members
                                 </span>
-                                <span className="flex items-center gap-1.5 hover:text-zinc-600 transition-colors">
+                                <span className="flex items-center gap-1.5 hover:text-muted-foreground transition-colors">
                                     <FolderKanban className="w-3.5 h-3.5" />
                                     {m.workspace._count?.projects || 0} Projects
                                 </span>
@@ -268,7 +269,7 @@ export function WorkspaceSelector({ user }: { user: any }) {
                 ))}
 
                 {(!user.memberships || user.memberships.length === 0) && (
-                    <div className="col-span-full py-12 text-center text-zinc-400 border-2 border-dashed border-zinc-200 rounded-xl">
+                    <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed border-border rounded-xl">
                         <p>No workspaces found. Create or join one to get started.</p>
                     </div>
                 )}
@@ -334,15 +335,15 @@ export function WorkspaceSelector({ user }: { user: any }) {
                         </div>
                         <div className="grid gap-2">
                             <Label>Skills</Label>
-                            <div className="bg-zinc-50 border rounded-md p-2 flex flex-wrap gap-2 min-h-[40px]">
+                            <div className="bg-muted/50 border border-border rounded-md p-2 flex flex-wrap gap-2 min-h-[40px]">
                                 {editSkills.map(skill => (
-                                    <span key={skill} className="bg-white border text-zinc-800 text-xs px-2 py-1 rounded flex items-center gap-1">
+                                    <span key={skill} className="bg-background border border-border text-foreground text-xs px-2 py-1 rounded flex items-center gap-1">
                                         {skill}
-                                        <button onClick={() => removeSkill(skill)} className="hover:text-red-500">×</button>
+                                        <button onClick={() => removeSkill(skill)} className="hover:text-destructive">×</button>
                                     </span>
                                 ))}
                                 <input
-                                    className="bg-transparent border-none outline-none text-sm flex-1 min-w-[80px]"
+                                    className="bg-transparent border-none outline-none text-sm flex-1 min-w-[80px] text-foreground placeholder:text-muted-foreground"
                                     placeholder="Add skill..."
                                     value={currentSkill}
                                     onChange={(e) => setCurrentSkill(e.target.value)}
@@ -415,12 +416,12 @@ export function WorkspaceSelector({ user }: { user: any }) {
                     <DialogHeader>
                         <div className="flex items-center gap-3">
                             {notification?.type === 'success' ? (
-                                <div className="p-2 rounded-full bg-green-100">
-                                    <CheckCircle className="w-6 h-6 text-green-600" />
+                                <div className="p-2 rounded-full bg-green-100 dark:bg-green-900/20">
+                                    <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
                                 </div>
                             ) : (
-                                <div className="p-2 rounded-full bg-blue-100">
-                                    <Info className="w-6 h-6 text-blue-600" />
+                                <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900/20">
+                                    <Info className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                                 </div>
                             )}
                             <DialogTitle>{notification?.title}</DialogTitle>
@@ -438,8 +439,8 @@ export function WorkspaceSelector({ user }: { user: any }) {
             </Dialog>
 
             {isPending && (
-                <div className="fixed inset-0 bg-white/50 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-none">
-                    <Loader2 className="w-10 h-10 animate-spin text-zinc-900" />
+                <div className="fixed inset-0 bg-background/50 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-none">
+                    <Loader2 className="w-10 h-10 animate-spin text-primary" />
                 </div>
             )}
         </div>
