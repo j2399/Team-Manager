@@ -33,9 +33,16 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
 
-        // Show all projects for the workspace
+        // Show projects if:
+        // 1. In user's workspace
+        // 2. User is a member
+        // 3. User is the lead
         let whereClause: any = {
-            workspaceId: user.workspaceId
+            OR: [
+                { workspaceId: user.workspaceId },
+                { members: { some: { userId: user.id } } },
+                { leadId: user.id }
+            ]
         }
 
         const projects = await prisma.project.findMany({
