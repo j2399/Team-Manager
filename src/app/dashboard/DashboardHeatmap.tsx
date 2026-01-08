@@ -147,6 +147,198 @@ function TaskListDialog({
     )
 }
 
+// Mini Kanban Column for user view
+function MiniKanbanColumn({
+    name,
+    tasks,
+    onTaskClick,
+    maxVisible = 3
+}: {
+    name: string
+    tasks: Task[]
+    onTaskClick: (task: Task) => void
+    maxVisible?: number
+}) {
+    const [isExpanded, setIsExpanded] = useState(false)
+    const isDone = name === 'Done'
+    const shouldCollapse = tasks.length > maxVisible
+    const visibleTasks = isExpanded ? tasks : tasks.slice(0, maxVisible)
+    const hiddenCount = tasks.length - maxVisible
+
+    return (
+        <div className={cn(
+            "flex-1 min-w-0 rounded-md border p-2",
+            isDone ? "bg-green-50/50 dark:bg-green-950/20" : "bg-muted/30"
+        )}>
+            <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] font-medium">{name}</span>
+                <span className={cn(
+                    "text-[9px] px-1 py-0.5 rounded",
+                    isDone ? "bg-green-100 text-green-700 dark:bg-green-900/50" : "bg-muted text-muted-foreground"
+                )}>
+                    {tasks.length}
+                </span>
+            </div>
+            <div className="space-y-1">
+                {visibleTasks.map(task => (
+                    <button
+                        key={task.id}
+                        onClick={() => onTaskClick(task)}
+                        className={cn(
+                            "w-full text-left p-1.5 rounded text-[10px] border transition-colors",
+                            isDone
+                                ? "bg-green-50 border-green-200 hover:bg-green-100 dark:bg-green-950/30 dark:border-green-900/50"
+                                : "bg-background hover:bg-muted/50"
+                        )}
+                    >
+                        <div className="flex items-center gap-1.5">
+                            <span
+                                className="w-1.5 h-1.5 rounded-full shrink-0"
+                                style={{ backgroundColor: task.projectColor }}
+                            />
+                            <span className="truncate">{task.title}</span>
+                            {task.isOverdue && !isDone && (
+                                <span className="text-[8px] text-red-500 shrink-0">!</span>
+                            )}
+                        </div>
+                    </button>
+                ))}
+                {shouldCollapse && (
+                    <button
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="w-full flex items-center justify-center gap-1 py-1 text-[9px] text-muted-foreground hover:text-foreground"
+                    >
+                        {isExpanded ? (
+                            <>Show less</>
+                        ) : (
+                            <>
+                                <span className="flex gap-0.5">
+                                    <span className="w-1 h-1 rounded-full bg-current opacity-50" />
+                                    <span className="w-1 h-1 rounded-full bg-current opacity-50" />
+                                    <span className="w-1 h-1 rounded-full bg-current opacity-50" />
+                                </span>
+                                +{hiddenCount}
+                            </>
+                        )}
+                    </button>
+                )}
+                {tasks.length === 0 && (
+                    <p className="text-[9px] text-muted-foreground text-center py-2">—</p>
+                )}
+            </div>
+        </div>
+    )
+}
+
+// User Kanban Dialog - shows mini kanban + assign button
+function UserKanbanDialog({
+    open,
+    onOpenChange,
+    user,
+    unassignedTasks,
+    onAssignClick
+}: {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    user: UserStat | null
+    unassignedTasks: Task[]
+    onAssignClick: () => void
+}) {
+    const router = useRouter()
+
+    if (!user) return null
+
+    const handleTaskClick = (task: Task) => {
+        let url = `/dashboard/projects/${task.projectId}?task=${task.id}`
+        if (task.pushId) url += `&push=${task.pushId}`
+        router.push(url)
+    }
+
+    // Group tasks by column
+    const todoTasks = user.tasks.filter(t => t.columnName === 'To Do')
+    const inProgressTasks = user.tasks.filter(t => t.columnName === 'In Progress')
+    const reviewTasks = user.tasks.filter(t => t.columnName === 'Review')
+    const doneTasks = user.tasks.filter(t => t.columnName === 'Done')
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                    <div className="flex items-center justify-between">
+                        <DialogTitle className="text-sm flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
+                                {user.name.charAt(0).toUpperCase()}
+                            </div>
+                            {user.name}'s Board
+                        </DialogTitle>
+                        {unassignedTasks.length > 0 && (
+                            <Button
+                                size="sm"
+                                onClick={onAssignClick}
+                                className="h-7 text-xs"
+                            >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Assign Task
+                            </Button>
+                        )}
+                    </div>
+                </DialogHeader>
+
+                {/* Stats row */}
+                <div className="flex items-center gap-4 py-2 text-[10px] text-muted-foreground border-b">
+                    <span>{user.activeTasks} active</span>
+                    {user.overdueTasks > 0 && (
+                        <span className="text-red-500">{user.overdueTasks} overdue</span>
+                    )}
+                    {user.stuckTasks > 0 && (
+                        <span className="text-amber-500">{user.stuckTasks} stuck</span>
+                    )}
+                    {user.helpRequestTasks > 0 && (
+                        <span className="text-amber-500">{user.helpRequestTasks} need help</span>
+                    )}
+                    <span className="text-green-600">{user.doneTasks} done</span>
+                </div>
+
+                {/* Mini Kanban Grid */}
+                <div className="flex-1 overflow-auto py-3">
+                    <div className="grid grid-cols-4 gap-2">
+                        <MiniKanbanColumn
+                            name="To Do"
+                            tasks={todoTasks}
+                            onTaskClick={handleTaskClick}
+                            maxVisible={4}
+                        />
+                        <MiniKanbanColumn
+                            name="In Progress"
+                            tasks={inProgressTasks}
+                            onTaskClick={handleTaskClick}
+                            maxVisible={4}
+                        />
+                        <MiniKanbanColumn
+                            name="Review"
+                            tasks={reviewTasks}
+                            onTaskClick={handleTaskClick}
+                            maxVisible={4}
+                        />
+                        <MiniKanbanColumn
+                            name="Done"
+                            tasks={doneTasks}
+                            onTaskClick={handleTaskClick}
+                            maxVisible={2}
+                        />
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                        Close
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 function AssignTasksDialog({
     open,
     onOpenChange,
@@ -546,12 +738,15 @@ export function DashboardHeatmap({
                 tasks={selectedIssue?.tasks || []}
             />
 
-            {/* User Tasks Dialog */}
-            <TaskListDialog
+            {/* User Kanban Dialog */}
+            <UserKanbanDialog
                 open={!!selectedUser}
                 onOpenChange={() => setSelectedUser(null)}
-                title={`${selectedUser?.name}'s Tasks (${selectedUser?.activeTasks} active)`}
-                tasks={selectedUser?.tasks.filter(t => t.columnName !== 'Done') || []}
+                user={selectedUser}
+                unassignedTasks={unassignedTasks}
+                onAssignClick={() => {
+                    setAssigningToUser(selectedUser)
+                }}
             />
 
             {/* Assign Tasks Dialog */}
