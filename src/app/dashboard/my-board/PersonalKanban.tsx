@@ -90,9 +90,11 @@ function TaskCard({ task }: { task: Task }) {
     const [isNavigating, setIsNavigating] = useState(false)
     const isDone = task.columnName === 'Done'
     // Don't show overdue for completed tasks
-    const { text: dueText, isOverdue: rawOverdue, isUrgent: rawUrgent } = getDueInfo(task.dueDate)
+    const { text: rawDueText, isOverdue: rawOverdue, isUrgent: rawUrgent } = getDueInfo(task.dueDate)
     const isOverdue = isDone ? false : rawOverdue
     const isUrgent = isDone ? false : rawUrgent
+    // Don't show "overdue" text for done tasks, just show the date if exists
+    const dueText = isDone ? '' : rawDueText
 
     const handleClick = () => {
         setIsNavigating(true)
@@ -111,9 +113,12 @@ function TaskCard({ task }: { task: Task }) {
             onClick={handleClick}
             disabled={isNavigating}
             className={cn(
-                "w-full text-left p-3 rounded-lg border bg-card transition-all duration-150",
+                "w-full text-left p-3 rounded-lg border transition-all duration-150",
                 "hover:shadow-md hover:border-border/80 active:scale-[0.99]",
-                task.hasHelpRequest && "ring-2 ring-amber-300/50",
+                isDone
+                    ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900/50"
+                    : "bg-card",
+                task.hasHelpRequest && !isDone && "ring-2 ring-amber-300/50",
                 isNavigating && "opacity-50"
             )}
         >

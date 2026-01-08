@@ -167,7 +167,7 @@ export default async function DashboardPage() {
         const [users, tasks] = await Promise.all([
             prisma.user.findMany({
                 where: { workspaceId: dbUser.workspaceId },
-                select: { id: true, name: true }
+                select: { id: true, name: true, avatar: true, role: true }
             }),
             prisma.task.findMany({
                 where: {
@@ -178,7 +178,7 @@ export default async function DashboardPage() {
                     assignees: { select: { userId: true } },
                     column: {
                         include: {
-                            board: { include: { project: { select: { id: true, color: true } } } }
+                            board: { include: { project: { select: { id: true, name: true, color: true } } } }
                         }
                     },
                     push: { select: { id: true } },
@@ -221,6 +221,7 @@ export default async function DashboardPage() {
                 title: task.title,
                 columnName: task.column?.name || 'Unknown',
                 projectId: task.column?.board?.project?.id || '',
+                projectName: task.column?.board?.project?.name || '',
                 projectColor: task.column?.board?.project?.color || '#6b7280',
                 pushId: task.push?.id || null,
                 assigneeIds: uniqueAssigneeIds,
@@ -231,10 +232,14 @@ export default async function DashboardPage() {
             }
         })
 
-        // User stats
+        // User stats with full details
         const userStats = users.map(u => {
             const userTasks = transformedTasks.filter(t => t.assigneeIds.includes(u.id))
             const activeTasks = userTasks.filter(t => t.columnName !== 'Done').length
+            const todoTasks = userTasks.filter(t => t.columnName === 'To Do').length
+            const inProgressTasks = userTasks.filter(t => t.columnName === 'In Progress').length
+            const reviewTasks = userTasks.filter(t => t.columnName === 'Review').length
+            const doneTasks = userTasks.filter(t => t.columnName === 'Done').length
             const overdueTasks = userTasks.filter(t => t.isOverdue).length
             const stuckTasks = userTasks.filter(t => t.isStuck).length
             const helpRequestTasks = userTasks.filter(t => t.isBlockedByHelp).length
@@ -243,11 +248,18 @@ export default async function DashboardPage() {
             return {
                 id: u.id,
                 name: u.name,
+                avatar: u.avatar,
+                role: u.role,
                 activeTasks,
+                todoTasks,
+                inProgressTasks,
+                reviewTasks,
+                doneTasks,
                 overdueTasks,
                 stuckTasks,
                 helpRequestTasks,
-                workloadScore
+                workloadScore,
+                tasks: userTasks
             }
         })
 
@@ -304,7 +316,7 @@ export default async function DashboardPage() {
         const overloadedUsers = userStats.filter(u => u.workloadScore > avgWorkload * 1.5 && u.activeTasks > 3).map(u => u.id)
         const idleUsers = userStats.filter(u => u.activeTasks === 0).map(u => u.id)
 
-        return { userStats, criticalIssues, overloadedUsers, idleUsers }
+        return { userStats, criticalIssues, overloadedUsers, idleUsers, allTasks: transformedTasks }
     }
 
     const [myTasks, pendingApproval, teamStats, recentActivity, heatmapData] = await Promise.all([
@@ -471,6 +483,7 @@ export default async function DashboardPage() {
                                 criticalIssues={heatmapData.criticalIssues}
                                 overloadedUsers={heatmapData.overloadedUsers}
                                 idleUsers={heatmapData.idleUsers}
+                                allTasks={heatmapData.allTasks}
                             />
                         )}
                     </div>
