@@ -120,53 +120,91 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
         return () => clearInterval(interval)
     }, [fetchMembers])
 
-    const fetchMessages = React.useCallback(async () => {
+    // Track last message timestamp for incremental updates
+    const lastMessageTime = React.useRef<string | null>(null)
+    const isTabVisible = React.useRef(true)
+
+    // Initial full fetch
+    const fetchAllMessages = React.useCallback(async () => {
         try {
             const res = await fetch('/api/chat?limit=50')
             if (res.ok) {
                 const data = await res.json()
-                setMessages(prev => {
-                    if (data.length > 0 && Array.isArray(data)) {
-                        const lastNew = data[data.length - 1]
-                        const lastPrev = prev[prev.length - 1]
+                if (Array.isArray(data) && data.length > 0) {
+                    setMessages(data)
+                    lastMessageTime.current = data[data.length - 1]?.createdAt || null
+                }
+            }
+        } catch (error) {
+            console.error(error)
+        }
+    }, [])
 
-                        // Check for new messages to notify
-                        if (lastNew?.id !== lastPrev?.id && prev.length > 0) {
-                            // Identify new messages
-                            const newMsgs = data.filter((m: Message) => !prev.find(p => p.id === m.id))
-                            newMsgs.forEach((m: Message) => {
-                                if (m.authorId !== currentUser?.id) {
-                                    if (m.content.includes("@everyone") || (currentUser?.name && m.content.includes(`@${currentUser.name}`))) {
-                                        toast({
-                                            title: `New mention from ${m.author?.name || m.authorName}`,
-                                            description: m.content,
-                                        })
-                                    }
+    // Incremental fetch - only get new messages since last check
+    const fetchNewMessages = React.useCallback(async () => {
+        // Skip if tab is hidden or no previous messages
+        if (!isTabVisible.current || !lastMessageTime.current) return
+
+        try {
+            const since = encodeURIComponent(lastMessageTime.current)
+            const res = await fetch(`/api/chat?limit=50&since=${since}`)
+            if (res.ok) {
+                const newMsgs = await res.json()
+                if (Array.isArray(newMsgs) && newMsgs.length > 0) {
+                    setMessages(prev => {
+                        // Append new messages
+                        const updated = [...prev, ...newMsgs]
+                        // Keep only last 50 to prevent memory bloat
+                        const trimmed = updated.slice(-50)
+                        lastMessageTime.current = trimmed[trimmed.length - 1]?.createdAt || null
+
+                        // Show toast for mentions
+                        newMsgs.forEach((m: Message) => {
+                            if (m.authorId !== currentUser?.id) {
+                                if (m.content.includes("@everyone") || (currentUser?.name && m.content.includes(`@${currentUser.name}`))) {
+                                    toast({
+                                        title: `New mention from ${m.author?.name || m.authorName}`,
+                                        description: m.content,
+                                    })
                                 }
-                            })
+                            }
+                        })
 
-                            return data
-                        }
-
-                        // Check if we need to update state
-                        if (data.length !== prev.length) {
-                            return data
-                        }
-                    }
-                    return prev.length === 0 ? data : prev
-                })
+                        return trimmed
+                    })
+                }
             }
         } catch (error) {
             console.error(error)
         }
     }, [currentUser, toast])
 
-    // Poll for messages (5 seconds - reduced from 500ms to save network)
+    // Track tab visibility to pause polling when hidden
     React.useEffect(() => {
-        fetchMessages()
-        const interval = setInterval(fetchMessages, 5000)
+        const handleVisibility = () => {
+            isTabVisible.current = document.visibilityState === 'visible'
+        }
+        document.addEventListener('visibilitychange', handleVisibility)
+        return () => document.removeEventListener('visibilitychange', handleVisibility)
+    }, [])
+
+    // Initial fetch when component mounts
+    React.useEffect(() => {
+        fetchAllMessages()
+    }, [fetchAllMessages])
+
+    // Smart polling: 1 second when expanded + visible, stopped otherwise
+    React.useEffect(() => {
+        if (!isExpanded) return // Don't poll when collapsed
+
+        const interval = setInterval(() => {
+            if (isTabVisible.current) {
+                fetchNewMessages()
+            }
+        }, 1000)
+
         return () => clearInterval(interval)
-    }, [fetchMessages])
+    }, [isExpanded, fetchNewMessages])
 
     const scrollToBottom = React.useCallback((smooth = true) => {
         const viewport = scrollRef.current
@@ -241,7 +279,8 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content, type })
             })
-            fetchMessages()
+            // After sending, fetch new messages to get the server-assigned ID
+            fetchNewMessages()
         } catch (error) {
             console.error(error)
         }

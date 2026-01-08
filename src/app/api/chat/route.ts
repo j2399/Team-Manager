@@ -12,11 +12,19 @@ export async function GET(request: Request) {
 
         const { searchParams } = new URL(request.url)
         const limit = parseInt(searchParams.get('limit') || '50')
+        const since = searchParams.get('since') // ISO timestamp for incremental updates
+
+        const where: any = {
+            workspaceId: user.workspaceId
+        }
+
+        // If 'since' is provided, only fetch messages newer than that timestamp
+        if (since) {
+            where.createdAt = { gt: new Date(since) }
+        }
 
         const messages = await prisma.generalChatMessage.findMany({
-            where: {
-                workspaceId: user.workspaceId
-            },
+            where,
             take: limit,
             orderBy: {
                 createdAt: 'desc'
