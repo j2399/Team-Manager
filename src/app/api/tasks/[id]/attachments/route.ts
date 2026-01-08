@@ -84,8 +84,10 @@ export async function POST(
 
         // Upload to Vercel Blob
         const filename = `${id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-        const blob = await put(filename, file, {
+        const fileBuffer = await file.arrayBuffer()
+        const blob = await put(filename, fileBuffer, {
             access: 'public',
+            contentType: file.type || 'application/octet-stream',
         })
 
         // Get max order for this task
