@@ -328,12 +328,6 @@ function UserKanbanDialog({
                         />
                     </div>
                 </div>
-
-                <DialogFooter>
-                    <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-                        Close
-                    </Button>
-                </DialogFooter>
             </DialogContent>
         </Dialog>
     )

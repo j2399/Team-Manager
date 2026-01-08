@@ -257,8 +257,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                         isActive ? "font-medium" : "text-muted-foreground group-hover:text-foreground"
                     )}
                 >
-                    <span className="truncate">{project.name}</span>
-                    {navigatingTo === `/dashboard/projects/${project.id}` && <Loader2 className="h-3 w-3 ml-auto animate-spin shrink-0" />}
+                    <span className={cn("truncate", navigatingTo === `/dashboard/projects/${project.id}` && "animate-opacity-sweep")}>{project.name}</span>
                 </Link>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -502,8 +501,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                             )}
                         >
                             <LayoutDashboard className="h-5 w-5" />
-                            Dashboard
-                            {navigatingTo === "/dashboard" && <Loader2 className="h-4 w-4 ml-auto animate-spin" />}
+                            <span className={navigatingTo === "/dashboard" ? "animate-opacity-sweep" : ""}>Dashboard</span>
                         </Link>
 
                         {/* My Board Link */}
@@ -516,8 +514,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                             )}
                         >
                             <Kanban className="h-5 w-5" />
-                            My Board
-                            {navigatingTo === "/dashboard/my-board" && <Loader2 className="h-4 w-4 ml-auto animate-spin" />}
+                            <span className={navigatingTo === "/dashboard/my-board" ? "animate-opacity-sweep" : ""}>My Board</span>
                         </Link>
 
                         {/* Projects Section */}
@@ -599,8 +596,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                     }}
                 >
                     <FolderKanban className="h-4 w-4" />
-                    Back to Workspaces
-                    {navigatingTo === '/workspaces' && <Loader2 className="h-4 w-4 ml-auto animate-spin" />}
+                    <span className={navigatingTo === '/workspaces' ? "animate-opacity-sweep" : ""}>Back to Workspaces</span>
                 </Button>
             </div>
 
