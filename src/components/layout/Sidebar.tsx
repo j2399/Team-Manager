@@ -9,6 +9,7 @@ import {
     Kanban, Loader2
 } from "lucide-react"
 import { DiscordIcon } from "@/components/icons/DiscordIcon"
+import { SpinningDots } from "@/components/ui/spinning-dots"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -262,7 +263,7 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                     )}
                 >
                     <span className="truncate">{project.name}</span>
-                    {navigatingTo === `/dashboard/projects/${project.id}` && <Loader2 className="h-3 w-3 ml-auto animate-spin shrink-0" />}
+                    {navigatingTo === `/dashboard/projects/${project.id}` && <SpinningDots className="ml-auto shrink-0" />}
                 </Link>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
