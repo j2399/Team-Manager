@@ -70,39 +70,17 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
         <>
             <div
                 onClick={() => setShowTaskPreview(true)}
-                className={`
-                    group cursor-pointer rounded-lg p-3 transition-all
-                    border-l-[3px] bg-card hover:bg-accent/50
-                    ${isOverdue ? 'border-l-red-500 bg-red-50/30 dark:bg-red-950/10' : ''}
-                    ${isUrgent && !isOverdue ? 'border-l-amber-500' : ''}
-                    ${!isUrgent && !isOverdue ? 'border-l-transparent hover:border-l-primary/50' : ''}
-                `}
-                style={{
-                    borderLeftColor: !isOverdue && !isUrgent ? projectColor : undefined
-                }}
+                className="group cursor-pointer rounded-lg p-3 transition-all border border-border bg-card hover:bg-accent/50"
             >
-                {/* Title */}
-                <h4 className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-                    {task.title}
-                </h4>
-
-                {/* Project & Due Date */}
-                <div className="flex items-center justify-between gap-2 mt-2">
-                    {project && (
-                        <span
-                            className="text-[10px] font-medium px-1.5 py-0.5 rounded truncate max-w-[120px]"
-                            style={{
-                                backgroundColor: `${projectColor}15`,
-                                color: projectColor
-                            }}
-                        >
-                            {project.name}
-                        </span>
-                    )}
+                {/* Top row: Title on left, Due time on right */}
+                <div className="flex items-start justify-between gap-2">
+                    <h4 className="text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                        {task.title}
+                    </h4>
 
                     {dueText && (
                         <span className={`
-                            text-[10px] flex items-center gap-1 shrink-0
+                            text-[10px] flex items-center gap-1 shrink-0 mt-0.5
                             ${isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : ''}
                             ${isUrgent && !isOverdue ? 'text-amber-600 dark:text-amber-400' : ''}
                             ${!isUrgent && !isOverdue ? 'text-muted-foreground' : ''}
@@ -112,6 +90,19 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
                         </span>
                     )}
                 </div>
+
+                {/* Project badge underneath title */}
+                {project && (
+                    <span
+                        className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded truncate max-w-[120px] mt-2"
+                        style={{
+                            backgroundColor: `${projectColor}15`,
+                            color: projectColor
+                        }}
+                    >
+                        {project.name}
+                    </span>
+                )}
             </div>
 
             {showTaskPreview && (
