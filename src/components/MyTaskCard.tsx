@@ -38,43 +38,32 @@ function getTimeUntilDue(dueDate: Date | string | null): { text: string; isOverd
     const now = new Date()
     const due = new Date(dueDate)
 
-    // Calculate difference in milliseconds
-    const diffMs = due.getTime() - now.getTime()
+    // Safety check for invalid dates
+    if (isNaN(due.getTime())) return { text: '', isOverdue: false, isUrgent: false }
 
-    // Calculate partials
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    const diffMs = due.getTime() - now.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-    const diffMinutes = Math.floor(diffMs / (1000 * 60))
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
     if (diffMs < 0) {
-        const absDiffDays = Math.abs(diffDays)
-        if (absDiffDays === 0) return { text: 'Due today', isOverdue: true, isUrgent: true }
-        if (absDiffDays === 1) return { text: '1d overdue', isOverdue: true, isUrgent: true }
-        return { text: `${absDiffDays}d overdue`, isOverdue: true, isUrgent: true }
+        const absDays = Math.abs(diffDays)
+        if (absDays === 0) return { text: 'Due today', isOverdue: true, isUrgent: true }
+        return { text: `${absDays}d overdue`, isOverdue: true, isUrgent: true }
     }
 
-    // Due in less than 1 hour
-    if (diffMinutes < 60) {
-        if (diffMinutes <= 0) return { text: 'Due now', isOverdue: false, isUrgent: true }
-        return { text: `${diffMinutes}m left`, isOverdue: false, isUrgent: true }
+    if (diffMins < 60) {
+        if (diffMins <= 0) return { text: 'Due now', isOverdue: false, isUrgent: true }
+        return { text: `${diffMins}m left`, isOverdue: false, isUrgent: true }
     }
 
-    // Due in less than 24 hours
     if (diffHours < 24) {
         return { text: `${diffHours}h left`, isOverdue: false, isUrgent: true }
     }
 
-    // Due tomorrow
-    if (diffDays === 1) {
-        return { text: 'Tomorrow', isOverdue: false, isUrgent: true }
-    }
+    if (diffDays === 1) return { text: 'Tomorrow', isOverdue: false, isUrgent: true }
+    if (diffDays <= 7) return { text: `${diffDays}d left`, isOverdue: false, isUrgent: diffDays <= 3 }
 
-    // Due within current week (<= 7 days)
-    if (diffDays <= 7) {
-        return { text: `${diffDays}d left`, isOverdue: false, isUrgent: diffDays <= 3 }
-    }
-
-    // Longer term
     return { text: `${diffDays}d left`, isOverdue: false, isUrgent: false }
 }
 
@@ -91,21 +80,17 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
         <>
             <div
                 onClick={() => setShowTaskPreview(true)}
-                className="group relative flex flex-col gap-1.5 cursor-pointer rounded-lg border border-border bg-card p-3 transition-all hover:bg-accent/50 overflow-hidden"
+                className="group relative flex flex-col gap-2 cursor-pointer rounded-lg border border-border bg-card p-3 transition-all hover:bg-accent/50 overflow-hidden"
             >
-                {/* 
-                  Grid layout for top row: 
-                  - Title takes as much space as possible but will not push the due date out.
-                  - Due date takes exactly what it needs and stays on the right.
-                */}
-                <div className="grid grid-cols-[1fr_auto] items-start gap-2">
-                    <h4 className="text-sm font-medium leading-snug line-clamp-2 transition-colors group-hover:text-primary min-w-0 break-words">
+                {/* Row 1: Title and Due Time */}
+                <div className="grid grid-cols-[1fr_auto] items-start gap-4">
+                    <h4 className="text-sm font-medium leading-tight group-hover:text-primary transition-colors line-clamp-2 min-w-0">
                         {task.title}
                     </h4>
 
                     {dueText && (
                         <div className={`
-                            flex items-center gap-1 shrink-0 text-[11px] font-semibold mt-0.5
+                            flex items-center gap-1 shrink-0 text-[11px] font-bold mt-0.5
                             ${isOverdue ? 'text-red-500' : ''}
                             ${isUrgent && !isOverdue ? 'text-amber-500' : ''}
                             ${!isUrgent && !isOverdue ? 'text-muted-foreground' : ''}
@@ -116,18 +101,11 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
                     )}
                 </div>
 
-                {/* Description - subdued and truncated to 1 line */}
-                {task.description && (
-                    <p className="text-[11px] leading-tight text-muted-foreground/50 truncate pr-2">
-                        {task.description}
-                    </p>
-                )}
-
-                {/* Project Badge - no left border on card, just this identifier */}
+                {/* Row 2: Project Badge (Directly underneath title) */}
                 {project && (
-                    <div className="flex items-center mt-1">
+                    <div className="flex items-center">
                         <span
-                            className="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tight truncate max-w-[150px]"
+                            className="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter truncate max-w-[140px]"
                             style={{
                                 backgroundColor: `${projectColor}15`,
                                 color: projectColor
@@ -136,6 +114,13 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
                             {project.name}
                         </span>
                     </div>
+                )}
+
+                {/* Row 3: Description (Underneath project badge) */}
+                {task.description && (
+                    <p className="text-[11px] leading-snug text-muted-foreground/50 truncate">
+                        {task.description}
+                    </p>
                 )}
             </div>
 
