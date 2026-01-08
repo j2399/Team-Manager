@@ -4,7 +4,7 @@ export default function ProjectLoading() {
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="shrink-0 border-b bg-background">
+            <div className="shrink-0 bg-background">
                 <div className="flex items-center justify-between gap-2 p-3">
                     <div className="flex items-center gap-3">
                         <div className="h-6 w-32 bg-muted rounded animate-pulse" />

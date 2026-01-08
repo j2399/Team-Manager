@@ -15,9 +15,8 @@ export default function DashboardLoading() {
                     <div className="lg:col-span-2 space-y-5">
                         {/* My Tasks */}
                         <section className="rounded-lg p-4 bg-muted/30">
-                            <div className="flex items-center justify-between mb-3">
+                            <div className="mb-3">
                                 <div className="h-4 w-20 bg-muted rounded animate-pulse" />
-                                <div className="h-3 w-16 bg-muted rounded animate-pulse" />
                             </div>
                             <div className="space-y-2">
                                 {[0, 1, 2, 3, 4].map((i) => (

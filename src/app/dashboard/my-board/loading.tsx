@@ -4,7 +4,7 @@ export default function MyBoardLoading() {
     return (
         <div className="h-full flex flex-col">
             {/* Header */}
-            <div className="p-4 border-b flex items-center justify-between shrink-0">
+            <div className="p-4 flex items-center justify-between shrink-0">
                 <div className="h-5 w-32 bg-muted rounded animate-pulse" />
                 <div className="h-8 w-24 bg-muted rounded animate-pulse" />
             </div>
