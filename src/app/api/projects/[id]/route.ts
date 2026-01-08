@@ -107,7 +107,7 @@ export async function DELETE(
 
         const { id } = await params
 
-        // Delete in order: tasks -> columns -> boards -> sprints -> whiteboards -> project
+        // Delete in order: tasks -> columns -> boards -> pushes -> project
         await prisma.$transaction(async (tx) => {
             // Get all boards for this project
             const boards = await tx.board.findMany({
@@ -150,11 +150,6 @@ export async function DELETE(
 
             // Delete pushes
             await tx.push.deleteMany({
-                where: { projectId: id }
-            })
-
-            // Delete whiteboards
-            await tx.whiteboard.deleteMany({
                 where: { projectId: id }
             })
 

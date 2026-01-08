@@ -166,8 +166,8 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
 
     React.useEffect(() => {
         fetchUserData()
-        // Poll for role changes
-        const interval = setInterval(fetchUserData, 2000)
+        // Poll for role changes (60 seconds - roles rarely change)
+        const interval = setInterval(fetchUserData, 60000)
         return () => clearInterval(interval)
     }, [fetchUserData])
 

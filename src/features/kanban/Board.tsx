@@ -280,14 +280,14 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
         })
     }, [board.columns])
 
-    // Auto-refresh board data
+    // Auto-refresh board data (15 seconds - reduced frequency to save network)
     useEffect(() => {
         const interval = setInterval(() => {
             // Only refresh if user is not currently interacting with critical UI elements
             if (!isDragging && !reviewDialog && !doneMoveDialog && !editingTask && !previewingTask && !creatingColumnId && !editingPush && !deletePushId) {
                 router.refresh()
             }
-        }, 5000)
+        }, 15000)
 
         return () => clearInterval(interval)
     }, [isDragging, reviewDialog, doneMoveDialog, editingTask, previewingTask, creatingColumnId, editingPush, deletePushId, router])

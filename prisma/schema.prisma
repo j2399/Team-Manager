@@ -55,7 +55,6 @@ model Project {
   workspaceId String?
   pushes      Push[]
   boards      Board[]
-  whiteboards Whiteboard[]
   members     ProjectMember[] @relation("ProjectMembers")
   userOrders  ProjectUserOrder[]
   createdAt   DateTime @default(now())
@@ -182,16 +181,6 @@ model TaskAttachment {
   taskId    String
   uploadedBy String
   createdAt DateTime @default(now())
-}
-
-model Whiteboard {
-  id        String   @id @default(cuid())
-  name      String   @default("Untitled")
-  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  projectId String?
-  data      String   // JSON string
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
 model ActivityLog {

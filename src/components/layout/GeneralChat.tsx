@@ -114,15 +114,15 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
         fetchMembers()
     }, [fetchMembers])
 
-    // Poll for members
+    // Poll for members (30 seconds - members rarely change)
     React.useEffect(() => {
-        const interval = setInterval(fetchMembers, 5000) // Poll every 5 seconds for new users
+        const interval = setInterval(fetchMembers, 30000)
         return () => clearInterval(interval)
     }, [fetchMembers])
 
     const fetchMessages = React.useCallback(async () => {
         try {
-            const res = await fetch('/api/chat?limit=200')
+            const res = await fetch('/api/chat?limit=50')
             if (res.ok) {
                 const data = await res.json()
                 setMessages(prev => {
@@ -161,10 +161,10 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
         }
     }, [currentUser, toast])
 
-    // Poll for messages
+    // Poll for messages (5 seconds - reduced from 500ms to save network)
     React.useEffect(() => {
         fetchMessages()
-        const interval = setInterval(fetchMessages, 500)
+        const interval = setInterval(fetchMessages, 5000)
         return () => clearInterval(interval)
     }, [fetchMessages])
 

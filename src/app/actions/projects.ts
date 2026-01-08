@@ -51,14 +51,6 @@ export async function createProject(formData: FormData) {
                 }
             })
 
-            await tx.whiteboard.create({
-                data: {
-                    projectId: p.id,
-                    name: 'Project Whiteboard',
-                    data: '{}'
-                }
-            })
-
             return p
         })
 

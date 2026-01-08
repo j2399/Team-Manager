@@ -13,7 +13,6 @@ async function main() {
         await prisma.comment.deleteMany()
         await prisma.task.deleteMany()
         await prisma.push.deleteMany()
-        await prisma.whiteboard.deleteMany()
         await prisma.column.deleteMany()
         await prisma.board.deleteMany()
         await prisma.project.deleteMany()

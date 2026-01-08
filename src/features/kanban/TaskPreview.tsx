@@ -354,10 +354,10 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
             fetchAttachments()
             fetchInstructions()
 
-            // Set up polling to refresh comments every 5 seconds
+            // Set up polling to refresh comments every 10 seconds
             const interval = setInterval(() => {
                 fetchComments()
-            }, 5000)
+            }, 10000)
 
             return () => clearInterval(interval)
         } else {
@@ -370,7 +370,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
             setInstructionsFile(null)
             setShowInstructionsFullscreen(false)
         }
-    }, [open, task.id, comments])
+    }, [open, task.id]) // Removed 'comments' to prevent infinite re-fetching
 
     const handleAddComment = async () => {
         if (!newComment.trim() || isSubmitting) return
