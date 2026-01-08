@@ -85,10 +85,12 @@ export async function POST(
         // Upload to Vercel Blob
         const filename = `${id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
         const fileBuffer = await file.arrayBuffer()
+        console.log(`[UPLOAD] Processing file: ${filename}, size: ${file.size} bytes`);
         const blob = await put(filename, fileBuffer, {
             access: 'public',
             contentType: file.type || 'application/octet-stream',
         })
+        console.log(`[UPLOAD] Blob created: ${blob.url}`);
 
         // Get max order for this task
         const maxOrder = await prisma.taskAttachment.aggregate({
@@ -108,6 +110,7 @@ export async function POST(
                 order: (maxOrder._max.order ?? -1) + 1
             }
         })
+        console.log(`[UPLOAD] Attachment record created in DB: ${attachment.id}`);
 
         // Log activity for attachment being added
         await prisma.activityLog.create({
@@ -126,11 +129,12 @@ export async function POST(
 
         return NextResponse.json(attachment, { status: 201 })
     } catch (error: any) {
-        console.error('Failed to create attachment:', error)
-        const errorMessage = error?.message || 'Failed to upload file'
+        console.error('Failed to upload attachment:', error)
+        const message = error?.message || 'Unknown error'
         return NextResponse.json({
-            error: errorMessage,
-            details: process.env.NODE_ENV === 'development' ? String(error) : undefined
+            error: `Failed to upload attachment: ${message}`,
+            details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
+            stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
         }, { status: 500 })
     }
 }
@@ -165,6 +169,7 @@ export async function DELETE(
 
         // Delete from Vercel Blob
         try {
+            console.log(`[DELETE] Deleting blob: ${attachment.url}`);
             await del(attachment.url)
         } catch (e) {
             console.error('Failed to delete from blob storage:', e)

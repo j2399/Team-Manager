@@ -71,10 +71,12 @@ export async function POST(
         // Upload to Vercel Blob
         const filename = `instructions/${id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
         const fileBuffer = await file.arrayBuffer()
+        console.log(`[INSTRUCTIONS] Processing file: ${filename}, size: ${file.size} bytes`);
         const blob = await put(filename, fileBuffer, {
             access: 'public',
             contentType: file.type || 'application/octet-stream',
         })
+        console.log(`[INSTRUCTIONS] Blob created: ${blob.url}`);
 
         // Update task with instructions file
         await prisma.task.update({
@@ -100,14 +102,18 @@ export async function POST(
             }
         })
 
+        console.log(`[INSTRUCTIONS] Task updated with new instructions: ${id}`);
         return NextResponse.json({
             url: blob.url,
             name: file.name
         }, { status: 201 })
     } catch (error: any) {
         console.error('Failed to upload instructions:', error)
+        const message = error?.message || 'Unknown error'
         return NextResponse.json({
-            error: error?.message || 'Failed to upload file'
+            error: `Failed to upload instructions: ${message}`,
+            details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
+            stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
         }, { status: 500 })
     }
 }

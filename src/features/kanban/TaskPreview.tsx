@@ -456,54 +456,29 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
 
             if (res.ok) {
                 if (data && data.id) {
-                    setComments(prev => [...prev, data]) // Add to end since we're showing oldest first
+                    setComments(prev => [...prev, data])
                     setNewComment("")
                     setReplyingTo(null)
                     setCommentError(null)
-                } else {
-                    console.error('Success response but invalid data:', data)
-                    setCommentError('Comment created but failed to display. Please refresh.')
+                    return // Success!
                 }
-            } else {
-                // Log each piece separately to debug
-                console.error('=== COMMENT CREATION FAILED ===')
-                console.error('Response status:', res?.status)
-                console.error('Response statusText:', res?.statusText)
-                console.error('Response OK:', res?.ok)
-                console.error('Response text:', responseText)
-                console.error('Parsed data:', data)
-                console.error('Data type:', typeof data)
-                console.error('Data keys:', data ? Object.keys(data) : 'no data')
-
-                const errorMessage = data?.error || data?.message || `Server error (${res?.status || 'unknown'} ${res?.statusText || 'unknown'})`
-                console.error('Error message:', errorMessage)
-                console.error('==============================')
-
-                setCommentError(errorMessage)
             }
-        } catch (err: any) {
-            const errorInfo = {
-                name: err?.name || 'Unknown',
-                message: err?.message || 'No message',
-                stack: err?.stack || 'No stack',
-                cause: err?.cause || 'No cause',
-                toString: err?.toString?.() || 'Cannot convert to string',
-                type: typeof err,
-                keys: err ? Object.keys(err) : []
-            }
-            console.error('Failed to add comment - Network/Request error:', err)
-            console.error('Error details:', errorInfo)
-            console.error('Error JSON:', JSON.stringify(errorInfo, null, 2))
-            const errorMessage = err?.message || err?.toString() || 'Network error. Please check your connection and try again.'
+
+            // More descriptive error for debugging
+            const errorMessage = data?.error || data?.message || data?.details || `Server error (${res?.status || 'unknown'} ${res?.statusText || ''})`
+            console.error('[COMMENT ERROR]', { status: res.status, data });
             setCommentError(errorMessage)
+        } catch (err: any) {
+            console.error('Failed to add comment:', err)
+            setCommentError(err?.message || 'Network error. Please try again.')
         } finally {
             setIsSubmitting(false)
         }
     }
 
     const uploadFile = async (file: File) => {
-        if (file.size > 50 * 1024 * 1024) {
-            setCommentError("File size exceeds 50MB limit.")
+        if (file.size > 4.5 * 1024 * 1024) {
+            setCommentError(`File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds Vercel's 4.5MB free tier limit.`)
             return
         }
         setIsSubmitting(true)
