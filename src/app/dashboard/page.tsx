@@ -359,22 +359,7 @@ export default async function DashboardPage() {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div className="flex items-center gap-3 flex-wrap">
-                        <h1 className="text-xl font-semibold">Welcome back, {user.name?.split(' ')[0]}</h1>
-                        {/* Stats right next to name */}
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                                <Circle className="h-3 w-3" />
-                                {todoTasks.length}
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <Loader2 className="h-3 w-3" />
-                                {inProgressTasks.length}
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {reviewTasks.length}
-                            </span>
-                        </div>
+                        <h1 className="text-xl font-semibold">{user.name?.split(' ')[0]}'s Dashboard</h1>
                     </div>
                     {/* Overdue warning on right */}
                     {overdueTasks.length > 0 && (
