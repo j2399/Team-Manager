@@ -1,10 +1,9 @@
 import prisma from "@/lib/prisma"
 import { getCurrentUser } from '@/lib/auth'
-import Link from "next/link"
-import { AlertCircle, ChevronRight, Users, Clock, CheckCircle2, Circle, Loader2 } from "lucide-react"
-import { MyTaskCard } from "@/components/MyTaskCard"
+import { AlertCircle, Users, CheckCircle2, Circle, Loader2, Clock } from "lucide-react"
 import { DashboardClient } from "./DashboardClient"
 import { TeamPopup } from "./TeamPopup"
+import { TaskRow, ApprovalRow } from "./TaskRow"
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +56,7 @@ export default async function DashboardPage() {
                         board: { include: { project: { select: { id: true, name: true, color: true } } } }
                     }
                 },
+                push: { select: { id: true } },
                 _count: { select: { comments: true, attachments: true } }
             },
             orderBy: [{ dueDate: 'asc' }, { updatedAt: 'desc' }],
@@ -77,6 +77,7 @@ export default async function DashboardPage() {
                 assignee: { select: { id: true, name: true } },
                 assignees: { include: { user: { select: { id: true, name: true } } } },
                 column: { include: { board: { include: { project: { select: { id: true, name: true, color: true } } } } } },
+                push: { select: { id: true } },
                 _count: { select: { comments: true, attachments: true } }
             },
             orderBy: { updatedAt: 'desc' },
@@ -178,38 +179,50 @@ export default async function DashboardPage() {
     const inProgressTasks = pendingTasks.filter(t => t.column?.name === 'In Progress')
     const reviewTasks = pendingTasks.filter(t => t.column?.name === 'Review')
 
+    // Helper to calculate due text
+    const getDueText = (dueDate: Date | null): { text: string; isOverdue: boolean } => {
+        if (!dueDate) return { text: '', isOverdue: false }
+        const diffMs = new Date(dueDate).getTime() - new Date().getTime()
+        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+        if (diffMs < 0) {
+            const overdueDays = Math.abs(diffDays)
+            return { text: overdueDays === 0 ? 'Today' : `${overdueDays}d overdue`, isOverdue: true }
+        }
+        if (diffDays === 0) return { text: 'Today', isOverdue: false }
+        if (diffDays === 1) return { text: 'Tomorrow', isOverdue: false }
+        return { text: `${diffDays}d`, isOverdue: false }
+    }
+
     return (
         <div className="h-full overflow-y-auto">
             <div className="p-4 md:p-6 space-y-5 animate-fade-in-up">
                 {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="flex items-center gap-3 flex-wrap">
                         <h1 className="text-xl font-semibold">Welcome back, {user.name?.split(' ')[0]}</h1>
-                        <p className="text-sm text-muted-foreground mt-0.5">
-                            {pendingTasks.length} tasks pending
-                            {overdueTasks.length > 0 && (
-                                <span className="text-red-500 ml-2">
-                                    <AlertCircle className="inline h-3.5 w-3.5 mr-0.5" />
-                                    {overdueTasks.length} overdue
-                                </span>
-                            )}
-                        </p>
+                        {/* Stats right next to name */}
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                                <Circle className="h-3 w-3" />
+                                {todoTasks.length}
+                            </span>
+                            <span className="flex items-center gap-1">
+                                <Loader2 className="h-3 w-3" />
+                                {inProgressTasks.length}
+                            </span>
+                            <span className="flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {reviewTasks.length}
+                            </span>
+                        </div>
                     </div>
-                    {/* Quick Stats */}
-                    <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                            <Circle className="h-3 w-3" />
-                            {todoTasks.length} to do
+                    {/* Overdue warning on right */}
+                    {overdueTasks.length > 0 && (
+                        <span className="text-xs text-red-500 flex items-center gap-1">
+                            <AlertCircle className="h-3.5 w-3.5" />
+                            {overdueTasks.length} overdue
                         </span>
-                        <span className="flex items-center gap-1">
-                            <Loader2 className="h-3 w-3" />
-                            {inProgressTasks.length} in progress
-                        </span>
-                        <span className="flex items-center gap-1">
-                            <CheckCircle2 className="h-3 w-3" />
-                            {reviewTasks.length} in review
-                        </span>
-                    </div>
+                    )}
                 </div>
 
                 {/* Main Grid */}
@@ -229,75 +242,25 @@ export default async function DashboardPage() {
                                         const project = task.column?.board?.project
                                         const projectColor = project?.color || '#6b7280'
                                         const dueDate = task.dueDate || task.endDate
-                                        const isOverdue = dueDate && new Date(dueDate) < new Date()
-                                        const columnName = task.column?.name || 'Unknown'
-
-                                        let dueText = ''
-                                        if (dueDate) {
-                                            const diffMs = new Date(dueDate).getTime() - new Date().getTime()
-                                            const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
-                                            if (diffMs < 0) {
-                                                const overdueDays = Math.abs(diffDays)
-                                                dueText = overdueDays === 0 ? 'Today' : `${overdueDays}d overdue`
-                                            } else if (diffDays === 0) {
-                                                dueText = 'Today'
-                                            } else if (diffDays === 1) {
-                                                dueText = 'Tomorrow'
-                                            } else {
-                                                dueText = `${diffDays}d`
-                                            }
-                                        }
+                                        const { text: dueText, isOverdue } = getDueText(dueDate)
 
                                         return (
-                                            <Link
+                                            <TaskRow
                                                 key={task.id}
-                                                href={`/dashboard/projects/${project?.id}?task=${task.id}`}
-                                                className="flex items-center justify-between p-3 rounded-md border border-border hover:bg-muted/30 transition-colors group"
-                                            >
-                                                <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                    {/* Status indicator */}
-                                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0">
-                                                        {columnName}
-                                                    </span>
-
-                                                    {/* Task title */}
-                                                    <span className="text-sm truncate">{task.title}</span>
-
-                                                    {/* Project badge - muted color */}
-                                                    {project && (
-                                                        <span
-                                                            className="text-[10px] px-1.5 py-0.5 rounded shrink-0 hidden sm:inline"
-                                                            style={{
-                                                                backgroundColor: `${projectColor}08`,
-                                                                color: `${projectColor}99`
-                                                            }}
-                                                        >
-                                                            {project.name}
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex items-center gap-3 shrink-0 ml-2">
-                                                    {/* Comments/attachments count */}
-                                                    {(task._count.comments > 0 || task._count.attachments > 0) && (
-                                                        <span className="text-[10px] text-muted-foreground hidden sm:inline">
-                                                            {task._count.comments > 0 && `${task._count.comments} comments`}
-                                                            {task._count.comments > 0 && task._count.attachments > 0 && ' · '}
-                                                            {task._count.attachments > 0 && `${task._count.attachments} files`}
-                                                        </span>
-                                                    )}
-
-                                                    {/* Due date */}
-                                                    {dueText && (
-                                                        <span className={`text-[10px] flex items-center gap-0.5 ${isOverdue ? 'text-red-500' : 'text-muted-foreground'}`}>
-                                                            <Clock className="h-2.5 w-2.5" />
-                                                            {dueText}
-                                                        </span>
-                                                    )}
-
-                                                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                </div>
-                                            </Link>
+                                                task={{
+                                                    id: task.id,
+                                                    title: task.title,
+                                                    columnName: task.column?.name || 'Unknown',
+                                                    projectId: project?.id || '',
+                                                    projectName: project?.name || '',
+                                                    projectColor,
+                                                    pushId: task.push?.id || null,
+                                                    dueText,
+                                                    isOverdue,
+                                                    commentsCount: task._count.comments,
+                                                    attachmentsCount: task._count.attachments
+                                                }}
+                                            />
                                         )
                                     })}
 
@@ -330,48 +293,20 @@ export default async function DashboardPage() {
                                             const assignedTo = assignees.length > 0 ? assignees : (assignee ? [assignee] : [])
 
                                             return (
-                                                <Link
+                                                <ApprovalRow
                                                     key={task.id}
-                                                    href={`/dashboard/projects/${project?.id}?task=${task.id}`}
-                                                    className="flex items-center justify-between p-3 rounded-md border border-border hover:bg-muted/30 transition-colors group"
-                                                >
-                                                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                                                        {/* Task title */}
-                                                        <span className="text-sm truncate">{task.title}</span>
-
-                                                        {/* Project badge - muted color */}
-                                                        {project && (
-                                                            <span
-                                                                className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
-                                                                style={{
-                                                                    backgroundColor: `${projectColor}08`,
-                                                                    color: `${projectColor}99`
-                                                                }}
-                                                            >
-                                                                {project.name}
-                                                            </span>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="flex items-center gap-3 shrink-0 ml-2">
-                                                        {/* Assigned to */}
-                                                        {assignedTo.length > 0 && (
-                                                            <span className="text-[10px] text-muted-foreground">
-                                                                by {assignedTo[0]}{assignedTo.length > 1 && ` +${assignedTo.length - 1}`}
-                                                            </span>
-                                                        )}
-
-                                                        {/* Comments/attachments */}
-                                                        {(task._count.comments > 0 || task._count.attachments > 0) && (
-                                                            <span className="text-[10px] text-muted-foreground hidden sm:inline">
-                                                                {task._count.comments > 0 && `${task._count.comments}c`}
-                                                                {task._count.attachments > 0 && ` ${task._count.attachments}f`}
-                                                            </span>
-                                                        )}
-
-                                                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                    </div>
-                                                </Link>
+                                                    task={{
+                                                        id: task.id,
+                                                        title: task.title,
+                                                        projectId: project?.id || '',
+                                                        projectName: project?.name || '',
+                                                        projectColor,
+                                                        pushId: task.push?.id || null,
+                                                        assignedTo,
+                                                        commentsCount: task._count.comments,
+                                                        attachmentsCount: task._count.attachments
+                                                    }}
+                                                />
                                             )
                                         })}
                                     </div>

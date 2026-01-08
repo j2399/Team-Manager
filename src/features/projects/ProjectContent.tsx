@@ -92,6 +92,7 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
     const taskIdFromUrl = searchParams.get('task')
     const highlightTaskId = searchParams.get('highlight')
     const viewFromUrl = searchParams.get('view')
+    const pushIdFromUrl = searchParams.get('push')
     const [view, setView] = useState<'kanban' | 'gantt'>(viewFromUrl === 'gantt' ? 'gantt' : 'kanban')
     const [previewTask, setPreviewTask] = useState<TaskType | null>(null)
     const [editTask, setEditTask] = useState<TaskType | null>(null)
@@ -233,6 +234,7 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                             users={users}
                             pushes={pushes}
                             highlightTaskId={highlightTaskId}
+                            expandPushId={pushIdFromUrl}
                         />
                     ) : (
                         <div className="p-10 text-center text-muted-foreground">

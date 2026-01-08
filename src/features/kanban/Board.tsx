@@ -83,9 +83,10 @@ type BoardProps = {
     users: { id: string; name: string; isProjectMember?: boolean }[]
     pushes?: PushType[]
     highlightTaskId?: string | null
+    expandPushId?: string | null
 }
 
-export function Board({ board, projectId, users, pushes = [], highlightTaskId }: BoardProps) {
+export function Board({ board, projectId, users, pushes = [], highlightTaskId, expandPushId }: BoardProps) {
     const router = useRouter()
     const [columns, setColumns] = useState<ColumnData[]>(board.columns)
     const [activeTask, setActiveTask] = useState<Task | null>(null)
@@ -100,7 +101,7 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
     const [isPersisting, setIsPersisting] = useState(false)
     const [flashingColumnId, setFlashingColumnId] = useState<string | null>(null)
     const [collapsedPushes, setCollapsedPushes] = useState<Set<string>>(() =>
-        new Set(pushes.map(p => p.id))
+        new Set(pushes.filter(p => p.id !== expandPushId).map(p => p.id))
     )
     const [loadingPushes, setLoadingPushes] = useState<Record<string, true>>({})
     const [loadedPushes, setLoadedPushes] = useState<Record<string, true>>({})
