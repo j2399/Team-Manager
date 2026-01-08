@@ -28,30 +28,53 @@ type MyTaskCardProps = {
     }
 }
 
+/**
+ * Returns a human-readable string for time until due.
+ * Optimized for dashboard card usage.
+ */
 function getTimeUntilDue(dueDate: Date | string | null): { text: string; isOverdue: boolean; isUrgent: boolean } {
     if (!dueDate) return { text: '', isOverdue: false, isUrgent: false }
 
     const now = new Date()
     const due = new Date(dueDate)
+
+    // Calculate difference in milliseconds
     const diffMs = due.getTime() - now.getTime()
-    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
-    const diffHours = Math.ceil(diffMs / (1000 * 60 * 60))
+
+    // Calculate partials
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffMinutes = Math.floor(diffMs / (1000 * 60))
 
     if (diffMs < 0) {
-        const overdueDays = Math.abs(diffDays)
-        if (overdueDays === 0) return { text: 'Due today', isOverdue: true, isUrgent: true }
-        if (overdueDays === 1) return { text: '1d overdue', isOverdue: true, isUrgent: true }
-        return { text: `${overdueDays}d overdue`, isOverdue: true, isUrgent: true }
+        const absDiffDays = Math.abs(diffDays)
+        if (absDiffDays === 0) return { text: 'Due today', isOverdue: true, isUrgent: true }
+        if (absDiffDays === 1) return { text: '1d overdue', isOverdue: true, isUrgent: true }
+        return { text: `${absDiffDays}d overdue`, isOverdue: true, isUrgent: true }
     }
 
-    if (diffHours <= 24) {
-        if (diffHours <= 1) return { text: '<1h left', isOverdue: false, isUrgent: true }
+    // Due in less than 1 hour
+    if (diffMinutes < 60) {
+        if (diffMinutes <= 0) return { text: 'Due now', isOverdue: false, isUrgent: true }
+        return { text: `${diffMinutes}m left`, isOverdue: false, isUrgent: true }
+    }
+
+    // Due in less than 24 hours
+    if (diffHours < 24) {
         return { text: `${diffHours}h left`, isOverdue: false, isUrgent: true }
     }
 
-    if (diffDays === 1) return { text: 'Tomorrow', isOverdue: false, isUrgent: true }
-    if (diffDays <= 7) return { text: `${diffDays}d left`, isOverdue: false, isUrgent: diffDays <= 3 }
+    // Due tomorrow
+    if (diffDays === 1) {
+        return { text: 'Tomorrow', isOverdue: false, isUrgent: true }
+    }
 
+    // Due within current week (<= 7 days)
+    if (diffDays <= 7) {
+        return { text: `${diffDays}d left`, isOverdue: false, isUrgent: diffDays <= 3 }
+    }
+
+    // Longer term
     return { text: `${diffDays}d left`, isOverdue: false, isUrgent: false }
 }
 
@@ -68,43 +91,45 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
         <>
             <div
                 onClick={() => setShowTaskPreview(true)}
-                className="group cursor-pointer rounded-lg p-3 transition-all border border-border bg-card hover:bg-accent/50"
+                className="group relative flex flex-col gap-1.5 cursor-pointer rounded-lg border border-border bg-card p-3 transition-all hover:bg-accent/50 overflow-hidden"
             >
-                {/* Row 1: Title + Due Date */}
-                <div className="flex justify-between items-start gap-4">
-                    {/* Left: Title */}
-                    <h4 className="flex-1 text-sm font-medium leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                {/* 
+                  Grid layout for top row: 
+                  - Title takes as much space as possible but will not push the due date out.
+                  - Due date takes exactly what it needs and stays on the right.
+                */}
+                <div className="grid grid-cols-[1fr_auto] items-start gap-2">
+                    <h4 className="text-sm font-medium leading-snug line-clamp-2 transition-colors group-hover:text-primary min-w-0 break-words">
                         {task.title}
                     </h4>
 
-                    {/* Right: Due Date */}
                     {dueText && (
                         <div className={`
-                            text-xs font-medium flex items-center gap-1 shrink-0
+                            flex items-center gap-1 shrink-0 text-[11px] font-semibold mt-0.5
                             ${isOverdue ? 'text-red-500' : ''}
                             ${isUrgent && !isOverdue ? 'text-amber-500' : ''}
                             ${!isUrgent && !isOverdue ? 'text-muted-foreground' : ''}
                         `}>
-                            <Clock className="h-3 w-3" />
-                            <span>{dueText}</span>
+                            <Clock className="h-3.5 w-3.5" />
+                            <span className="whitespace-nowrap">{dueText}</span>
                         </div>
                     )}
                 </div>
 
-                {/* Row 2: Description (if exists) */}
+                {/* Description - subdued and truncated to 1 line */}
                 {task.description && (
-                    <p className="text-xs text-muted-foreground/60 truncate mt-1.5">
+                    <p className="text-[11px] leading-tight text-muted-foreground/50 truncate pr-2">
                         {task.description}
                     </p>
                 )}
 
-                {/* Row 3: Project Badge */}
+                {/* Project Badge - no left border on card, just this identifier */}
                 {project && (
-                    <div className="mt-2">
+                    <div className="flex items-center mt-1">
                         <span
-                            className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded"
+                            className="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tight truncate max-w-[150px]"
                             style={{
-                                backgroundColor: `${projectColor}20`,
+                                backgroundColor: `${projectColor}15`,
                                 color: projectColor
                             }}
                         >
