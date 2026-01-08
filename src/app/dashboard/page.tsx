@@ -1,18 +1,9 @@
 import prisma from "@/lib/prisma"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { getCurrentUser } from '@/lib/auth'
 import Link from "next/link"
-import {
-    Clock, AlertCircle,
-    FileText, Activity, Calendar
-} from "lucide-react"
-import { ProjectTimeline } from "@/components/dashboard/ProjectTimeline"
-import { MemberStats } from "@/components/dashboard/MemberStats"
-import { ActivityLogList } from "@/components/ActivityLogList"
-import { PendingReviewTask } from "@/components/PendingReviewTask"
+import { AlertCircle, ChevronRight, Users, FolderKanban } from "lucide-react"
 import { MyTaskCard } from "@/components/MyTaskCard"
+import { DashboardClient } from "./DashboardClient"
 
 export const dynamic = 'force-dynamic'
 
@@ -20,25 +11,22 @@ export default async function DashboardPage() {
     const user = await getCurrentUser()
 
     if (!user || !user.id || user.id === 'pending') {
-        return <div className="p-4">Please complete your profile setup.</div>
+        return <div className="p-6 text-muted-foreground">Please complete your profile setup.</div>
     }
 
     const dbUser = await prisma.user.findUnique({
         where: { id: user.id }
     })
 
-    if (!dbUser) return <div className="p-4">User not found. Please log in again.</div>
+    if (!dbUser) return <div className="p-6 text-muted-foreground">User not found. Please log in again.</div>
 
     const isAdmin = user.role === 'Admin'
     const isTeamLead = user.role === 'Team Lead'
-    const isMember = user.role === 'Member'
+    const isLeadership = isAdmin || isTeamLead
 
-    // --- OPTIMIZATION START ---
-    // Parallelize all independent fetches
-
-    // 1. Fetch My Tasks (User's assigned tasks)
+    // Parallel data fetching
     const fetchMyTasks = async () => {
-        let myTasksWhere: any = {
+        let where: any = {
             OR: [
                 { assigneeId: dbUser.id },
                 { assignees: { some: { userId: dbUser.id } } }
@@ -50,243 +38,212 @@ export default async function DashboardPage() {
                 where: { userId: dbUser.id },
                 select: { projectId: true }
             })
-            const assignedProjectIds = memberProjects.map(pm => pm.projectId)
-
-            if (assignedProjectIds.length > 0) {
-                myTasksWhere.column = {
-                    board: {
-                        projectId: { in: assignedProjectIds }
-                    }
-                }
+            const projectIds = memberProjects.map(pm => pm.projectId)
+            if (projectIds.length > 0) {
+                where.column = { board: { projectId: { in: projectIds } } }
             } else {
-                myTasksWhere = { id: 'none' }
+                return []
             }
         }
 
         return prisma.task.findMany({
-            where: myTasksWhere,
+            where,
             include: {
                 assignee: { select: { id: true, name: true } },
                 assignees: { include: { user: { select: { id: true, name: true } } } },
                 column: {
                     include: {
-                        board: {
-                            include: { project: { select: { id: true, name: true, color: true } } }
-                        }
+                        board: { include: { project: { select: { id: true, name: true, color: true } } } }
                     }
                 }
             },
-            orderBy: { updatedAt: 'desc' }
+            orderBy: [{ dueDate: 'asc' }, { updatedAt: 'desc' }],
+            take: 50
         })
     }
 
-    // 2. Fetch Pending Review Tasks (Admin/Team Lead only)
-    const fetchPendingReviews = async () => {
-        if (user.role !== 'Admin' && user.role !== 'Team Lead') return []
+    const fetchReviewTasks = async () => {
+        if (!isLeadership) return []
 
-        const where = user.role === 'Admin'
+        const where = isAdmin
             ? { column: { name: 'Review', board: { project: { workspaceId: dbUser.workspaceId } } } }
-            : { column: { name: 'Review', board: { project: { is: { leadId: dbUser.id } } } } }
+            : { column: { name: 'Review', board: { project: { leadId: dbUser.id } } } }
 
-        const tasks = await prisma.task.findMany({
+        return prisma.task.findMany({
             where,
             include: {
                 assignee: { select: { id: true, name: true } },
                 column: { include: { board: { include: { project: { select: { id: true, name: true, color: true } } } } } }
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { updatedAt: 'desc' },
             take: 10
         })
-
-        // Enrich with review log date 
-        // (Optimization: Do this in parallel for the 10 items)
-        return Promise.all(tasks.map(async (task) => {
-            const reviewLog = await prisma.activityLog.findFirst({
-                where: { taskId: task.id, field: 'status', newValue: 'Review' },
-                orderBy: { createdAt: 'desc' },
-                select: { createdAt: true }
-            })
-            return {
-                ...task,
-                reviewSince: reviewLog?.createdAt || null,
-            }
-        }))
     }
 
-    // 3. Fetch Activity Logs (Admin & Team Lead)
-    const fetchActivityLogs = async () => {
-        if (user.role !== 'Admin' && user.role !== 'Team Lead') return []
-        return prisma.activityLog.findMany({
-            where: { task: { column: { board: { project: { workspaceId: dbUser.workspaceId } } } } },
-            orderBy: { createdAt: 'desc' },
-            take: 20,
-            include: {
-                task: {
-                    include: {
-                        column: {
-                            include: {
-                                board: { include: { project: { select: { id: true, name: true } } } }
+    const fetchProjects = async () => {
+        if (isAdmin) {
+            return prisma.project.findMany({
+                where: { workspaceId: dbUser.workspaceId },
+                include: {
+                    _count: { select: { boards: true } },
+                    boards: {
+                        include: {
+                            columns: {
+                                include: { _count: { select: { tasks: true } } }
+                            }
+                        }
+                    }
+                },
+                orderBy: { updatedAt: 'desc' },
+                take: 6
+            })
+        } else if (isTeamLead) {
+            return prisma.project.findMany({
+                where: { leadId: dbUser.id },
+                include: {
+                    _count: { select: { boards: true } },
+                    boards: {
+                        include: {
+                            columns: {
+                                include: { _count: { select: { tasks: true } } }
+                            }
+                        }
+                    }
+                },
+                orderBy: { updatedAt: 'desc' },
+                take: 6
+            })
+        } else {
+            const memberships = await prisma.projectMember.findMany({
+                where: { userId: dbUser.id },
+                include: {
+                    project: {
+                        include: {
+                            _count: { select: { boards: true } },
+                            boards: {
+                                include: {
+                                    columns: {
+                                        include: { _count: { select: { tasks: true } } }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            }
-        })
-    }
-
-    // 4. Fetch Timeline Data (Gantt)
-    const fetchTimelineData = async () => {
-        // Now treating Team Lead same as Admin for fetching logic
-        if (!isAdmin && !isTeamLead && !isMember) return []
-
-        let where: any = {
-            startDate: { not: null },
-            endDate: { not: null },
-        }
-
-        if (isAdmin || isTeamLead) {
-            where.column = { board: { project: { workspaceId: dbUser.workspaceId } } }
-        } else if (isMember) {
-            const memberProjects = await prisma.projectMember.findMany({
-                where: { userId: dbUser.id },
-                select: { projectId: true }
             })
-            const assignedProjectIds = memberProjects.map(pm => pm.projectId)
-            if (assignedProjectIds.length === 0) return []
-
-            where = {
-                ...where,
-                OR: [
-                    { assigneeId: dbUser.id },
-                    { assignees: { some: { userId: dbUser.id } } }
-                ],
-                column: { board: { projectId: { in: assignedProjectIds } } }
-            }
+            return memberships.map(m => m.project)
         }
-
-        return prisma.task.findMany({
-            where,
-            include: {
-                column: { include: { board: { include: { project: { select: { id: true, name: true, color: true } } } } } },
-                push: { select: { id: true, name: true, color: true } }
-            },
-            orderBy: { startDate: 'asc' },
-            take: 50 // Same limit as before
-        })
     }
 
-    // 5. Fetch Member Stats (Admin & Team Lead) - OPTIMIZED
-    const fetchMemberStats = async () => {
-        if (!isAdmin && !isTeamLead) return []
+    const fetchTeamStats = async () => {
+        if (!isLeadership) return null
 
-        // Parallel fetch users and lightweight task data
-        const [allUsers, allTasksLight] = await Promise.all([
+        const [users, tasks] = await Promise.all([
             prisma.user.findMany({
                 where: { workspaceId: dbUser.workspaceId },
-                select: { id: true, name: true, avatar: true, role: true }
+                select: { id: true, name: true, avatar: true }
             }),
             prisma.task.findMany({
                 where: { column: { board: { project: { workspaceId: dbUser.workspaceId } } } },
                 select: {
                     assigneeId: true,
-                    assignees: { select: { user: { select: { id: true } } } },
+                    assignees: { select: { userId: true } },
                     column: { select: { name: true } }
                 }
             })
         ])
 
-        return allUsers.map(user => {
-            // Filter in memory from lightweight dataset
-            const userTasks = allTasksLight.filter(t =>
-                t.assignees.some(ta => ta.user.id === user.id) ||
-                t.assigneeId === user.id
+        const stats = users.map(u => {
+            const userTasks = tasks.filter(t =>
+                t.assigneeId === u.id || t.assignees.some(a => a.userId === u.id)
             )
-            const completed = userTasks.filter(t => t.column?.name === 'Done').length
-            const inProgress = userTasks.filter(t => t.column?.name === 'In Progress' || t.column?.name === 'Review').length
-            const todo = userTasks.filter(t => t.column?.name && ['Todo', 'To Do'].includes(t.column.name)).length
-
             return {
-                userId: user.id,
-                userName: user.name,
-                userAvatar: user.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png` : null,
-                role: user.role,
-                completedTasks: completed,
-                inProgressTasks: inProgress,
-                todoTasks: todo,
-                totalTasks: userTasks.length
+                id: u.id,
+                name: u.name,
+                avatar: u.avatar,
+                done: userTasks.filter(t => t.column?.name === 'Done').length,
+                inProgress: userTasks.filter(t => t.column?.name === 'In Progress').length,
+                total: userTasks.length
+            }
+        }).sort((a, b) => b.done - a.done)
+
+        return { users: stats, totalTasks: tasks.length }
+    }
+
+    const fetchRecentActivity = async () => {
+        if (!isLeadership) return []
+
+        return prisma.activityLog.findMany({
+            where: { task: { column: { board: { project: { workspaceId: dbUser.workspaceId } } } } },
+            orderBy: { createdAt: 'desc' },
+            take: 8,
+            select: {
+                id: true,
+                action: true,
+                field: true,
+                taskTitle: true,
+                changedByName: true,
+                createdAt: true,
+                task: { select: { id: true, column: { select: { board: { select: { project: { select: { id: true } } } } } } } }
             }
         })
     }
 
-    // EXECUTE ALL FETCHES IN PARALLEL
-    const [
-        myTasks,
-        pendingReviewTasksWithDetails,
-        activityLogs,
-        allTasksWithDates,
-        memberStats
-    ] = await Promise.all([
+    const [myTasks, reviewTasks, projects, teamStats, recentActivity] = await Promise.all([
         fetchMyTasks(),
-        fetchPendingReviews(),
-        fetchActivityLogs(),
-        fetchTimelineData(),
-        fetchMemberStats()
+        fetchReviewTasks(),
+        fetchProjects(),
+        fetchTeamStats(),
+        fetchRecentActivity()
     ])
 
-    // Post-processing
-    const pendingTasks = myTasks.filter(t => t.column?.name !== 'Done' && t.column?.name !== 'Review')
-    const overdueTasks = pendingTasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date()).length
+    // Process tasks
+    const pendingTasks = myTasks.filter(t => t.column?.name !== 'Done')
+    const overdueTasks = pendingTasks.filter(t => {
+        const due = t.dueDate || t.endDate
+        return due && new Date(due) < new Date()
+    })
 
-    const formatTimeAgo = (date: Date) => {
-        const diff = new Date().getTime() - new Date(date).getTime()
-        const minutes = Math.floor(diff / 60000)
-        const hours = Math.floor(minutes / 60)
-        const days = Math.floor(hours / 24)
-        if (days > 0) return `${days}d`
-        if (hours > 0) return `${hours}h`
-        return `${minutes}m`
-    }
-
-    // Transform tasks for MiniGanttChart / ProjectTimeline
-    const ganttTasks = allTasksWithDates.map(t => ({
-        id: t.id,
-        title: t.title,
-        startDate: t.startDate,
-        endDate: t.endDate,
-        column: t.column ? { name: t.column.name } : null,
-        project: t.column?.board?.project || null,
-        push: t.push || null
-    }))
+    // Calculate project stats
+    const projectsWithStats = projects.map(p => {
+        const totalTasks = p.boards.reduce((acc, b) =>
+            acc + b.columns.reduce((colAcc, c) => colAcc + c._count.tasks, 0), 0)
+        const doneTasks = p.boards.reduce((acc, b) =>
+            acc + b.columns.filter(c => c.name === 'Done').reduce((colAcc, c) => colAcc + c._count.tasks, 0), 0)
+        return { ...p, totalTasks, doneTasks }
+    })
 
     return (
-        <div className="h-full flex flex-col p-4 pb-0 animate-fade-in-up">
-            {/* Header - only show if there are overdue tasks */}
-            {overdueTasks > 0 && (
-                <div className="flex items-center justify-end shrink-0 mb-4">
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1 text-red-500">
-                            <AlertCircle className="h-4 w-4" />{overdueTasks} overdue
-                        </span>
+        <div className="h-full overflow-y-auto">
+            <div className="p-4 md:p-6 space-y-6 animate-fade-in-up">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h1 className="text-xl font-semibold">Welcome back, {user.name?.split(' ')[0]}</h1>
+                        <p className="text-sm text-muted-foreground mt-0.5">
+                            {pendingTasks.length} tasks pending
+                            {overdueTasks.length > 0 && (
+                                <span className="text-red-500 ml-2">
+                                    <AlertCircle className="inline h-3.5 w-3.5 mr-0.5" />
+                                    {overdueTasks.length} overdue
+                                </span>
+                            )}
+                        </p>
                     </div>
                 </div>
-            )}
 
-            {/* Main Content - Mobile: stack, Desktop: grid - NO HORIZONTAL SCROLL */}
-            <div className="flex-1 min-h-0 flex flex-col lg:grid gap-4 lg:grid-cols-12 overflow-y-auto overflow-x-hidden pb-4">
-                {/* 1. My Tasks */}
-                <Card className={`flex flex-col min-h-[300px] lg:min-h-0 ${isAdmin || isTeamLead ? 'lg:col-span-6 2xl:col-span-3' : 'lg:col-span-6'}`}>
-                    <CardHeader className="pb-2 px-4 pt-4 shrink-0">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-sm flex items-center gap-2">
-                                <FileText className="h-4 w-4" />My Tasks
-                            </CardTitle>
-                            <Badge variant="outline">{pendingTasks.length}</Badge>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="flex-1 min-h-0 px-2 pb-4 overflow-hidden">
-                        <ScrollArea className="h-full max-h-[400px] lg:max-h-none">
-                            <div className="space-y-2 px-2 pb-2">
-                                {pendingTasks.slice(0, 15).map(task => (
+                {/* Main Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Left Column - Tasks */}
+                    <div className="lg:col-span-2 space-y-6">
+                        {/* My Tasks */}
+                        <section>
+                            <div className="flex items-center justify-between mb-3">
+                                <h2 className="text-sm font-medium text-muted-foreground">My Tasks</h2>
+                                <span className="text-xs text-muted-foreground">{pendingTasks.length} pending</span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {pendingTasks.slice(0, 8).map(task => (
                                     <MyTaskCard
                                         key={task.id}
                                         task={{
@@ -303,93 +260,185 @@ export default async function DashboardPage() {
                                         }}
                                     />
                                 ))}
-                                {pendingTasks.length === 0 && (
-                                    <p className="text-xs text-muted-foreground text-center py-4">No pending tasks</p>
-                                )}
                             </div>
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
+                            {pendingTasks.length === 0 && (
+                                <p className="text-sm text-muted-foreground text-center py-8">No pending tasks</p>
+                            )}
+                        </section>
 
-                {/* 2. Admin & Team Lead: Pending Reviews */}
-                {(isAdmin || isTeamLead) && (
-                    <Card className="lg:col-span-6 2xl:col-span-3 flex flex-col min-h-[250px] lg:min-h-0 overflow-hidden">
-                        <CardHeader className="pb-2 px-4 pt-4 shrink-0">
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="text-sm flex items-center gap-2">
-                                    <Clock className="h-4 w-4" />Pending Review
-                                </CardTitle>
-                                <Badge variant="secondary">{pendingReviewTasksWithDetails.length}</Badge>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="flex-1 min-h-0 p-3 pt-0 overflow-hidden">
-                            <ScrollArea className="h-full max-h-[300px] lg:max-h-none">
-                                <div className="flex flex-col gap-2">
-                                    {pendingReviewTasksWithDetails.length > 0 ? (
-                                        pendingReviewTasksWithDetails.map(task => (
-                                            <PendingReviewTask key={task.id} task={task} />
-                                        ))
-                                    ) : (
-                                        <div className="text-xs text-muted-foreground text-center py-4">
-                                            Nothing to review
-                                        </div>
-                                    )}
+                        {/* Review Tasks - Leadership Only */}
+                        {isLeadership && reviewTasks.length > 0 && (
+                            <section>
+                                <div className="flex items-center justify-between mb-3">
+                                    <h2 className="text-sm font-medium text-muted-foreground">Needs Review</h2>
+                                    <span className="text-xs text-muted-foreground">{reviewTasks.length} waiting</span>
                                 </div>
-                            </ScrollArea>
-                        </CardContent>
-                    </Card>
-                )}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    {reviewTasks.slice(0, 4).map(task => {
+                                        const project = task.column?.board?.project
+                                        const projectColor = project?.color || '#6b7280'
+                                        return (
+                                            <Link
+                                                key={task.id}
+                                                href={`/dashboard/projects/${project?.id}?task=${task.id}`}
+                                                className="group p-2.5 rounded-md border border-border/60 bg-card hover:border-border hover:shadow-sm active:scale-[0.99] transition-all duration-150"
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="min-w-0">
+                                                        <p className="text-[13px] font-medium line-clamp-1">{task.title}</p>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            {project && (
+                                                                <span
+                                                                    className="text-[10px] font-medium px-1.5 py-0.5 rounded"
+                                                                    style={{ backgroundColor: `${projectColor}12`, color: projectColor }}
+                                                                >
+                                                                    {project.name}
+                                                                </span>
+                                                            )}
+                                                            {task.assignee && (
+                                                                <span className="text-[10px] text-muted-foreground">
+                                                                    by {task.assignee.name}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                                </div>
+                                            </Link>
+                                        )
+                                    })}
+                                </div>
+                            </section>
+                        )}
 
-                {/* 3. Admin & Team Lead: Activity Log */}
-                {(isAdmin || isTeamLead) && (
-                    <Card className="lg:col-span-6 2xl:col-span-3 flex flex-col min-h-[250px] lg:min-h-0">
-                        <CardHeader className="pb-2 px-4 pt-4 shrink-0">
-                            <CardTitle className="text-sm flex items-center gap-2">
-                                <Activity className="h-4 w-4" />Activity Log
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex-1 min-h-0 px-2 pb-2">
-                            <ActivityLogList logs={activityLogs} />
-                        </CardContent>
-                    </Card>
-                )}
+                        {/* Projects */}
+                        <section>
+                            <div className="flex items-center justify-between mb-3">
+                                <h2 className="text-sm font-medium text-muted-foreground">Projects</h2>
+                                <Link href="/dashboard" className="text-xs text-primary hover:underline">View all</Link>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                {projectsWithStats.slice(0, 6).map(project => {
+                                    const progress = project.totalTasks > 0
+                                        ? Math.round((project.doneTasks / project.totalTasks) * 100)
+                                        : 0
+                                    return (
+                                        <Link
+                                            key={project.id}
+                                            href={`/dashboard/projects/${project.id}`}
+                                            className="group p-3 rounded-md border border-border/60 bg-card hover:border-border hover:shadow-sm active:scale-[0.99] transition-all duration-150"
+                                        >
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div
+                                                    className="w-2 h-2 rounded-full shrink-0"
+                                                    style={{ backgroundColor: project.color || '#6b7280' }}
+                                                />
+                                                <span className="text-sm font-medium truncate">{project.name}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                                <span>{project.totalTasks} tasks</span>
+                                                <span>{progress}% done</span>
+                                            </div>
+                                            <div className="mt-2 h-1 bg-muted rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full rounded-full transition-all duration-300"
+                                                    style={{
+                                                        width: `${progress}%`,
+                                                        backgroundColor: project.color || '#6b7280'
+                                                    }}
+                                                />
+                                            </div>
+                                        </Link>
+                                    )
+                                })}
+                            </div>
+                        </section>
+                    </div>
 
-                {/* 4. Admin & Team Lead: Metrics */}
-                {(isAdmin || isTeamLead) && (
-                    <Card className="lg:col-span-6 2xl:col-span-3 flex flex-col min-h-[300px] lg:min-h-0">
-                        <CardHeader className="pb-2 px-4 pt-4 shrink-0">
-                            <CardTitle className="text-sm flex items-center gap-2">
-                                Activity Overview
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex-1 min-h-0 p-0">
-                            <ScrollArea className="h-full max-h-[400px] lg:max-h-none">
-                                <div className="p-4 space-y-6">
-                                    <ProjectTimeline tasks={ganttTasks} />
-                                    <div className="pt-2 border-t">
-                                        <MemberStats stats={memberStats} />
+                    {/* Right Column - Leadership Only */}
+                    {isLeadership && (
+                        <div className="space-y-6">
+                            {/* Team Overview */}
+                            {teamStats && (
+                                <section>
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h2 className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+                                            <Users className="h-3.5 w-3.5" />
+                                            Team
+                                        </h2>
+                                        <Link href="/dashboard/members" className="text-xs text-primary hover:underline">
+                                            View all
+                                        </Link>
                                     </div>
-                                </div>
-                            </ScrollArea>
-                        </CardContent>
-                    </Card>
-                )}
+                                    <div className="space-y-1">
+                                        {teamStats.users.slice(0, 5).map(member => (
+                                            <div
+                                                key={member.id}
+                                                className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50 transition-colors"
+                                            >
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium shrink-0">
+                                                        {member.name.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <span className="text-sm truncate">{member.name}</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-[10px] text-muted-foreground shrink-0">
+                                                    <span>{member.done} done</span>
+                                                    <span>{member.inProgress} active</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
 
-                {/* Member Timeline */}
-                {isMember && (
-                    <Card className="lg:col-span-6 flex flex-col min-h-[300px] lg:min-h-0">
-                        <CardHeader className="pb-2 px-4 pt-4 shrink-0">
-                            <CardTitle className="text-sm flex items-center gap-2">
-                                <Calendar className="h-4 w-4" />My Timeline
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex-1 min-h-0 px-2 pb-2">
-                            <ScrollArea className="h-full max-h-[400px] lg:max-h-none">
-                                <ProjectTimeline tasks={ganttTasks} />
-                            </ScrollArea>
-                        </CardContent>
-                    </Card>
-                )}
+                            {/* Recent Activity */}
+                            {recentActivity.length > 0 && (
+                                <section>
+                                    <h2 className="text-sm font-medium text-muted-foreground mb-3">Recent Activity</h2>
+                                    <div className="space-y-0.5">
+                                        {recentActivity.map(log => (
+                                            <DashboardClient
+                                                key={log.id}
+                                                activity={log}
+                                            />
+                                        ))}
+                                    </div>
+                                </section>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Member View - Full Width Projects if no team stats */}
+                    {!isLeadership && pendingTasks.length === 0 && (
+                        <div className="lg:col-span-1">
+                            <section>
+                                <h2 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
+                                    <FolderKanban className="h-3.5 w-3.5" />
+                                    Your Projects
+                                </h2>
+                                <div className="space-y-2">
+                                    {projectsWithStats.map(project => (
+                                        <Link
+                                            key={project.id}
+                                            href={`/dashboard/projects/${project.id}`}
+                                            className="flex items-center justify-between p-3 rounded-md border border-border/60 bg-card hover:border-border hover:shadow-sm active:scale-[0.99] transition-all duration-150"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <div
+                                                    className="w-2 h-2 rounded-full"
+                                                    style={{ backgroundColor: project.color || '#6b7280' }}
+                                                />
+                                                <span className="text-sm font-medium">{project.name}</span>
+                                            </div>
+                                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                        </Link>
+                                    ))}
+                                </div>
+                            </section>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     )
