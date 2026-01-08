@@ -9,14 +9,14 @@ export default function SettingsLoading() {
                 {[0, 1, 2].map((i) => (
                     <section
                         key={i}
-                        className="border border-border rounded-lg p-4 space-y-3"
+                        className="rounded-lg p-4 space-y-3 bg-muted/10"
                     >
                         <div
                             className="h-4 w-32 bg-muted rounded animate-pulse"
                             style={{ animationDelay: `${i * 80}ms` }}
                         />
                         <div
-                            className="h-10 w-full bg-muted/30 rounded animate-pulse"
+                            className="h-10 w-full bg-muted/40 rounded animate-pulse"
                             style={{ animationDelay: `${i * 80 + 40}ms` }}
                         />
                     </section>

@@ -4,7 +4,7 @@ export default function ProjectLoading() {
     return (
         <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="shrink-0 border-b bg-background">
+            <div className="shrink-0 bg-background">
                 <div className="flex items-center justify-between gap-2 p-3">
                     <div className="flex items-center gap-3">
                         <div className="h-6 w-32 bg-muted rounded animate-pulse" />
@@ -16,15 +16,14 @@ export default function ProjectLoading() {
                 </div>
             </div>
 
-            {/* Collapsed Push Bars - This is how the kanban shows pushes */}
+            {/* Collapsed Push Bars */}
             <div className="flex-1 p-3 space-y-2 overflow-auto">
                 {[0, 1, 2].map((i) => (
                     <div
                         key={i}
-                        className="rounded-lg border border-border overflow-hidden animate-pulse"
+                        className="rounded-lg overflow-hidden animate-pulse"
                         style={{ animationDelay: `${i * 100}ms` }}
                     >
-                        {/* Collapsed push header */}
                         <div className="flex items-center justify-between p-3 bg-muted/20">
                             <div className="flex items-center gap-3">
                                 <div className="w-3 h-3 bg-muted rounded" />
@@ -39,8 +38,8 @@ export default function ProjectLoading() {
                     </div>
                 ))}
 
-                {/* Unassigned tasks section placeholder */}
-                <div className="rounded-lg border border-border overflow-hidden animate-pulse delay-300">
+                {/* Unassigned section */}
+                <div className="rounded-lg overflow-hidden animate-pulse delay-300">
                     <div className="flex items-center justify-between p-3 bg-muted/10">
                         <div className="flex items-center gap-3">
                             <div className="w-3 h-3 bg-muted rounded" />

@@ -142,10 +142,14 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
         }
     }, [pathname])
 
-    // Clear navigation loading state when path changes
+    // Clear navigation loading state only when we've reached the destination
     React.useEffect(() => {
-        setNavigatingTo(null)
-    }, [pathname])
+        if (navigatingTo && (pathname === navigatingTo || pathname.startsWith(navigatingTo.replace(/\/$/, '') + '/'))) {
+            // Add a small delay to allow the actual page content to render
+            const timer = setTimeout(() => setNavigatingTo(null), 300)
+            return () => clearTimeout(timer)
+        }
+    }, [pathname, navigatingTo])
 
     // Form state for editing
     const [newProjectLeadId, setNewProjectLeadId] = React.useState("none")
