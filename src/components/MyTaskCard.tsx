@@ -29,8 +29,7 @@ type MyTaskCardProps = {
 }
 
 /**
- * Returns a human-readable string for time until due.
- * Optimized for dashboard card usage.
+ * Robustly calculates the time remaining until a due date.
  */
 function getTimeUntilDue(dueDate: Date | string | null): { text: string; isOverdue: boolean; isUrgent: boolean } {
     if (!dueDate) return { text: '', isOverdue: false, isUrgent: false }
@@ -46,24 +45,35 @@ function getTimeUntilDue(dueDate: Date | string | null): { text: string; isOverd
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
+    // Overdue
     if (diffMs < 0) {
         const absDays = Math.abs(diffDays)
         if (absDays === 0) return { text: 'Due today', isOverdue: true, isUrgent: true }
         return { text: `${absDays}d overdue`, isOverdue: true, isUrgent: true }
     }
 
+    // Less than an hour
     if (diffMins < 60) {
         if (diffMins <= 0) return { text: 'Due now', isOverdue: false, isUrgent: true }
         return { text: `${diffMins}m left`, isOverdue: false, isUrgent: true }
     }
 
+    // Less than a day
     if (diffHours < 24) {
         return { text: `${diffHours}h left`, isOverdue: false, isUrgent: true }
     }
 
-    if (diffDays === 1) return { text: 'Tomorrow', isOverdue: false, isUrgent: true }
-    if (diffDays <= 7) return { text: `${diffDays}d left`, isOverdue: false, isUrgent: diffDays <= 3 }
+    // Tomorrow
+    if (diffDays === 1) {
+        return { text: 'Tomorrow', isOverdue: false, isUrgent: true }
+    }
 
+    // Within a week
+    if (diffDays <= 7) {
+        return { text: `${diffDays}d left`, isOverdue: false, isUrgent: diffDays <= 3 }
+    }
+
+    // Further out
     return { text: `${diffDays}d left`, isOverdue: false, isUrgent: false }
 }
 
@@ -80,11 +90,14 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
         <>
             <div
                 onClick={() => setShowTaskPreview(true)}
-                className="group relative flex flex-col gap-2 cursor-pointer rounded-lg border border-border bg-card p-3 transition-all hover:bg-accent/50 overflow-hidden"
+                className="group relative w-full flex flex-col gap-2 cursor-pointer rounded-lg border border-border bg-card p-3 transition-opacity transition-colors hover:bg-accent/50 overflow-hidden"
             >
-                {/* Row 1: Title and Due Time */}
-                <div className="grid grid-cols-[1fr_auto] items-start gap-4">
-                    <h4 className="text-sm font-medium leading-tight group-hover:text-primary transition-colors line-clamp-2 min-w-0">
+                {/* 
+                   Row 1: Title and Due Date
+                   - Use flex-1 min-w-0 on title to ensure it shrinks and allows due date on right.
+                */}
+                <div className="flex items-start justify-between gap-3 w-full">
+                    <h4 className="flex-1 min-w-0 text-sm font-semibold leading-tight group-hover:text-primary transition-colors line-clamp-2 break-words">
                         {task.title}
                     </h4>
 
@@ -101,11 +114,13 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
                     )}
                 </div>
 
-                {/* Row 2: Project Badge (Directly underneath title) */}
+                {/* 
+                   Row 2: Project Badge
+                */}
                 {project && (
-                    <div className="flex items-center">
+                    <div className="flex">
                         <span
-                            className="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter truncate max-w-[140px]"
+                            className="inline-block text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-tighter truncate max-w-[80%]"
                             style={{
                                 backgroundColor: `${projectColor}15`,
                                 color: projectColor
@@ -116,11 +131,16 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
                     </div>
                 )}
 
-                {/* Row 3: Description (Underneath project badge) */}
+                {/* 
+                   Row 3: Description 
+                   - Added w-full and min-w-0 to prevent description from stretching card.
+                */}
                 {task.description && (
-                    <p className="text-[11px] leading-snug text-muted-foreground/50 truncate">
-                        {task.description}
-                    </p>
+                    <div className="w-full min-w-0">
+                        <p className="text-[11px] leading-snug text-muted-foreground/50 truncate">
+                            {task.description}
+                        </p>
+                    </div>
                 )}
             </div>
 
