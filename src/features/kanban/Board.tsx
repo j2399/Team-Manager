@@ -47,6 +47,7 @@ type Task = {
     endDate?: Date | string | null
     updatedAt?: Date | string | null
     requireAttachment?: boolean
+    enableProgress?: boolean
     assignee?: { id?: string; name: string } | null
     assignees?: { user: { id: string; name: string } }[]
     activityLogs?: { changedByName: string; createdAt: Date | string }[]

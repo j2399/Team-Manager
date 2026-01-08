@@ -32,6 +32,7 @@ type Task = {
     endDate?: Date | string | null
     dueDate?: Date | string | null
     requireAttachment?: boolean
+    enableProgress?: boolean
     instructionsFileUrl?: string | null
     instructionsFileName?: string | null
     assignee?: { id?: string; name: string } | null
