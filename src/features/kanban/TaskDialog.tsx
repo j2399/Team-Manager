@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Plus, Trash2, ChevronDown, FileText, Upload, X } from "lucide-react"
+import { Plus, Trash2, ChevronDown, FileText, Upload, X, ListChecks } from "lucide-react"
 import { useState, useTransition, useEffect, useMemo, useRef } from "react"
 import { createTask, updateTaskDetails, deleteTask } from "@/app/actions/kanban"
 import { RemoveScroll } from "react-remove-scroll"
@@ -96,6 +96,11 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const instructionsFileRef = useRef<HTMLInputElement>(null)
     const [isDraggingFile, setIsDraggingFile] = useState(false)
 
+    // Checklist state
+    const [enableChecklist, setEnableChecklist] = useState(false)
+    const [checklistItems, setChecklistItems] = useState<string[]>([])
+    const [newChecklistItem, setNewChecklistItem] = useState("")
+
     // Reset form when task changes or dialog opens
     useEffect(() => {
         if (open) {
@@ -133,9 +138,23 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 setEndDate("")
                 setRequireAttachment(true)
                 setEnableProgress(false)
+                setEnableChecklist(false)
+                setChecklistItems([])
+                setNewChecklistItem("")
             }
         }
     }, [task, today, open])
+
+    const addChecklistItem = () => {
+        if (newChecklistItem.trim()) {
+            setChecklistItems(prev => [...prev, newChecklistItem.trim()])
+            setNewChecklistItem("")
+        }
+    }
+
+    const removeChecklistItem = (index: number) => {
+        setChecklistItems(prev => prev.filter((_, i) => i !== index))
+    }
 
     const [isLoading, setIsLoading] = useState(false)
 
@@ -275,6 +294,17 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                     setIsUploadingInstructions(false)
                 }
 
+                // Create checklist items for new task
+                if (enableChecklist && checklistItems.length > 0 && result.task?.id) {
+                    for (let i = 0; i < checklistItems.length; i++) {
+                        await fetch(`/api/tasks/${result.task.id}/checklist`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ content: checklistItems[i], order: i })
+                        })
+                    }
+                }
+
                 // Reset form
                 setTitle("")
                 setDescription("")
@@ -283,6 +313,9 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 setStartDate(today)
                 setEndDate("")
                 setInstructionsFile(null)
+                setEnableChecklist(false)
+                setChecklistItems([])
+                setNewChecklistItem("")
 
                 if (result.task && onTaskCreated) {
                     onTaskCreated(result.task)
@@ -566,6 +599,81 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                         </p>
                                     </div>
                                 </div>
+
+                                {/* Checklist Option - Only show when creating new task */}
+                                {!task && (
+                                    <div className="border p-3 rounded-lg bg-muted/20">
+                                        <div className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id="enableChecklist"
+                                                checked={enableChecklist}
+                                                onCheckedChange={(checked) => setEnableChecklist(checked === true)}
+                                            />
+                                            <div className="grid gap-1.5 leading-none flex-1">
+                                                <label
+                                                    htmlFor="enableChecklist"
+                                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-1.5"
+                                                >
+                                                    <ListChecks className="h-3.5 w-3.5" />
+                                                    Add Checklist
+                                                </label>
+                                                <p className="text-xs text-muted-foreground">
+                                                    Break down this task into sub-steps that can be tracked.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {enableChecklist && (
+                                            <div className="mt-3 pt-3 border-t space-y-2">
+                                                {checklistItems.map((item, index) => (
+                                                    <div
+                                                        key={index}
+                                                        className="flex items-center gap-2 bg-background rounded-md px-3 py-2 text-sm"
+                                                    >
+                                                        <span className="text-muted-foreground">{index + 1}.</span>
+                                                        <span className="flex-1">{item}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeChecklistItem(index)}
+                                                            className="text-muted-foreground hover:text-destructive transition-colors"
+                                                        >
+                                                            <X className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                <div className="flex gap-2">
+                                                    <Input
+                                                        value={newChecklistItem}
+                                                        onChange={(e) => setNewChecklistItem(e.target.value)}
+                                                        placeholder="Add a checklist item..."
+                                                        className="h-9 text-sm"
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault()
+                                                                addChecklistItem()
+                                                            }
+                                                        }}
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={addChecklistItem}
+                                                        disabled={!newChecklistItem.trim()}
+                                                        className="h-9 px-3"
+                                                    >
+                                                        <Plus className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
+                                                {checklistItems.length === 0 && (
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        Press Enter or click + to add items
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-3">

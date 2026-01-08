@@ -5,15 +5,18 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
     AlertTriangle, Clock, HelpCircle, UserX, ChevronRight, Loader2,
-    Users, Zap, Target, CheckCircle2, BarChart3
+    Users, Zap, Target, CheckCircle2, BarChart3, ChevronDown, Plus
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
 import {
     Dialog,
     DialogContent,
     DialogHeader,
     DialogTitle,
+    DialogFooter,
 } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
 
 type Task = {
     id: string
@@ -144,6 +147,114 @@ function TaskListDialog({
     )
 }
 
+function AssignTasksDialog({
+    open,
+    onOpenChange,
+    user,
+    unassignedTasks,
+    onAssign
+}: {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    user: UserStat | null
+    unassignedTasks: Task[]
+    onAssign: (taskIds: string[], userId: string) => Promise<void>
+}) {
+    const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
+    const [isAssigning, setIsAssigning] = useState(false)
+
+    const toggleTask = (taskId: string) => {
+        setSelectedTasks(prev => {
+            const next = new Set(prev)
+            if (next.has(taskId)) next.delete(taskId)
+            else next.add(taskId)
+            return next
+        })
+    }
+
+    const handleAssign = async () => {
+        if (!user || selectedTasks.size === 0) return
+        setIsAssigning(true)
+        await onAssign(Array.from(selectedTasks), user.id)
+        setIsAssigning(false)
+        setSelectedTasks(new Set())
+        onOpenChange(false)
+    }
+
+    if (!user) return null
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+                <DialogHeader>
+                    <DialogTitle className="text-sm flex items-center gap-2">
+                        <Plus className="h-4 w-4" />
+                        Assign Tasks to {user.name}
+                    </DialogTitle>
+                </DialogHeader>
+
+                <div className="py-2">
+                    <p className="text-xs text-muted-foreground mb-3">
+                        Select unassigned tasks to assign to {user.name.split(' ')[0]}.
+                        Current workload: {user.activeTasks} active tasks.
+                    </p>
+
+                    <div className="flex-1 overflow-y-auto max-h-[40vh] space-y-1 border rounded-md p-2">
+                        {unassignedTasks.length > 0 ? (
+                            unassignedTasks.map(task => (
+                                <div
+                                    key={task.id}
+                                    onClick={() => toggleTask(task.id)}
+                                    className={cn(
+                                        "flex items-center gap-2 p-2 rounded-md cursor-pointer transition-colors",
+                                        selectedTasks.has(task.id)
+                                            ? "bg-primary/10 border border-primary/30"
+                                            : "hover:bg-muted/50"
+                                    )}
+                                >
+                                    <Checkbox checked={selectedTasks.has(task.id)} />
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <span
+                                            className="w-2 h-2 rounded-full shrink-0"
+                                            style={{ backgroundColor: task.projectColor }}
+                                        />
+                                        <span className="text-xs truncate">{task.title}</span>
+                                    </div>
+                                    <span className="text-[9px] text-muted-foreground shrink-0">
+                                        {task.projectName}
+                                    </span>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-xs text-muted-foreground text-center py-8">
+                                No unassigned tasks available
+                            </p>
+                        )}
+                    </div>
+                </div>
+
+                <DialogFooter className="gap-2">
+                    <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                        Cancel
+                    </Button>
+                    <Button
+                        size="sm"
+                        onClick={handleAssign}
+                        disabled={selectedTasks.size === 0 || isAssigning}
+                    >
+                        {isAssigning ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                        ) : (
+                            <Plus className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        Assign {selectedTasks.size > 0 ? `(${selectedTasks.size})` : ''}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 export function DashboardHeatmap({
     userStats,
     criticalIssues,
@@ -151,20 +262,39 @@ export function DashboardHeatmap({
     idleUsers,
     allTasks
 }: DashboardHeatmapProps) {
+    const router = useRouter()
     const [selectedIssue, setSelectedIssue] = useState<CriticalIssue | null>(null)
     const [selectedUser, setSelectedUser] = useState<UserStat | null>(null)
+    const [assigningToUser, setAssigningToUser] = useState<UserStat | null>(null)
+    const [showAllMembers, setShowAllMembers] = useState(false)
 
     const maxWorkload = Math.max(...userStats.map(u => u.workloadScore), 1)
     const totalActiveTasks = allTasks.filter(t => t.columnName !== 'Done').length
 
     // Sort users by workload
     const sortedUsers = [...userStats].sort((a, b) => b.workloadScore - a.workloadScore)
+    const displayedUsers = showAllMembers ? sortedUsers : sortedUsers.slice(0, 8)
+
+    const unassignedTasks = allTasks.filter(t => t.isUnassigned)
+
+    const handleAssignTasks = async (taskIds: string[], userId: string) => {
+        try {
+            for (const taskId of taskIds) {
+                await fetch(`/api/tasks/${taskId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ assigneeIds: [userId] })
+                })
+            }
+            router.refresh()
+        } catch (error) {
+            console.error('Failed to assign tasks:', error)
+        }
+    }
 
     if (criticalIssues.length === 0 && userStats.length === 0) {
         return null
     }
-
-    const unassignedTasks = allTasks.filter(t => t.isUnassigned)
 
     return (
         <section className="border border-border rounded-lg p-4">
@@ -223,102 +353,127 @@ export function DashboardHeatmap({
 
             {/* Workload Distribution Grid */}
             <div className="mb-4">
-                <h3 className="text-[10px] font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    Workload Distribution
-                </h3>
+                <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        Workload Distribution
+                    </h3>
+                    {sortedUsers.length > 8 && (
+                        <button
+                            onClick={() => setShowAllMembers(!showAllMembers)}
+                            className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
+                        >
+                            {showAllMembers ? 'Show less' : `Show all (${sortedUsers.length})`}
+                            <ChevronDown className={cn("h-3 w-3 transition-transform", showAllMembers && "rotate-180")} />
+                        </button>
+                    )}
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                    {sortedUsers.slice(0, 8).map(user => {
+                    {displayedUsers.map(user => {
                         const isOverloaded = overloadedUsers.includes(user.id)
                         const isIdle = idleUsers.includes(user.id)
 
                         return (
-                            <button
+                            <div
                                 key={user.id}
-                                onClick={() => setSelectedUser(user)}
                                 className={cn(
-                                    "p-2 rounded-md border transition-all hover:shadow-sm text-left",
+                                    "p-2 rounded-md border transition-all text-left relative group",
                                     getWorkloadColor(user.workloadScore, maxWorkload),
                                     isOverloaded && "ring-2 ring-red-400",
                                     isIdle && "ring-2 ring-blue-400"
                                 )}
                             >
-                                <div className="flex items-center gap-1.5 mb-1.5">
-                                    <div className="w-5 h-5 rounded-full bg-background flex items-center justify-center text-[9px] font-medium shrink-0 border">
-                                        {user.name.charAt(0).toUpperCase()}
+                                {/* User header - clickable for view tasks */}
+                                <button
+                                    onClick={() => setSelectedUser(user)}
+                                    className="w-full text-left"
+                                >
+                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                        <div className="w-5 h-5 rounded-full bg-background flex items-center justify-center text-[9px] font-medium shrink-0 border">
+                                            {user.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-[10px] font-medium truncate">{user.name.split(' ')[0]}</p>
+                                        </div>
                                     </div>
-                                    <div className="min-w-0">
-                                        <p className="text-[10px] font-medium truncate">{user.name.split(' ')[0]}</p>
-                                    </div>
-                                </div>
 
-                                {/* Task counts */}
-                                <div className="grid grid-cols-4 gap-0.5 text-center mb-1.5">
-                                    <div className="bg-background/50 rounded px-0.5 py-0.5">
-                                        <p className="text-[8px] text-muted-foreground">TD</p>
-                                        <p className="text-[10px] font-bold">{user.todoTasks}</p>
+                                    {/* Task counts */}
+                                    <div className="grid grid-cols-4 gap-0.5 text-center mb-1.5">
+                                        <div className="bg-background/50 rounded px-0.5 py-0.5">
+                                            <p className="text-[8px] text-muted-foreground">TD</p>
+                                            <p className="text-[10px] font-bold">{user.todoTasks}</p>
+                                        </div>
+                                        <div className="bg-background/50 rounded px-0.5 py-0.5">
+                                            <p className="text-[8px] text-muted-foreground">IP</p>
+                                            <p className="text-[10px] font-bold">{user.inProgressTasks}</p>
+                                        </div>
+                                        <div className="bg-background/50 rounded px-0.5 py-0.5">
+                                            <p className="text-[8px] text-muted-foreground">RV</p>
+                                            <p className="text-[10px] font-bold">{user.reviewTasks}</p>
+                                        </div>
+                                        <div className="bg-background/50 rounded px-0.5 py-0.5">
+                                            <p className="text-[8px] text-muted-foreground">DN</p>
+                                            <p className="text-[10px] font-bold text-green-600">{user.doneTasks}</p>
+                                        </div>
                                     </div>
-                                    <div className="bg-background/50 rounded px-0.5 py-0.5">
-                                        <p className="text-[8px] text-muted-foreground">IP</p>
-                                        <p className="text-[10px] font-bold">{user.inProgressTasks}</p>
-                                    </div>
-                                    <div className="bg-background/50 rounded px-0.5 py-0.5">
-                                        <p className="text-[8px] text-muted-foreground">RV</p>
-                                        <p className="text-[10px] font-bold">{user.reviewTasks}</p>
-                                    </div>
-                                    <div className="bg-background/50 rounded px-0.5 py-0.5">
-                                        <p className="text-[8px] text-muted-foreground">DN</p>
-                                        <p className="text-[10px] font-bold text-green-600">{user.doneTasks}</p>
-                                    </div>
-                                </div>
 
-                                {/* Issue badges */}
-                                <div className="flex items-center gap-1 flex-wrap">
-                                    {user.overdueTasks > 0 && (
-                                        <span className="text-[8px] px-1 py-0.5 rounded bg-red-100 text-red-600 dark:bg-red-900/50">
-                                            {user.overdueTasks} late
-                                        </span>
-                                    )}
-                                    {user.stuckTasks > 0 && (
-                                        <span className="text-[8px] px-1 py-0.5 rounded bg-amber-100 text-amber-600 dark:bg-amber-900/50">
-                                            {user.stuckTasks} stuck
-                                        </span>
-                                    )}
-                                    {user.helpRequestTasks > 0 && (
-                                        <span className="text-[8px] px-1 py-0.5 rounded bg-amber-100 text-amber-600 dark:bg-amber-900/50">
-                                            {user.helpRequestTasks} help
-                                        </span>
-                                    )}
-                                    {isIdle && (
-                                        <span className="text-[8px] px-1 py-0.5 rounded bg-blue-100 text-blue-600 dark:bg-blue-900/50">
-                                            Free
-                                        </span>
-                                    )}
-                                </div>
-
-                                {/* Workload bar */}
-                                <div className="mt-1.5">
-                                    <div className="h-1 bg-background rounded-full overflow-hidden">
-                                        <div
-                                            className={cn(
-                                                "h-full rounded-full transition-all",
-                                                user.workloadScore / maxWorkload < 0.5 ? "bg-green-500" :
-                                                    user.workloadScore / maxWorkload < 0.75 ? "bg-yellow-500" :
-                                                        user.workloadScore / maxWorkload < 0.9 ? "bg-orange-500" : "bg-red-500"
-                                            )}
-                                            style={{ width: `${Math.min((user.workloadScore / maxWorkload) * 100, 100)}%` }}
-                                        />
+                                    {/* Issue badges */}
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                        {user.overdueTasks > 0 && (
+                                            <span className="text-[8px] px-1 py-0.5 rounded bg-red-100 text-red-600 dark:bg-red-900/50">
+                                                {user.overdueTasks} late
+                                            </span>
+                                        )}
+                                        {user.stuckTasks > 0 && (
+                                            <span className="text-[8px] px-1 py-0.5 rounded bg-amber-100 text-amber-600 dark:bg-amber-900/50">
+                                                {user.stuckTasks} stuck
+                                            </span>
+                                        )}
+                                        {user.helpRequestTasks > 0 && (
+                                            <span className="text-[8px] px-1 py-0.5 rounded bg-amber-100 text-amber-600 dark:bg-amber-900/50">
+                                                {user.helpRequestTasks} help
+                                            </span>
+                                        )}
+                                        {isIdle && (
+                                            <span className="text-[8px] px-1 py-0.5 rounded bg-blue-100 text-blue-600 dark:bg-blue-900/50">
+                                                Free
+                                            </span>
+                                        )}
                                     </div>
-                                </div>
-                            </button>
+
+                                    {/* Workload bar */}
+                                    <div className="mt-1.5">
+                                        <div className="h-1 bg-background rounded-full overflow-hidden">
+                                            <div
+                                                className={cn(
+                                                    "h-full rounded-full transition-all",
+                                                    user.workloadScore / maxWorkload < 0.5 ? "bg-green-500" :
+                                                        user.workloadScore / maxWorkload < 0.75 ? "bg-yellow-500" :
+                                                            user.workloadScore / maxWorkload < 0.9 ? "bg-orange-500" : "bg-red-500"
+                                                )}
+                                                style={{ width: `${Math.min((user.workloadScore / maxWorkload) * 100, 100)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                </button>
+
+                                {/* Assign button - appears on hover */}
+                                {unassignedTasks.length > 0 && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setAssigningToUser(user)
+                                        }}
+                                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90"
+                                        title="Assign tasks"
+                                    >
+                                        <Plus className="h-3 w-3" />
+                                    </button>
+                                )}
+                            </div>
                         )
                     })}
                 </div>
-                {sortedUsers.length > 8 && (
-                    <p className="text-[9px] text-muted-foreground text-center mt-2">
-                        +{sortedUsers.length - 8} more team members
-                    </p>
-                )}
             </div>
 
             {/* Legend */}
@@ -343,71 +498,43 @@ export function DashboardHeatmap({
                     <div className="w-2.5 h-2.5 rounded border-2 border-blue-400" />
                     <span>Available</span>
                 </div>
+                <div className="flex items-center gap-1 ml-auto">
+                    <span className="text-muted-foreground">Hover card + click</span>
+                    <Plus className="h-2.5 w-2.5" />
+                    <span>to assign</span>
+                </div>
             </div>
 
-            {/* Bottom row: Unassigned + Available */}
-            {(unassignedTasks.length > 0 || idleUsers.length > 0) && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 pt-3 border-t">
-                    {/* Unassigned Tasks */}
-                    {unassignedTasks.length > 0 && (
-                        <div>
-                            <h4 className="text-[10px] font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                                <UserX className="h-3 w-3" />
-                                Unassigned ({unassignedTasks.length})
-                            </h4>
-                            <div className="space-y-1 max-h-32 overflow-y-auto">
-                                {unassignedTasks.slice(0, 5).map(task => (
-                                    <Link
-                                        key={task.id}
-                                        href={`/dashboard/projects/${task.projectId}?task=${task.id}`}
-                                        className="flex items-center justify-between p-1.5 rounded hover:bg-muted/50 transition-colors"
-                                    >
-                                        <div className="flex items-center gap-1.5 min-w-0">
-                                            <div
-                                                className="w-1.5 h-1.5 rounded-full shrink-0"
-                                                style={{ backgroundColor: task.projectColor }}
-                                            />
-                                            <span className="text-[10px] truncate">{task.title}</span>
-                                        </div>
-                                        <ChevronRight className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
-                                    </Link>
-                                ))}
-                                {unassignedTasks.length > 5 && (
-                                    <p className="text-[9px] text-muted-foreground text-center">
-                                        +{unassignedTasks.length - 5} more
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Available Team Members */}
-                    {idleUsers.length > 0 && (
-                        <div>
-                            <h4 className="text-[10px] font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                                <CheckCircle2 className="h-3 w-3 text-green-500" />
-                                Available ({idleUsers.length})
-                            </h4>
-                            <div className="space-y-1">
-                                {userStats.filter(u => idleUsers.includes(u.id)).slice(0, 4).map(user => (
+            {/* Unassigned Tasks Quick View */}
+            {unassignedTasks.length > 0 && (
+                <div className="mt-4 pt-3 border-t">
+                    <h4 className="text-[10px] font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                        <UserX className="h-3 w-3" />
+                        Unassigned Tasks ({unassignedTasks.length})
+                    </h4>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {unassignedTasks.slice(0, 5).map(task => (
+                            <Link
+                                key={task.id}
+                                href={`/dashboard/projects/${task.projectId}?task=${task.id}`}
+                                className="flex items-center justify-between p-1.5 rounded hover:bg-muted/50 transition-colors"
+                            >
+                                <div className="flex items-center gap-1.5 min-w-0">
                                     <div
-                                        key={user.id}
-                                        className="flex items-center gap-2 p-1.5 rounded bg-green-50 dark:bg-green-950/30"
-                                    >
-                                        <div className="w-4 h-4 rounded-full bg-background flex items-center justify-center text-[8px] font-medium border">
-                                            {user.name.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="text-[10px] font-medium truncate">{user.name}</p>
-                                            <p className="text-[8px] text-muted-foreground">
-                                                {user.doneTasks} completed
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+                                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                                        style={{ backgroundColor: task.projectColor }}
+                                    />
+                                    <span className="text-[10px] truncate">{task.title}</span>
+                                </div>
+                                <ChevronRight className="h-2.5 w-2.5 text-muted-foreground shrink-0" />
+                            </Link>
+                        ))}
+                        {unassignedTasks.length > 5 && (
+                            <p className="text-[9px] text-muted-foreground text-center">
+                                +{unassignedTasks.length - 5} more
+                            </p>
+                        )}
+                    </div>
                 </div>
             )}
 
@@ -425,6 +552,15 @@ export function DashboardHeatmap({
                 onOpenChange={() => setSelectedUser(null)}
                 title={`${selectedUser?.name}'s Tasks (${selectedUser?.activeTasks} active)`}
                 tasks={selectedUser?.tasks.filter(t => t.columnName !== 'Done') || []}
+            />
+
+            {/* Assign Tasks Dialog */}
+            <AssignTasksDialog
+                open={!!assigningToUser}
+                onOpenChange={() => setAssigningToUser(null)}
+                user={assigningToUser}
+                unassignedTasks={unassignedTasks}
+                onAssign={handleAssignTasks}
             />
         </section>
     )
