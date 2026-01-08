@@ -944,8 +944,8 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId }:
                                                 className="h-7 flex items-center gap-1.5 px-2.5 rounded-md border border-border hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-colors relative z-10 text-xs font-medium text-muted-foreground"
                                                 title="Add Task"
                                             >
-                                                <Plus className="h-3.5 w-3.5" />
                                                 <span>Add Task</span>
+                                                <Plus className="h-3.5 w-3.5" />
                                             </div>
                                         )}
                                         {isComplete && (

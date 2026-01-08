@@ -165,7 +165,7 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
 	                            <Button
 	                                variant="outline"
                                 size="sm"
-                                className="h-7 px-2 md:px-3 shrink-0 border-[color:var(--push-btn-border)] bg-[color:var(--push-btn-bg)] hover:bg-[color:var(--push-btn-bg-hover)] hover:border-[color:var(--push-btn-border-hover)] animate-fade-in-up"
+                                className="h-7 px-2 md:px-3 shrink-0 border-[color:var(--push-btn-border)] bg-[color:var(--push-btn-bg)] hover:bg-[color:var(--push-btn-bg-hover)] hover:border-[color:var(--push-btn-border-hover)]"
                                 style={{
                                     ["--push-btn-bg" as any]: hexToRgba(projectColor, 0.10),
                                     ["--push-btn-bg-hover" as any]: hexToRgba(projectColor, 0.16),
@@ -175,8 +175,8 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                                 }}
                                 onClick={() => setShowPushDialog(true)}
                             >
-                                <Plus className="w-3.5 h-3.5 md:mr-1.5 text-[color:var(--push-btn-icon)]" />
                                 <span className="hidden md:inline">Add Push</span>
+                                <Plus className="w-3.5 h-3.5 md:ml-1.5 text-[color:var(--push-btn-icon)]" />
                             </Button>
                         )}
                     </div>
