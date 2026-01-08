@@ -1000,12 +1000,12 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                         {attachments.map(a => {
                                             if (deletingIds.has(a.id)) {
                                                 return (
-                                                    <div key={a.id} className="relative group bg-red-100/50 rounded overflow-hidden border border-red-200 shrink-0 w-24 h-24 flex flex-col items-center justify-center gap-1">
-                                                        <span className="text-[10px] text-red-500 font-medium">Deleted</span>
+                                                    <div key={a.id} className="relative group bg-muted/80 rounded overflow-hidden border border-border shrink-0 w-24 h-24 flex flex-col items-center justify-center gap-1.5">
+                                                        <span className="text-[10px] text-muted-foreground font-medium">Removing...</span>
                                                         <Button
-                                                            variant="outline"
+                                                            variant="secondary"
                                                             size="sm"
-                                                            className="h-6 text-[10px] px-2 bg-white hover:bg-white/80"
+                                                            className="h-6 text-[10px] px-3"
                                                             onClick={(e) => {
                                                                 e.stopPropagation()
                                                                 handleUndoDelete(a.id)
@@ -1013,7 +1013,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                                         >
                                                             Undo
                                                         </Button>
-                                                        <div className="absolute top-0 left-0 w-full h-0.5 bg-red-500 animate-[shrink_4s_linear]" style={{ animationDuration: '4s' }} />
+                                                        <div className="absolute bottom-0 left-0 w-full h-0.5 bg-primary/60 origin-left animate-[shrink_4s_linear]" style={{ animationDuration: '4s' }} />
                                                     </div>
                                                 )
                                             }

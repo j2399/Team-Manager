@@ -251,7 +251,8 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
                 "group relative flex flex-col rounded-lg border bg-card p-3 shadow-sm transition-colors transition-shadow duration-200",
                 "hover:shadow-md hover:border-primary/20",
                 isReviewColumn ? "border-orange-200 bg-orange-50/10" : "border-border",
-                isDragDisabled ? 'cursor-default' : 'cursor-grab'
+                isDragDisabled ? 'cursor-default' : 'cursor-grab',
+                isHighlighted && 'animate-highlight-bulge'
             )}
         >
             {/* Title */}
@@ -383,10 +384,7 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
                 </div>
             )}
 
-            {isHighlighted && (
-                <div className="absolute inset-0 z-10 rounded-lg border-2 border-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)] pointer-events-none animate-highlight-fade" />
-            )}
-
+            
             <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
                 <AlertDialog open={showReviewConfirm} onOpenChange={setShowReviewConfirm}>
                     <AlertDialogContent>
