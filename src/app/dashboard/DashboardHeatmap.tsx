@@ -493,7 +493,7 @@ export function DashboardHeatmap({
             <div className="flex items-center justify-between mb-4">
                 <h2 className="text-sm font-medium flex items-center gap-1.5">
                     <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
-                    Team Heatmap
+                    Work Distribution
                 </h2>
                 <span className="text-[10px] text-muted-foreground">
                     {totalActiveTasks} active tasks
@@ -546,14 +546,10 @@ export function DashboardHeatmap({
             {/* Workload Distribution Grid */}
             <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        Workload Distribution
-                    </h3>
                     {sortedUsers.length > 8 && (
                         <button
                             onClick={() => setShowAllMembers(!showAllMembers)}
-                            className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
+                            className="text-[10px] text-primary hover:underline flex items-center gap-0.5 ml-auto"
                         >
                             {showAllMembers ? 'Show less' : `Show all (${sortedUsers.length})`}
                             <ChevronDown className={cn("h-3 w-3 transition-transform", showAllMembers && "rotate-180")} />
