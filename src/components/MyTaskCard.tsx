@@ -62,12 +62,14 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
 
     const project = task.column?.board?.project
     const projectColor = project?.color || '#6b7280'
+    const effectiveDueDate = task.endDate || task.dueDate
+
     const { text: dueText, isOverdue, isUrgent } = task.column?.name !== 'Done'
-        ? getTimeUntilDue(task.dueDate)
+        ? getTimeUntilDue(effectiveDueDate)
         : { text: '', isOverdue: false, isUrgent: false }
 
-    const formattedDate = task.dueDate
-        ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const formattedDate = effectiveDueDate
+        ? new Date(effectiveDueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
         : null
 
     return (
