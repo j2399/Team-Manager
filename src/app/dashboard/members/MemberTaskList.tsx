@@ -17,10 +17,13 @@ type Task = {
     startDate?: Date | string | null
     updatedAt?: Date | string | null
     progress?: number | null
-    column?: { name: string } | null
+    column?: {
+        name: string
+        board?: {
+            project?: { id: string; name: string; color: string | null } | null
+        } | null
+    } | null
     push?: { name: string; color: string } | null
-    project?: { name: string; color: string } | null
-    projectId?: string
 }
 
 type ActivityLog = {
@@ -78,6 +81,7 @@ function TaskItem({ task }: { task: Task }) {
     const overdue = isOverdue(task)
     const status = task.column?.name || 'Unknown'
     const dueDate = task.dueDate || task.endDate
+    const project = task.column?.board?.project
 
     return (
         <div className={`flex items-center justify-between p-3 rounded-lg border ${overdue ? 'border-red-200 bg-red-50/50 dark:border-red-900/50 dark:bg-red-950/20' : 'border-border bg-muted/20'} hover:bg-muted/40 transition-colors group`}>
@@ -97,15 +101,15 @@ function TaskItem({ task }: { task: Task }) {
                         )}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
-                        {task.project && (
+                        {project && (
                             <span
                                 className="text-[10px] px-1.5 py-0.5 rounded"
                                 style={{
-                                    backgroundColor: `${task.project.color}20`,
-                                    color: task.project.color
+                                    backgroundColor: project.color ? `${project.color}20` : '#3b82f620',
+                                    color: project.color || '#3b82f6'
                                 }}
                             >
-                                {task.project.name}
+                                {project.name}
                             </span>
                         )}
                         {task.push && (
@@ -133,8 +137,8 @@ function TaskItem({ task }: { task: Task }) {
                 <Badge className={`text-[10px] h-5 ${statusColors[status] || 'bg-gray-100'}`}>
                     {status}
                 </Badge>
-                {task.projectId && (
-                    <Link href={`/dashboard/projects/${task.projectId}?task=${task.id}`}>
+                {project && (
+                    <Link href={`/dashboard/projects/${project.id}?task=${task.id}`}>
                         <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
                             <ExternalLink className="h-3.5 w-3.5" />
                         </Button>

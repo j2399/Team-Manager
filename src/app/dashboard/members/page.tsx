@@ -36,9 +36,17 @@ export default async function MembersPage() {
             },
             assignedTasks: {
                 include: {
-                    column: { select: { name: true } },
-                    push: { select: { name: true, color: true } },
-                    project: { select: { name: true, color: true } }
+                    column: {
+                        select: {
+                            name: true,
+                            board: {
+                                select: {
+                                    project: { select: { id: true, name: true, color: true } }
+                                }
+                            }
+                        }
+                    },
+                    push: { select: { name: true, color: true } }
                 },
                 orderBy: { updatedAt: 'desc' }
             },
@@ -46,9 +54,17 @@ export default async function MembersPage() {
                 include: {
                     task: {
                         include: {
-                            column: { select: { name: true } },
-                            push: { select: { name: true, color: true } },
-                            project: { select: { name: true, color: true } }
+                            column: {
+                                select: {
+                                    name: true,
+                                    board: {
+                                        select: {
+                                            project: { select: { id: true, name: true, color: true } }
+                                        }
+                                    }
+                                }
+                            },
+                            push: { select: { name: true, color: true } }
                         }
                     }
                 }
