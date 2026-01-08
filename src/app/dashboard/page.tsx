@@ -259,7 +259,7 @@ export default async function DashboardPage() {
     }))
 
     return (
-        <div className="h-full flex flex-col p-4 pb-0">
+        <div className="h-full flex flex-col p-4 pb-0 animate-fade-in-up">
             {/* Header - only show if there are overdue tasks */}
             {overdueTasks > 0 && (
                 <div className="flex items-center justify-end shrink-0 mb-4">

@@ -235,3 +235,184 @@
     transform: rotate(0deg);
   }
 }
+
+/* Smooth fade-in for page content */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.3s ease-out forwards;
+}
+
+/* Staggered fade-in for lists */
+@keyframes fade-in-stagger {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-stagger > * {
+  opacity: 0;
+  animation: fade-in-stagger 0.25s ease-out forwards;
+}
+
+.animate-fade-in-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.animate-fade-in-stagger > *:nth-child(2) { animation-delay: 30ms; }
+.animate-fade-in-stagger > *:nth-child(3) { animation-delay: 60ms; }
+.animate-fade-in-stagger > *:nth-child(4) { animation-delay: 90ms; }
+.animate-fade-in-stagger > *:nth-child(5) { animation-delay: 120ms; }
+.animate-fade-in-stagger > *:nth-child(6) { animation-delay: 150ms; }
+.animate-fade-in-stagger > *:nth-child(7) { animation-delay: 180ms; }
+.animate-fade-in-stagger > *:nth-child(8) { animation-delay: 210ms; }
+.animate-fade-in-stagger > *:nth-child(n+9) { animation-delay: 240ms; }
+
+/* Subtle pulse for loading states */
+@keyframes subtle-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-subtle-pulse {
+  animation: subtle-pulse 1.5s ease-in-out infinite;
+}
+
+/* Scale bounce for successful actions */
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-pop {
+  animation: pop 0.2s ease-out;
+}
+
+/* Smooth slide in from right */
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.2s ease-out forwards;
+}
+
+/* Card hover lift effect */
+.card-hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.dark .card-hover-lift:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Button press effect */
+.btn-press {
+  transition: transform 0.1s ease;
+}
+
+.btn-press:active {
+  transform: scale(0.97);
+}
+
+/* Smooth expand/collapse */
+.smooth-collapse {
+  transition: grid-template-rows 0.25s ease-out;
+}
+
+/* Focus ring animation */
+@keyframes focus-ring-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--ring), 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 4px rgba(var(--ring), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--ring), 0);
+  }
+}
+
+/* Checkmark animation */
+@keyframes checkmark-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-checkmark path {
+  stroke-dasharray: 20;
+  stroke-dashoffset: 20;
+  animation: checkmark-draw 0.3s ease forwards 0.1s;
+}
+
+/* Toast slide in */
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-slide-in 0.3s ease-out;
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 25%,
+    var(--accent) 50%,
+    var(--muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}

@@ -37,7 +37,7 @@ export function ProjectCard({ project, users, isAdmin }: Props) {
     }
 
     return (
-        <Card className="hover:bg-muted/50 transition-colors h-full group relative">
+        <Card className="hover:bg-muted/50 transition-all h-full group relative card-hover-lift">
             <Link href={`/dashboard/projects/${project.id}`} className="absolute inset-0 z-0" />
             <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">

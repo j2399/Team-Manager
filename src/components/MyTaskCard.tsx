@@ -46,7 +46,7 @@ export function MyTaskCard({ task }: MyTaskCardProps) {
 
     return (
         <>
-            <div className={`border rounded-lg bg-card hover:bg-accent/50 transition-colors ${isOverdue ? 'border-red-300 bg-red-50/50 dark:border-red-900/50 dark:bg-red-900/10' : ''}`}>
+            <div className={`border rounded-lg bg-card hover:bg-accent/50 transition-all card-hover-lift ${isOverdue ? 'border-red-300 bg-red-50/50 dark:border-red-900/50 dark:bg-red-900/10' : ''}`}>
                 {/* Header with title */}
                 <div className="p-3 pb-2 flex items-start gap-2">
                     <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
