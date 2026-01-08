@@ -8,7 +8,7 @@ import { ProjectSelect } from "./ProjectSelect"
 import { MemberActions } from "./MemberActions"
 import { MemberTaskList } from "./MemberTaskList"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { CheckCircle2, Clock, Circle, TrendingUp, AlertCircle, Calendar, Activity } from "lucide-react"
+import { CheckCircle2, Clock, Circle, TrendingUp, AlertCircle, Activity } from "lucide-react"
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +19,7 @@ export default async function MembersPage() {
     }
     const canChangeRoles = currentUser.role === 'Admin' || currentUser.role === 'Team Lead'
 
-    // Fetch users with their tasks and activity
+    // Fetch users with their tasks
     const users = await prisma.user.findMany({
         where: {
             memberships: {
@@ -68,22 +68,35 @@ export default async function MembersPage() {
                         }
                     }
                 }
-            },
-            activityLogs: {
-                orderBy: { createdAt: 'desc' },
-                take: 10,
-                select: {
-                    id: true,
-                    action: true,
-                    field: true,
-                    taskTitle: true,
-                    createdAt: true,
-                    details: true
-                }
             }
         },
         orderBy: { name: 'asc' }
     })
+
+    // Fetch activity logs separately by user ID
+    const userIds = users.map(u => u.id)
+    const activityLogs = await prisma.activityLog.findMany({
+        where: {
+            changedBy: { in: userIds }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100, // Get recent logs
+        select: {
+            id: true,
+            action: true,
+            field: true,
+            taskTitle: true,
+            createdAt: true,
+            details: true,
+            changedBy: true
+        }
+    })
+
+    // Group activity logs by user
+    const activityByUser = userIds.reduce((acc, id) => {
+        acc[id] = activityLogs.filter(log => log.changedBy === id).slice(0, 10)
+        return acc
+    }, {} as Record<string, typeof activityLogs>)
 
     const allProjects = await prisma.project.findMany({
         where: { workspaceId: currentUser.workspaceId || 'non-existent-id' },
@@ -122,9 +135,10 @@ export default async function MembersPage() {
             : 0
 
         // Get recent activity count (last 7 days)
+        const userLogs = activityByUser[user.id] || []
         const weekAgo = new Date()
         weekAgo.setDate(weekAgo.getDate() - 7)
-        const recentActivityCount = user.activityLogs.filter(
+        const recentActivityCount = userLogs.filter(
             log => new Date(log.createdAt) > weekAgo
         ).length
 
@@ -138,7 +152,8 @@ export default async function MembersPage() {
             overdueTasks,
             completionRate,
             recentActivityCount,
-            totalTasks: uniqueTasks.length
+            totalTasks: uniqueTasks.length,
+            activityLogs: userLogs
         }
     })
 
