@@ -34,7 +34,7 @@ export default async function MembersPage() {
                     project: { select: { id: true, name: true, color: true } }
                 }
             },
-            assignedTasks: {
+            tasks: {
                 include: {
                     column: {
                         select: {
@@ -95,7 +95,7 @@ export default async function MembersPage() {
     const userStats = users.map(user => {
         // Combine both assignment types
         const allTasks = [
-            ...user.assignedTasks,
+            ...user.tasks,
             ...user.taskAssignments.map(ta => ta.task)
         ]
         // Remove duplicates
