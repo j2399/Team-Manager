@@ -263,7 +263,6 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                     )}
                 >
                     <span className="truncate">{project.name}</span>
-                    {navigatingTo === `/dashboard/projects/${project.id}` && <SpinningDots className="ml-auto shrink-0" />}
                 </Link>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -272,7 +271,28 @@ export function Sidebar({ initialUserData }: { initialUserData?: Partial<UserDat
                             size="icon"
                             className="h-6 w-6 shrink-0 text-muted-foreground/50 hover:text-muted-foreground"
                         >
-                            <MoreHorizontal className="h-4 w-4" />
+                            {navigatingTo === `/dashboard/projects/${project.id}` ? (
+                                <div className="relative w-4 h-4 flex items-center justify-center">
+                                    {[0, 1, 2].map((i) => (
+                                        <span
+                                            key={i}
+                                            className="absolute w-1 h-1 rounded-full bg-current"
+                                            style={{
+                                                animation: `orbitDot 0.8s ease-in-out infinite`,
+                                                animationDelay: `${i * -0.266}s`,
+                                            }}
+                                        />
+                                    ))}
+                                    <style jsx>{`
+                                        @keyframes orbitDot {
+                                            0% { transform: rotate(0deg) translateX(5px); }
+                                            100% { transform: rotate(360deg) translateX(5px); }
+                                        }
+                                    `}</style>
+                                </div>
+                            ) : (
+                                <MoreHorizontal className="h-4 w-4" />
+                            )}
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start" side="right" className="w-32 z-50">
