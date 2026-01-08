@@ -17,9 +17,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { acceptReviewTask, denyReviewTask } from "@/app/actions/kanban"
 import {
     Pencil, Calendar, User, Clock,
-    Paperclip, Send, FileText, Upload, Reply, X, Download, Maximize2, Trash2, CheckCircle, XCircle, ChevronDown
+    Paperclip, Send, FileText, Upload, Reply, X, Download, Maximize2, Trash2, CheckCircle, XCircle, ChevronDown, ListChecks
 } from "lucide-react"
 import { getInitials } from "@/lib/utils"
+import { TaskChecklist } from "@/components/TaskChecklist"
+import { HelpRequest } from "@/components/HelpRequest"
 
 type Task = {
     id: string
@@ -1082,6 +1084,30 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Checklist Section */}
+                            <div className="border-t pt-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-medium flex items-center gap-1">
+                                        <ListChecks className="h-3 w-3" />
+                                        Checklist
+                                    </span>
+                                </div>
+                                <TaskChecklist taskId={task.id} isEditable={true} />
+                            </div>
+
+                            {/* Help Request Section */}
+                            <div className="border-t pt-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-medium mb-2">Need Help?</span>
+                                </div>
+                                <HelpRequest
+                                    taskId={task.id}
+                                    taskTitle={task.title}
+                                    currentUserId={currentUser?.id}
+                                    userRole={userRole}
+                                />
                             </div>
 
                             {/* Comments Section */}

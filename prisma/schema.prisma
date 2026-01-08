@@ -120,7 +120,7 @@ model Task {
   id              String   @id @default(cuid())
   title           String
   description     String?
-  status          String   @default("Todo") 
+  status          String   @default("Todo")
   assignee        User?    @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   assigneeId      String?
   assignees       TaskAssignee[]
@@ -142,6 +142,8 @@ model Task {
   comments        Comment[]
   attachments     TaskAttachment[]
   activityLogs    ActivityLog[]
+  checklistItems  TaskChecklistItem[]
+  helpRequests    HelpRequest[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -181,6 +183,40 @@ model TaskAttachment {
   taskId    String
   uploadedBy String
   createdAt DateTime @default(now())
+}
+
+model TaskChecklistItem {
+  id          String   @id @default(cuid())
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId      String
+  content     String
+  completed   Boolean  @default(false)
+  completedBy String?
+  completedAt DateTime?
+  order       Int      @default(0)
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([taskId, order])
+}
+
+model HelpRequest {
+  id          String   @id @default(cuid())
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId      String
+  requestedBy String   // User ID
+  requestedByName String
+  message     String?  // Optional context message
+  status      String   @default("open") // open, acknowledged, resolved
+  resolvedBy  String?
+  resolvedByName String?
+  resolvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([taskId])
+  @@index([status])
 }
 
 model ActivityLog {
