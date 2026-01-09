@@ -160,17 +160,17 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
     return (
         <div className="flex flex-col h-full animate-fade-in-up">
             <div className="shrink-0 border-b bg-background">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 p-3">
-	                    <div className="flex items-center gap-2 md:gap-3">
-	                        <h1 className="text-base md:text-lg font-semibold truncate">{project.name}</h1>
-	                        {view === 'kanban' && (
+                <div className="flex items-center justify-between gap-2 p-3">
+                    <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                        <h1 className="text-base md:text-lg font-semibold truncate">{project.name}</h1>
+                        {view === 'kanban' && (
                             <TooltipProvider delayDuration={300}>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className={`h-7 px-2 md:px-3 shrink-0 border-[color:var(--push-btn-border)] bg-[color:var(--push-btn-bg)] hover:bg-[color:var(--push-btn-bg-hover)] hover:border-[color:var(--push-btn-border-hover)] transition-opacity ${canManagePushes ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                                            className={`h-7 px-2 shrink-0 border-[color:var(--push-btn-border)] bg-[color:var(--push-btn-bg)] hover:bg-[color:var(--push-btn-bg-hover)] hover:border-[color:var(--push-btn-border-hover)] transition-opacity ${canManagePushes ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                                             style={{
                                                 ["--push-btn-bg" as any]: hexToRgba(projectColor, 0.10),
                                                 ["--push-btn-bg-hover" as any]: hexToRgba(projectColor, 0.16),
@@ -180,8 +180,8 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                                             }}
                                             onClick={() => setShowPushDialog(true)}
                                         >
-                                            <span className="hidden md:inline">Add Push</span>
-                                            <Plus className="w-3.5 h-3.5 md:ml-1.5 text-[color:var(--push-btn-icon)]" />
+                                            <Plus className="w-3.5 h-3.5 mr-1 text-[color:var(--push-btn-icon)]" />
+                                            <span className="text-xs">Add Push</span>
                                         </Button>
                                     </TooltipTrigger>
                                     <TooltipContent side="bottom" className="max-w-[200px] text-center">
@@ -191,8 +191,8 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                             </TooltipProvider>
                         )}
                     </div>
-                    <div className="flex items-center gap-2 overflow-x-auto">
-                        <div className="relative flex items-center p-0.5 bg-muted rounded-lg shrink-0 overflow-hidden">
+                    <div className="flex items-center gap-2 shrink-0">
+                        <div className="relative flex items-center p-0.5 bg-muted rounded-lg overflow-hidden">
                             {/* Sliding indicator */}
                             <div
                                 className={`absolute inset-y-0.5 w-[calc(50%-2px)] bg-primary rounded-md transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${view === 'kanban' ? 'left-0.5' : 'left-[calc(50%+1px)]'}`}
@@ -201,18 +201,16 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                                 }}
                             />
                             <button
-                                className={`relative z-10 flex items-center gap-1.5 h-7 px-2 md:px-3 rounded-md text-sm font-medium transition-colors duration-200 ${view === 'kanban' ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                                className={`relative z-10 flex items-center gap-1 h-7 px-2 rounded-md text-sm font-medium transition-colors duration-200 ${view === 'kanban' ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                                 onClick={() => handleViewChange('kanban')}
                             >
                                 <LayoutGrid className="w-3.5 h-3.5" />
-                                <span className="hidden md:inline">Kanban</span>
                             </button>
                             <button
-                                className={`relative z-10 flex items-center gap-1.5 h-7 px-2 md:px-3 rounded-md text-sm font-medium transition-colors duration-200 ${view === 'gantt' ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                                className={`relative z-10 flex items-center gap-1 h-7 px-2 rounded-md text-sm font-medium transition-colors duration-200 ${view === 'gantt' ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                                 onClick={() => handleViewChange('gantt')}
                             >
                                 <Calendar className="w-3.5 h-3.5" />
-                                <span className="hidden md:inline">Gantt</span>
                             </button>
                         </div>
                         {project.lead && (

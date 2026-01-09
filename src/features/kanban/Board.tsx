@@ -928,70 +928,68 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
                                     aria-expanded={isOpen}
                                     aria-controls={contentId}
                                     onClick={() => togglePushCollapse(push.id)}
-                                    className={`w-full flex items-center justify-between p-4 transition-colors ${isOpen ? "rounded-t-lg" : "rounded-lg"} relative overflow-hidden ${isComplete ? 'bg-green-100 dark:bg-green-900/20 hover:bg-green-200/50 dark:hover:bg-green-900/30' : 'hover:bg-accent/50 dark:hover:bg-accent/20'}`}
+                                    className={`w-full flex items-center justify-between p-3 md:p-4 transition-colors ${isOpen ? "rounded-t-lg" : "rounded-lg"} relative overflow-hidden ${isComplete ? 'bg-green-100 dark:bg-green-900/20 hover:bg-green-200/50 dark:hover:bg-green-900/30' : 'hover:bg-accent/50 dark:hover:bg-accent/20'}`}
                                 >
-                                    <div className="flex items-center gap-3">
-                                        <span className="font-semibold text-lg tracking-tight">{push.name}</span>
-                                        <div
-                                            role="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                if (!isAdmin) return
-                                                const todoColumn = columns.find(c => c.name === 'Todo' || c.name === 'To Do')
-                                                if (todoColumn) {
-                                                    setCreatingColumnId(todoColumn.id)
-                                                    setCreatingPushId(push.id)
-                                                }
-                                            }}
-                                            className={`h-7 flex items-center gap-1.5 px-2.5 rounded-md border border-border hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-all relative z-10 text-xs font-medium text-muted-foreground ${isAdmin ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                                            title="Add Task"
-                                        >
-                                            <span>Add Task</span>
-                                            <Plus className="h-3.5 w-3.5" />
-                                        </div>
-                                        {isComplete && (
-                                            <span className="flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2.5 py-0.5 rounded-full ring-1 ring-inset ring-green-600/20 dark:ring-green-400/20">
-                                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                                {push.endDate && push.endDate !== 'null' ? `Completed on ${new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : 'Completed!'}
+                                    <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                                        <span className="font-semibold text-base md:text-lg tracking-tight truncate">{push.name}</span>
+                                        {isComplete ? (
+                                            <span className="hidden sm:flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full ring-1 ring-inset ring-green-600/20 dark:ring-green-400/20 shrink-0">
+                                                <CheckCircle2 className="w-3 h-3" />
+                                                <span className="hidden md:inline">{push.endDate && push.endDate !== 'null' ? `Completed ${new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : 'Completed!'}</span>
+                                                <span className="md:hidden">Done</span>
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] md:text-xs text-muted-foreground bg-muted/50 px-1.5 md:px-2 py-0.5 rounded shrink-0">
+                                                {push.completedCount}/{push.taskCount}
                                             </span>
                                         )}
                                     </div>
 
-                                    <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-1 md:gap-2 shrink-0">
                                         {!isComplete && (
-                                            <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium">
-                                                <span className="bg-muted/50 px-2 py-0.5 rounded">
-                                                    {new Date(push.startDate).toLocaleDateString([], { month: 'short', day: 'numeric' })} - {push.endDate ? new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Ongoing'}
-                                                </span>
-                                                <span className="bg-muted/50 px-2 py-0.5 rounded">
-                                                    {push.completedCount}/{push.taskCount}
-                                                </span>
+                                            <span className="hidden md:inline text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded">
+                                                {new Date(push.startDate).toLocaleDateString([], { month: 'short', day: 'numeric' })} - {push.endDate ? new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Ongoing'}
+                                            </span>
+                                        )}
+                                        {isAdmin && (
+                                            <div
+                                                role="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    const todoColumn = columns.find(c => c.name === 'Todo' || c.name === 'To Do')
+                                                    if (todoColumn) {
+                                                        setCreatingColumnId(todoColumn.id)
+                                                        setCreatingPushId(push.id)
+                                                    }
+                                                }}
+                                                className="h-7 w-7 md:h-8 md:w-8 flex items-center justify-center rounded-md border border-border hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-all relative z-10"
+                                                title="Add Task"
+                                            >
+                                                <Plus className="h-3.5 w-3.5 md:h-4 md:w-4" />
                                             </div>
                                         )}
-                                        <div className="flex items-center gap-1">
-                                            {isAdmin && (
-                                                <>
-                                                    <div
-                                                        role="button"
-                                                        onClick={(e) => handleEditPush(e, push)}
-                                                        className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-primary/10 hover:text-primary transition-colors relative z-10"
-                                                        title="Edit Push"
-                                                    >
-                                                        <Pencil className="h-4 w-4" />
-                                                    </div>
-                                                    <div
-                                                        role="button"
-                                                        onClick={(e) => handleDeletePush(e, push.id)}
-                                                        className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors relative z-10"
-                                                        title="Delete Push"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </div>
-                                                </>
-                                            )}
-                                            <div className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors relative z-10">
-                                                <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-                                            </div>
+                                        {isAdmin && (
+                                            <>
+                                                <div
+                                                    role="button"
+                                                    onClick={(e) => handleEditPush(e, push)}
+                                                    className="flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-md hover:bg-primary/10 hover:text-primary transition-colors relative z-10"
+                                                    title="Edit Push"
+                                                >
+                                                    <Pencil className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                                                </div>
+                                                <div
+                                                    role="button"
+                                                    onClick={(e) => handleDeletePush(e, push.id)}
+                                                    className="flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors relative z-10"
+                                                    title="Delete Push"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                                                </div>
+                                            </>
+                                        )}
+                                        <div className="h-7 w-7 md:h-8 md:w-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors relative z-10">
+                                            <ChevronDown className={`h-4 w-4 md:h-5 md:w-5 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
                                         </div>
                                     </div>
                                 </button>
