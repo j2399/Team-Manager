@@ -89,12 +89,14 @@ function TaskStack({ count }: { count: number }) {
             {Array.from({ length: displayCount }).map((_, idx) => (
                 <div
                     key={idx}
-                    className="absolute bottom-0 h-5 w-7 rounded-sm bg-muted border border-border shadow-sm"
+                    className="absolute bottom-0 h-5 w-8 rounded-sm bg-muted border border-border shadow-sm flex items-center justify-center"
                     style={{
                         left: `${idx * 10}px`,
                         zIndex: displayCount - idx
                     }}
-                />
+                >
+                    <span className="text-[6px] text-muted-foreground/50 font-medium">task</span>
+                </div>
             ))}
         </div>
     )
@@ -278,7 +280,7 @@ function UserDetailDialog({
                             <p className="text-[10px] text-muted-foreground">Active Tasks</p>
                         </div>
                         <div className="bg-background rounded-lg p-3 border">
-                            <p className="text-2xl font-bold text-emerald-600">{doneTasks.length}</p>
+                            <p className="text-2xl font-bold">{doneTasks.length}</p>
                             <p className="text-[10px] text-muted-foreground">Completed</p>
                         </div>
                         <div className="bg-background rounded-lg p-3 border">
@@ -288,17 +290,17 @@ function UserDetailDialog({
                         <div className="bg-background rounded-lg p-3 border">
                             {user.overdueTasks > 0 ? (
                                 <>
-                                    <p className="text-2xl font-bold text-red-500">{user.overdueTasks}</p>
+                                    <p className="text-2xl font-bold">{user.overdueTasks}</p>
                                     <p className="text-[10px] text-muted-foreground">Overdue</p>
                                 </>
                             ) : user.stuckTasks > 0 ? (
                                 <>
-                                    <p className="text-2xl font-bold text-amber-500">{user.stuckTasks}</p>
+                                    <p className="text-2xl font-bold">{user.stuckTasks}</p>
                                     <p className="text-[10px] text-muted-foreground">Stuck</p>
                                 </>
                             ) : (
                                 <>
-                                    <p className="text-2xl font-bold text-emerald-500">✓</p>
+                                    <p className="text-2xl font-bold">✓</p>
                                     <p className="text-[10px] text-muted-foreground">On Track</p>
                                 </>
                             )}
@@ -338,10 +340,10 @@ function UserDetailDialog({
                     <h3 className="text-sm font-medium mb-3">Current Tasks</h3>
                     <div className="grid grid-cols-4 gap-3">
                         {/* To Do */}
-                        <div className="border rounded-lg overflow-hidden bg-slate-50/50 dark:bg-slate-900/20">
-                            <div className="bg-slate-100 dark:bg-slate-800 px-2 py-1.5 flex items-center justify-between border-b">
+                        <div className="border rounded-lg overflow-hidden">
+                            <div className="bg-muted/50 px-2 py-1.5 flex items-center justify-between border-b">
                                 <span className="text-[10px] font-medium">To Do</span>
-                                <span className="text-[9px] bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded">{todoTasks.length}</span>
+                                <span className="text-[9px] text-muted-foreground">{todoTasks.length}</span>
                             </div>
                             <div className="p-1.5 space-y-1.5 max-h-[280px] overflow-auto">
                                 {todoTasks.length > 0 ? todoTasks.map(task => (
@@ -371,10 +373,10 @@ function UserDetailDialog({
                         </div>
 
                         {/* In Progress */}
-                        <div className="border rounded-lg overflow-hidden bg-amber-50/30 dark:bg-amber-900/10">
-                            <div className="bg-amber-100 dark:bg-amber-900/30 px-2 py-1.5 flex items-center justify-between border-b">
+                        <div className="border rounded-lg overflow-hidden">
+                            <div className="bg-muted/50 px-2 py-1.5 flex items-center justify-between border-b">
                                 <span className="text-[10px] font-medium">In Progress</span>
-                                <span className="text-[9px] bg-amber-200 dark:bg-amber-800/50 px-1 py-0.5 rounded">{inProgressTasks.length}</span>
+                                <span className="text-[9px] text-muted-foreground">{inProgressTasks.length}</span>
                             </div>
                             <div className="p-1.5 space-y-1.5 max-h-[280px] overflow-auto">
                                 {inProgressTasks.length > 0 ? inProgressTasks.map(task => (
@@ -404,10 +406,10 @@ function UserDetailDialog({
                         </div>
 
                         {/* Review */}
-                        <div className="border rounded-lg overflow-hidden bg-blue-50/30 dark:bg-blue-900/10">
-                            <div className="bg-blue-100 dark:bg-blue-900/30 px-2 py-1.5 flex items-center justify-between border-b">
+                        <div className="border rounded-lg overflow-hidden">
+                            <div className="bg-muted/50 px-2 py-1.5 flex items-center justify-between border-b">
                                 <span className="text-[10px] font-medium">Review</span>
-                                <span className="text-[9px] bg-blue-200 dark:bg-blue-800/50 px-1 py-0.5 rounded">{reviewTasks.length}</span>
+                                <span className="text-[9px] text-muted-foreground">{reviewTasks.length}</span>
                             </div>
                             <div className="p-1.5 space-y-1.5 max-h-[280px] overflow-auto">
                                 {reviewTasks.length > 0 ? reviewTasks.map(task => (
@@ -431,10 +433,10 @@ function UserDetailDialog({
                         </div>
 
                         {/* Done */}
-                        <div className="border rounded-lg overflow-hidden bg-emerald-50/30 dark:bg-emerald-900/10">
-                            <div className="bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1.5 flex items-center justify-between border-b">
+                        <div className="border rounded-lg overflow-hidden">
+                            <div className="bg-muted/50 px-2 py-1.5 flex items-center justify-between border-b">
                                 <span className="text-[10px] font-medium">Done</span>
-                                <span className="text-[9px] bg-emerald-200 dark:bg-emerald-800/50 px-1 py-0.5 rounded">{doneTasks.length}</span>
+                                <span className="text-[9px] text-muted-foreground">{doneTasks.length}</span>
                             </div>
                             <div className="p-1.5 space-y-1.5 max-h-[280px] overflow-auto">
                                 {doneTasks.length > 0 ? doneTasks.slice(0, 8).map(task => (
