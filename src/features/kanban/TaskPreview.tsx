@@ -1098,16 +1098,6 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                 </div>
                             </div>
 
-                            {/* Help Request */}
-                            <div className="border-t pt-3 flex justify-end">
-                                <HelpRequest
-                                    taskId={task.id}
-                                    taskTitle={task.title}
-                                    currentUserId={currentUser?.id}
-                                    userRole={userRole}
-                                />
-                            </div>
-
                             {/* Checklist Section - Only shown if task has checklist items */}
                             {checklistCount > 0 && (
                                 <div className="border-t pt-3">
@@ -1225,15 +1215,21 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                         </div>
                     </div>
 
-                    {/* Review Action Buttons */}
-                    {showReviewButtons && (
-                        <div className="border-t px-3 py-3 shrink-0 bg-muted/30">
+                    {/* Footer with Help Request and Review Buttons */}
+                    <div className="border-t px-3 py-2 shrink-0 flex items-center justify-between">
+                        <HelpRequest
+                            taskId={task.id}
+                            taskTitle={task.title}
+                            currentUserId={currentUser?.id}
+                            userRole={userRole}
+                        />
+                        {showReviewButtons && (
                             <div className="flex items-center gap-2">
                                 <Button
                                     onClick={handleAccept}
                                     disabled={isProcessingReview}
                                     size="sm"
-                                    className="flex-1 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
                                 >
                                     <CheckCircle className="h-4 w-4 mr-1.5" />
                                     Accept
@@ -1242,14 +1238,14 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                     onClick={handleDeny}
                                     disabled={isProcessingReview}
                                     size="sm"
-                                    className="flex-1 h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
+                                    className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
                                 >
                                     <XCircle className="h-4 w-4 mr-1.5" />
                                     Deny
                                 </Button>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
 
                     {isDragging && (
                         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center border-2 border-dashed border-primary m-4 rounded-lg pointer-events-none">
