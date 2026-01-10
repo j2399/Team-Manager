@@ -824,28 +824,6 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                     {/* Main Content - Native Scrollable Div */}
                     <div className="flex-1 min-h-0 overflow-y-auto">
                         <div className="p-3 space-y-3">
-                            {/* Compact Info Row */}
-                            <div className="flex items-center gap-2 text-[10px] flex-wrap bg-muted/50 rounded p-1.5">
-                                <span className="flex items-center gap-0.5" suppressHydrationWarning>
-                                    <Clock className="h-2.5 w-2.5 text-muted-foreground" />
-                                    <span className="text-muted-foreground">{daysActive}d active</span>
-                                </span>
-                                <span className="text-muted-foreground/30">•</span>
-                                <span className="flex items-center gap-0.5" suppressHydrationWarning>
-                                    <Calendar className="h-2.5 w-2.5 text-muted-foreground" />
-                                    <span className="text-muted-foreground">{formatDate(task.startDate)} → {formatDate(task.endDate)}</span>
-                                </span>
-                                <span className="text-muted-foreground/30">•</span>
-                                <span className="flex items-center gap-0.5">
-                                    <User className="h-2.5 w-2.5 text-muted-foreground" />
-                                    <span className="text-muted-foreground">
-                                        Assigned to: {task.assignees && task.assignees.length > 0
-                                            ? task.assignees.map(a => a?.user?.name || 'Unknown').join(', ')
-                                            : (task.assignee?.name || 'Unassigned')}
-                                    </span>
-                                </span>
-                            </div>
-
                             {/* Task Details - Collapsible section with description and instructions */}
                             {(task.description || instructionsFile) && (
                                 <Collapsible open={taskDetailsExpanded} onOpenChange={setTaskDetailsExpanded}>
@@ -1215,32 +1193,51 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                         </div>
                     </div>
 
-                    {/* Footer with Help Request and Review Buttons */}
-                    <div className="border-t px-3 py-2 shrink-0 flex items-center justify-between">
+                    {/* Footer with Task Info, Help Request and Review Buttons */}
+                    <div className="border-t px-3 py-2 shrink-0 flex items-center gap-3 text-[10px] text-muted-foreground">
                         <HelpRequest
                             taskId={task.id}
                             taskTitle={task.title}
                             currentUserId={currentUser?.id}
                             userRole={userRole}
                         />
+                        <span className="text-muted-foreground/30">•</span>
+                        <span className="flex items-center gap-1" suppressHydrationWarning>
+                            <Clock className="h-2.5 w-2.5" />
+                            {daysActive}d active
+                        </span>
+                        <span className="text-muted-foreground/30">•</span>
+                        <span className="flex items-center gap-1" suppressHydrationWarning>
+                            <Calendar className="h-2.5 w-2.5" />
+                            {formatDate(task.startDate)} → {formatDate(task.endDate)}
+                        </span>
+                        <span className="text-muted-foreground/30">•</span>
+                        <span className="flex items-center gap-1 truncate">
+                            <User className="h-2.5 w-2.5 shrink-0" />
+                            <span className="truncate">
+                                {task.assignees && task.assignees.length > 0
+                                    ? task.assignees.map(a => a?.user?.name || 'Unknown').join(', ')
+                                    : (task.assignee?.name || 'Unassigned')}
+                            </span>
+                        </span>
                         {showReviewButtons && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 ml-auto">
                                 <Button
                                     onClick={handleAccept}
                                     disabled={isProcessingReview}
                                     size="sm"
-                                    className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
                                 >
-                                    <CheckCircle className="h-4 w-4 mr-1.5" />
+                                    <CheckCircle className="h-3.5 w-3.5 mr-1" />
                                     Accept
                                 </Button>
                                 <Button
                                     onClick={handleDeny}
                                     disabled={isProcessingReview}
                                     size="sm"
-                                    className="h-8 text-xs bg-red-600 hover:bg-red-700 text-white"
+                                    className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white"
                                 >
-                                    <XCircle className="h-4 w-4 mr-1.5" />
+                                    <XCircle className="h-3.5 w-3.5 mr-1" />
                                     Deny
                                 </Button>
                             </div>
