@@ -70,6 +70,15 @@ export async function POST(request: Request) {
                 authorName: user.name || 'User',
                 authorAvatar: user.avatar,
                 workspaceId: user.workspaceId
+            },
+            include: {
+                author: {
+                    select: {
+                        id: true,
+                        name: true,
+                        avatar: true
+                    }
+                }
             }
         })
 

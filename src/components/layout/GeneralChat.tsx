@@ -40,7 +40,7 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
     const { toast } = useToast()
     const [messages, setMessages] = React.useState<Message[]>([])
     const [inputValue, setInputValue] = React.useState("")
-    const [currentUser, setCurrentUser] = React.useState<{ id: string, name: string } | null>(null)
+    const [currentUser, setCurrentUser] = React.useState<{ id: string, name: string, avatar: string | null } | null>(null)
     const scrollRef = React.useRef<HTMLDivElement>(null)
     const [giphyOpen, setGiphyOpen] = React.useState(false)
     const [searchTerm, setSearchTerm] = React.useState("")
@@ -152,14 +152,21 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
                 const newMsgs = await res.json()
                 if (Array.isArray(newMsgs) && newMsgs.length > 0) {
                     setMessages(prev => {
+                        // Get existing message IDs for deduplication
+                        const existingIds = new Set(prev.map(m => m.id))
+                        // Filter out any messages we already have (prevents duplicates from race conditions)
+                        const trulyNewMsgs = newMsgs.filter((m: Message) => !existingIds.has(m.id))
+
+                        if (trulyNewMsgs.length === 0) return prev
+
                         // Append new messages
-                        const updated = [...prev, ...newMsgs]
+                        const updated = [...prev, ...trulyNewMsgs]
                         // Keep only last 50 to prevent memory bloat
                         const trimmed = updated.slice(-50)
                         lastMessageTime.current = trimmed[trimmed.length - 1]?.createdAt || null
 
-                        // Show toast for mentions
-                        newMsgs.forEach((m: Message) => {
+                        // Show toast for mentions (only for truly new messages)
+                        trulyNewMsgs.forEach((m: Message) => {
                             if (m.authorId !== currentUser?.id) {
                                 if (m.content.includes("@everyone") || (currentUser?.name && m.content.includes(`@${currentUser.name}`))) {
                                     toast({
@@ -251,18 +258,18 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
         if (!content.trim()) return
 
         // Optimistic update
-        const tempId = Date.now().toString()
+        const tempId = `temp-${Date.now()}`
         const optimisticMsg: Message = {
             id: tempId,
             content,
             type,
             authorId: currentUser?.id || "temp",
             authorName: currentUser?.name || "Me",
-            authorAvatar: null,
+            authorAvatar: currentUser?.avatar || null,
             createdAt: new Date().toISOString(),
             author: {
                 name: currentUser?.name || "Me",
-                avatar: null
+                avatar: currentUser?.avatar || null
             }
         }
 
@@ -274,15 +281,22 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
         setMentionQuery(null)
 
         try {
-            await fetch('/api/chat', {
+            const res = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content, type })
             })
-            // After sending, fetch new messages to get the server-assigned ID
-            fetchNewMessages()
+            if (res.ok) {
+                const newMsg = await res.json()
+                // Replace optimistic message with real one from server
+                setMessages(prev => prev.map(msg => msg.id === tempId ? newMsg : msg))
+                // Update lastMessageTime so polling doesn't re-add this message
+                lastMessageTime.current = newMsg.createdAt
+            }
         } catch (error) {
             console.error(error)
+            // Remove optimistic message on error
+            setMessages(prev => prev.filter(msg => msg.id !== tempId))
         }
     }
 

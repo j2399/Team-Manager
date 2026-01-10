@@ -272,6 +272,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
     const [uploadingFileName, setUploadingFileName] = useState<string | null>(null)
     const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
     const deleteTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
+    const [checklistCount, setChecklistCount] = useState<number>(0)
 
     // Scroll to bottom on new comments
     useEffect(() => {
@@ -387,12 +388,26 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
         }
     }
 
+    const fetchChecklistCount = async () => {
+        if (!task.id) return
+        try {
+            const res = await fetch(`/api/tasks/${task.id}/checklist`)
+            if (res.ok) {
+                const data = await res.json()
+                setChecklistCount(Array.isArray(data) ? data.length : 0)
+            }
+        } catch (err) {
+            console.error('Failed to fetch checklist:', err)
+        }
+    }
+
     useEffect(() => {
         if (open && task.id) {
             // Initial full fetch
             fetchComments()
             fetchAttachments()
             fetchInstructions()
+            fetchChecklistCount()
 
             // Smart polling - check for new comments every 3 seconds (lightweight)
             const interval = setInterval(() => {
@@ -411,6 +426,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
             setShowInstructionsFullscreen(false)
             lastCommentTime.current = null
             commentCount.current = 0
+            setChecklistCount(0)
         }
     }, [open, task.id])
 
@@ -1082,22 +1098,28 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                 </div>
                             </div>
 
-                            {/* Checklist Section */}
-                            <div className="border-t pt-3">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-medium flex items-center gap-1">
-                                        <ListChecks className="h-3 w-3" />
-                                        Checklist
-                                    </span>
-                                    <HelpRequest
-                                        taskId={task.id}
-                                        taskTitle={task.title}
-                                        currentUserId={currentUser?.id}
-                                        userRole={userRole}
-                                    />
-                                </div>
-                                <TaskChecklist taskId={task.id} isEditable={true} />
+                            {/* Help Request */}
+                            <div className="border-t pt-3 flex justify-end">
+                                <HelpRequest
+                                    taskId={task.id}
+                                    taskTitle={task.title}
+                                    currentUserId={currentUser?.id}
+                                    userRole={userRole}
+                                />
                             </div>
+
+                            {/* Checklist Section - Only shown if task has checklist items */}
+                            {checklistCount > 0 && (
+                                <div className="border-t pt-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-[10px] font-medium flex items-center gap-1">
+                                            <ListChecks className="h-3 w-3" />
+                                            Checklist
+                                        </span>
+                                    </div>
+                                    <TaskChecklist taskId={task.id} isEditable={true} />
+                                </div>
+                            )}
 
                             {/* Comments Section */}
                             <div className="border-t pt-2 flex flex-col min-h-0">

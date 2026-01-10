@@ -30,6 +30,7 @@ export function NotificationBell() {
     const lastCheckTime = useRef<string>(new Date().toISOString())
     const isTabVisible = useRef(true)
     const hasFetchedFull = useRef(false)
+    const unreadCountRef = useRef(0)
 
     // Full fetch - get all notifications
     const fetchAllNotifications = async () => {
@@ -38,7 +39,9 @@ export function NotificationBell() {
             if (res.ok) {
                 const data = await res.json()
                 setNotifications(data.notifications || [])
-                setUnreadCount((data.notifications || []).filter((n: Notification) => !n.read).length)
+                const count = (data.notifications || []).filter((n: Notification) => !n.read).length
+                setUnreadCount(count)
+                unreadCountRef.current = count
                 lastCheckTime.current = data.lastCheck || new Date().toISOString()
                 hasFetchedFull.current = true
             }
@@ -56,12 +59,13 @@ export function NotificationBell() {
             if (res.ok) {
                 const data = await res.json()
                 const newCount = data.unreadCount || 0
-                if (newCount !== unreadCount) {
-                    setUnreadCount(newCount)
+                if (newCount !== unreadCountRef.current) {
                     // If count increased, ring the bell
-                    if (newCount > unreadCount) {
+                    if (newCount > unreadCountRef.current) {
                         setBellRingNonce(n => n + 1)
                     }
+                    setUnreadCount(newCount)
+                    unreadCountRef.current = newCount
                 }
             }
         } catch (e) {
@@ -87,7 +91,7 @@ export function NotificationBell() {
     useEffect(() => {
         const interval = setInterval(checkForNew, 5000)
         return () => clearInterval(interval)
-    }, [unreadCount])
+    }, [])
 
     // Fetch full data when popover opens
     const handleOpenChange = (isOpen: boolean) => {
@@ -125,6 +129,7 @@ export function NotificationBell() {
             })
             setNotifications(prev => prev.map(n => ({ ...n, read: true })))
             setUnreadCount(0)
+            unreadCountRef.current = 0
         } catch (e) {
             console.error('Failed to mark all as read', e)
         }
