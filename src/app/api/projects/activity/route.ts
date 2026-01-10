@@ -38,7 +38,9 @@ export async function GET() {
                                     }
                                 },
                                 createdAt: true,
-                                updatedAt: true
+                                updatedAt: true,
+                                submittedAt: true,
+                                approvedAt: true
                             }
                         }
                     },
@@ -71,6 +73,19 @@ export async function GET() {
                     t.status?.toLowerCase() === 'todo'
                 ).length
 
+                // Build timeline of submissions and approvals
+                const timeline: { date: string; type: 'submitted' | 'approved' }[] = []
+                tasks.forEach(t => {
+                    if (t.submittedAt) {
+                        timeline.push({ date: t.submittedAt.toISOString(), type: 'submitted' })
+                    }
+                    if (t.approvedAt) {
+                        timeline.push({ date: t.approvedAt.toISOString(), type: 'approved' })
+                    }
+                })
+                // Sort by date
+                timeline.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
                 return {
                     id: push.id,
                     name: push.name,
@@ -81,7 +96,8 @@ export async function GET() {
                     completed,
                     inReview,
                     inProgress,
-                    todo
+                    todo,
+                    timeline
                 }
             })
 

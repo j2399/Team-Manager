@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation"
 import { ChevronRight, TrendingUp, TrendingDown, Minus, CheckCircle2, Clock, Loader2, AlertTriangle, Calendar, Target, Activity, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+type TimelineEvent = {
+    date: string
+    type: 'submitted' | 'approved'
+}
+
 type PushStats = {
     id: string
     name: string
@@ -16,6 +21,7 @@ type PushStats = {
     inReview: number
     inProgress: number
     todo: number
+    timeline: TimelineEvent[]
 }
 
 type ProjectActivity = {
@@ -60,54 +66,171 @@ const getPushHealth = (push: PushStats) => {
     return completionRate
 }
 
-// Mini chart showing completed tasks per push over time
-function CompletionTimeline({ pushes, currentPushId }: { pushes: PushStats[], currentPushId: string }) {
-    if (pushes.length < 2) return null
+// Line chart showing actual submission/approval events over time
+function TaskTimeline({ timeline, pushName }: { timeline: TimelineEvent[], pushName: string }) {
+    if (timeline.length === 0) {
+        return (
+            <div className="mt-2 pt-2 border-t border-border">
+                <div className="text-[9px] text-muted-foreground mb-1.5">Task activity timeline</div>
+                <div className="h-12 flex items-center justify-center text-[9px] text-muted-foreground/60 italic">
+                    No data yet - tracking starts when tasks are moved to Review or Done
+                </div>
+            </div>
+        )
+    }
 
-    // Get last 6 pushes max for cleaner display
-    const recentPushes = pushes.slice(-6)
-    const data = recentPushes.map(p => ({
-        id: p.id,
-        completed: p.completed,
-        date: p.startDate ? new Date(p.startDate) : null
-    }))
+    // Parse dates and build cumulative counts
+    const events = timeline.map(e => ({
+        date: new Date(e.date),
+        type: e.type
+    })).sort((a, b) => a.date.getTime() - b.date.getTime())
 
-    const maxCompleted = Math.max(...data.map(d => d.completed), 1)
-    const width = 160
-    const height = 40
-    const barWidth = (width - 8) / data.length - 4
-    const padding = 4
+    // Build cumulative data points
+    let submittedCount = 0
+    let approvedCount = 0
+    const dataPoints: { date: Date; submitted: number; approved: number; type: 'submitted' | 'approved' }[] = []
 
-    // Format month for x-axis
-    const formatMonth = (date: Date | null) => {
-        if (!date) return ''
-        return date.toLocaleDateString('en-US', { month: 'short' })
+    events.forEach(e => {
+        if (e.type === 'submitted') {
+            submittedCount++
+        } else {
+            approvedCount++
+        }
+        dataPoints.push({
+            date: e.date,
+            submitted: submittedCount,
+            approved: approvedCount,
+            type: e.type
+        })
+    })
+
+    // Chart dimensions
+    const width = 180
+    const height = 60
+    const padding = { top: 8, right: 8, bottom: 16, left: 20 }
+    const chartWidth = width - padding.left - padding.right
+    const chartHeight = height - padding.top - padding.bottom
+
+    // Calculate scales
+    const minDate = dataPoints[0].date.getTime()
+    const maxDate = dataPoints[dataPoints.length - 1].date.getTime()
+    const dateRange = maxDate - minDate || 1
+    const maxCount = Math.max(submittedCount, approvedCount, 1)
+
+    const getX = (date: Date) => {
+        return padding.left + ((date.getTime() - minDate) / dateRange) * chartWidth
+    }
+    const getY = (value: number) => {
+        return padding.top + chartHeight - (value / maxCount) * chartHeight
+    }
+
+    // Build path strings for lines
+    let submittedPath = ''
+    let approvedPath = ''
+    let lastSubmitted = 0
+    let lastApproved = 0
+
+    dataPoints.forEach((point, i) => {
+        const x = getX(point.date)
+        if (point.type === 'submitted') {
+            lastSubmitted = point.submitted
+            if (submittedPath === '') {
+                submittedPath = `M ${x} ${getY(lastSubmitted)}`
+            } else {
+                submittedPath += ` L ${x} ${getY(lastSubmitted)}`
+            }
+        } else {
+            lastApproved = point.approved
+            if (approvedPath === '') {
+                approvedPath = `M ${x} ${getY(lastApproved)}`
+            } else {
+                approvedPath += ` L ${x} ${getY(lastApproved)}`
+            }
+        }
+    })
+
+    // Format date for display
+    const formatDate = (date: Date) => {
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     }
 
     return (
         <div className="mt-2 pt-2 border-t border-border">
-            <div className="text-[9px] text-muted-foreground mb-1.5">Tasks completed per sprint</div>
-            <div className="flex items-end justify-between gap-1" style={{ height }}>
-                {data.map((d, i) => {
-                    const barHeight = Math.max(4, (d.completed / maxCompleted) * (height - 12))
-                    const isCurrent = d.id === currentPushId
-                    return (
-                        <div key={i} className="flex flex-col items-center gap-0.5">
-                            <span className="text-[8px] text-muted-foreground">{d.completed}</span>
-                            <div
-                                className={cn(
-                                    "rounded-sm transition-all",
-                                    isCurrent ? "bg-emerald-500" : "bg-muted-foreground/30"
-                                )}
-                                style={{ width: barWidth, height: barHeight }}
-                            />
-                            <span className="text-[7px] text-muted-foreground/70">
-                                {formatMonth(d.date)}
-                            </span>
-                        </div>
-                    )
-                })}
+            <div className="flex items-center justify-between mb-1">
+                <div className="text-[9px] text-muted-foreground">Task activity timeline</div>
+                <div className="flex items-center gap-2 text-[8px]">
+                    <span className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                        Submitted
+                    </span>
+                    <span className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        Approved
+                    </span>
+                </div>
             </div>
+            <svg width={width} height={height} className="overflow-visible">
+                {/* Y-axis labels */}
+                <text x={padding.left - 4} y={padding.top + 2} className="text-[7px] fill-muted-foreground" textAnchor="end">
+                    {maxCount}
+                </text>
+                <text x={padding.left - 4} y={padding.top + chartHeight} className="text-[7px] fill-muted-foreground" textAnchor="end">
+                    0
+                </text>
+
+                {/* Grid line */}
+                <line
+                    x1={padding.left}
+                    y1={padding.top + chartHeight}
+                    x2={padding.left + chartWidth}
+                    y2={padding.top + chartHeight}
+                    className="stroke-border"
+                    strokeWidth={0.5}
+                />
+
+                {/* Submitted line (blue) */}
+                {submittedPath && (
+                    <path
+                        d={submittedPath}
+                        fill="none"
+                        className="stroke-blue-500"
+                        strokeWidth={1.5}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                )}
+
+                {/* Approved line (green) */}
+                {approvedPath && (
+                    <path
+                        d={approvedPath}
+                        fill="none"
+                        className="stroke-emerald-500"
+                        strokeWidth={1.5}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                )}
+
+                {/* Data points */}
+                {dataPoints.map((point, i) => (
+                    <circle
+                        key={i}
+                        cx={getX(point.date)}
+                        cy={getY(point.type === 'submitted' ? point.submitted : point.approved)}
+                        r={2.5}
+                        className={point.type === 'submitted' ? 'fill-blue-500' : 'fill-emerald-500'}
+                    />
+                ))}
+
+                {/* X-axis labels */}
+                <text x={padding.left} y={height - 2} className="text-[7px] fill-muted-foreground">
+                    {formatDate(dataPoints[0].date)}
+                </text>
+                <text x={width - padding.right} y={height - 2} className="text-[7px] fill-muted-foreground" textAnchor="end">
+                    {formatDate(dataPoints[dataPoints.length - 1].date)}
+                </text>
+            </svg>
         </div>
     )
 }
@@ -381,8 +504,8 @@ export function ProjectActivityTracker() {
                                                     </div>
                                                 </div>
 
-                                                {/* Timeline - Completed tasks per sprint */}
-                                                <CompletionTimeline pushes={selectedProjectData.pushes} currentPushId={push.id} />
+                                                {/* Timeline - Actual submission/approval events */}
+                                                <TaskTimeline timeline={push.timeline} pushName={push.name} />
                                             </div>
                                         )}
                                     </div>

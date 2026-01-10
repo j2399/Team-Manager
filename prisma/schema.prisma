@@ -139,6 +139,8 @@ model Task {
   startDate       DateTime?
   endDate         DateTime?
   dueDate         DateTime?
+  submittedAt     DateTime?  // When task was submitted for review
+  approvedAt      DateTime?  // When task was approved/completed
   comments        Comment[]
   attachments     TaskAttachment[]
   activityLogs    ActivityLog[]

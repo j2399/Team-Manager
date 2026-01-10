@@ -246,7 +246,11 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
 
         const task = await prisma.task.findUnique({
             where: { id: taskId },
-            include: {
+            select: {
+                id: true,
+                title: true,
+                requireAttachment: true,
+                submittedAt: true,
                 column: true,
                 attachments: { select: { id: true } }
             }
@@ -281,9 +285,27 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
             }
         }
 
+        // Build update data with timestamps for Review/Done
+        const updateData: any = { columnId }
+
+        // Set submittedAt when moving to Review (only if not already set)
+        if (targetColumnName === 'Review' && !task.submittedAt) {
+            updateData.submittedAt = new Date()
+        }
+
+        // Set approvedAt when moving to Done
+        if (targetColumnName === 'Done') {
+            updateData.approvedAt = new Date()
+        }
+
+        // Clear approvedAt if moving out of Done (task was rejected/moved back)
+        if (sourceColumnName === 'Done' && targetColumnName !== 'Done') {
+            updateData.approvedAt = null
+        }
+
         const updatedTask = await prisma.task.update({
             where: { id: taskId },
-            data: { columnId },
+            data: updateData,
             include: {
                 assignee: { select: { id: true, name: true, discordId: true } },
                 assignees: { include: { user: { select: { id: true, name: true } } } },
@@ -717,7 +739,8 @@ export async function updateTaskProgress(taskId: string, progress: number, proje
                         where: { id: taskId },
                         data: {
                             progress,
-                            columnId: reviewColumn.id
+                            columnId: reviewColumn.id,
+                            submittedAt: new Date() // Track when submitted for review
                         }
                     })
                     return { success: true, movedToReview: true }
