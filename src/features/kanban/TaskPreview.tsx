@@ -1193,55 +1193,57 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                         </div>
                     </div>
 
-                    {/* Footer with Task Info, Help Request and Review Buttons */}
-                    <div className="border-t px-3 py-2 shrink-0 flex items-center gap-3 text-[10px] text-muted-foreground">
+                    {/* Footer with Help Request (left) and Task Info (right) */}
+                    <div className="border-t px-3 py-2 shrink-0 flex items-center justify-between text-[10px] text-muted-foreground">
                         <HelpRequest
                             taskId={task.id}
                             taskTitle={task.title}
                             currentUserId={currentUser?.id}
                             userRole={userRole}
                         />
-                        <span className="text-muted-foreground/30">•</span>
-                        <span className="flex items-center gap-1" suppressHydrationWarning>
-                            <Clock className="h-2.5 w-2.5" />
-                            {daysActive}d active
-                        </span>
-                        <span className="text-muted-foreground/30">•</span>
-                        <span className="flex items-center gap-1" suppressHydrationWarning>
-                            <Calendar className="h-2.5 w-2.5" />
-                            {formatDate(task.startDate)} → {formatDate(task.endDate)}
-                        </span>
-                        <span className="text-muted-foreground/30">•</span>
-                        <span className="flex items-center gap-1 truncate">
-                            <User className="h-2.5 w-2.5 shrink-0" />
-                            <span className="truncate">
-                                {task.assignees && task.assignees.length > 0
-                                    ? task.assignees.map(a => a?.user?.name || 'Unknown').join(', ')
-                                    : (task.assignee?.name || 'Unassigned')}
+                        <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-1" suppressHydrationWarning>
+                                <Clock className="h-2.5 w-2.5" />
+                                {daysActive}d active
                             </span>
-                        </span>
-                        {showReviewButtons && (
-                            <div className="flex items-center gap-2 ml-auto">
-                                <Button
-                                    onClick={handleAccept}
-                                    disabled={isProcessingReview}
-                                    size="sm"
-                                    className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                                >
-                                    <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                                    Accept
-                                </Button>
-                                <Button
-                                    onClick={handleDeny}
-                                    disabled={isProcessingReview}
-                                    size="sm"
-                                    className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white"
-                                >
-                                    <XCircle className="h-3.5 w-3.5 mr-1" />
-                                    Deny
-                                </Button>
-                            </div>
-                        )}
+                            <span className="text-muted-foreground/30">•</span>
+                            <span className="flex items-center gap-1" suppressHydrationWarning>
+                                <Calendar className="h-2.5 w-2.5" />
+                                {formatDate(task.startDate)} → {formatDate(task.endDate)}
+                            </span>
+                            <span className="text-muted-foreground/30">•</span>
+                            <span className="flex items-center gap-1">
+                                <User className="h-2.5 w-2.5 shrink-0" />
+                                <span className="truncate max-w-[120px]">
+                                    {task.assignees && task.assignees.length > 0
+                                        ? task.assignees.map(a => a?.user?.name || 'Unknown').join(', ')
+                                        : (task.assignee?.name || 'Unassigned')}
+                                </span>
+                            </span>
+                            {showReviewButtons && (
+                                <>
+                                    <span className="text-muted-foreground/30">•</span>
+                                    <Button
+                                        onClick={handleAccept}
+                                        disabled={isProcessingReview}
+                                        size="sm"
+                                        className="h-6 text-[10px] bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    >
+                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                        Accept
+                                    </Button>
+                                    <Button
+                                        onClick={handleDeny}
+                                        disabled={isProcessingReview}
+                                        size="sm"
+                                        className="h-6 text-[10px] bg-red-600 hover:bg-red-700 text-white"
+                                    >
+                                        <XCircle className="h-3 w-3 mr-1" />
+                                        Deny
+                                    </Button>
+                                </>
+                            )}
+                        </div>
                     </div>
 
                     {isDragging && (

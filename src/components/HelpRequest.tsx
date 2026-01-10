@@ -222,10 +222,10 @@ export function HelpRequest({ taskId, taskTitle, currentUserId, userRole }: Help
             <Button
                 variant="outline"
                 size="sm"
-                className="h-6 text-[10px] px-2 border-amber-200 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-950"
+                className="h-6 text-[10px] px-2 border-amber-300 text-muted-foreground hover:bg-amber-50/50 hover:text-muted-foreground dark:border-amber-700 dark:hover:bg-amber-950/30"
                 onClick={() => setShowAskDialog(true)}
             >
-                <HelpCircle className="h-3 w-3 mr-1" />
+                <HelpCircle className="h-3 w-3 mr-1 text-amber-500" />
                 Ask for Help
             </Button>
 
