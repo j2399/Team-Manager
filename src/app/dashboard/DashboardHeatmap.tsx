@@ -646,15 +646,25 @@ export function DashboardHeatmap({
                             key={user.id}
                             onClick={() => setSelectedUser(user)}
                             className={cn(
-                                "p-3 rounded-lg border text-left transition-all hover:shadow-md",
+                                "relative p-3 rounded-lg border text-left transition-all hover:shadow-md overflow-hidden",
                                 "bg-card",
-                                status === 'struggling' && "border-red-200 dark:border-red-900/50",
-                                status === 'available' && "border-blue-200 dark:border-blue-900/50",
-                                status === 'on-track' && "border-border"
+                                status === 'struggling' && "border-red-300 dark:border-red-800",
+                                status === 'available' && "border-blue-300 dark:border-blue-800",
+                                status === 'on-track' && "border-emerald-300 dark:border-emerald-800"
                             )}
                         >
+                            {/* Bottom gradient */}
+                            <div
+                                className={cn(
+                                    "absolute inset-x-0 bottom-0 h-12 pointer-events-none",
+                                    status === 'struggling' && "bg-gradient-to-t from-red-100/80 dark:from-red-950/40 to-transparent",
+                                    status === 'available' && "bg-gradient-to-t from-blue-100/80 dark:from-blue-950/40 to-transparent",
+                                    status === 'on-track' && "bg-gradient-to-t from-emerald-100/80 dark:from-emerald-950/40 to-transparent"
+                                )}
+                            />
+
                             {/* User header */}
-                            <div className="flex items-center gap-2 mb-2">
+                            <div className="relative flex items-center gap-2 mb-2">
                                 {user.avatar ? (
                                     <img
                                         src={user.avatar}
@@ -673,11 +683,18 @@ export function DashboardHeatmap({
                             </div>
 
                             {/* Task stack visual */}
-                            <TaskStack count={user.activeTasks} />
+                            <div className="relative">
+                                <TaskStack count={user.activeTasks} />
+                            </div>
 
                             {/* Status */}
-                            <div className="flex items-center justify-between mt-2 pt-2 border-t">
-                                <span className="text-[9px] text-muted-foreground">
+                            <div className="relative flex items-center justify-between mt-2 pt-2 border-t border-border/50">
+                                <span className={cn(
+                                    "text-[9px] font-medium",
+                                    status === 'struggling' && "text-red-700 dark:text-red-400",
+                                    status === 'available' && "text-blue-700 dark:text-blue-400",
+                                    status === 'on-track' && "text-emerald-700 dark:text-emerald-400"
+                                )}>
                                     {status === 'struggling' ? 'Struggling' : status === 'available' ? 'Available' : 'On track'}
                                 </span>
                                 <span className="text-[9px] text-muted-foreground">
