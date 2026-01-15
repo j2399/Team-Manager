@@ -38,9 +38,17 @@ export function TaskRow({ task }: TaskRowProps) {
         <button
             onClick={handleClick}
             disabled={isLoading}
-            className="w-full flex items-center justify-between p-3 rounded-md border border-border hover:bg-muted/30 transition-colors group text-left"
+            className="relative w-full flex items-center justify-between p-3 rounded-md border border-border hover:bg-muted/30 transition-colors group text-left overflow-hidden"
         >
-            <div className="flex items-center gap-2 min-w-0 flex-1">
+            {/* Project color gradient from left */}
+            <div
+                className="absolute inset-y-0 left-0 w-16 pointer-events-none"
+                style={{
+                    background: `linear-gradient(to right, ${task.projectColor}15, transparent)`
+                }}
+            />
+
+            <div className="relative flex items-center gap-2 min-w-0 flex-1">
                 {/* Task title */}
                 <span className="text-sm truncate">{task.title}</span>
 
@@ -48,19 +56,6 @@ export function TaskRow({ task }: TaskRowProps) {
                 <span className="text-[9px] px-1 py-px rounded text-muted-foreground/60 shrink-0">
                     {task.columnName}
                 </span>
-
-                {/* Project badge - muted color */}
-                {task.projectName && (
-                    <span
-                        className="text-[10px] px-1.5 py-0.5 rounded shrink-0 hidden sm:inline"
-                        style={{
-                            backgroundColor: `${task.projectColor}08`,
-                            color: `${task.projectColor}99`
-                        }}
-                    >
-                        {task.projectName}
-                    </span>
-                )}
             </div>
 
             <div className="flex items-center gap-3 shrink-0 ml-2">
@@ -123,27 +118,22 @@ export function ApprovalRow({ task }: ApprovalRowProps) {
         <button
             onClick={handleClick}
             disabled={isLoading}
-            className="w-full flex items-center justify-between p-3 rounded-md border border-border hover:bg-muted/30 transition-colors group text-left"
+            className="relative w-full flex items-center justify-between p-3 rounded-md border border-border hover:bg-muted/30 transition-colors group text-left overflow-hidden"
         >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
+            {/* Project color gradient from left */}
+            <div
+                className="absolute inset-y-0 left-0 w-16 pointer-events-none"
+                style={{
+                    background: `linear-gradient(to right, ${task.projectColor}15, transparent)`
+                }}
+            />
+
+            <div className="relative flex items-center gap-3 min-w-0 flex-1">
                 {/* Task title */}
                 <span className="text-sm truncate">{task.title}</span>
-
-                {/* Project badge - muted color */}
-                {task.projectName && (
-                    <span
-                        className="text-[10px] px-1.5 py-0.5 rounded shrink-0"
-                        style={{
-                            backgroundColor: `${task.projectColor}08`,
-                            color: `${task.projectColor}99`
-                        }}
-                    >
-                        {task.projectName}
-                    </span>
-                )}
             </div>
 
-            <div className="flex items-center gap-3 shrink-0 ml-2">
+            <div className="relative flex items-center gap-3 shrink-0 ml-2">
                 {/* Assigned to */}
                 {task.assignedTo.length > 0 && (
                     <span className="text-[10px] text-muted-foreground">
