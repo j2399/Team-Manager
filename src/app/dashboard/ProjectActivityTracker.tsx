@@ -248,9 +248,11 @@ export function ProjectActivityTracker() {
 
     const fetchProjectActivity = async () => {
         try {
-            const res = await fetch('/api/projects/activity')
-            if (res.ok) {
-                const data = await res.json()
+            const res = await fetch('/api/projects/activity', { credentials: 'include' })
+            const data = await res.json()
+
+            // Check if we got valid array data
+            if (res.ok && Array.isArray(data)) {
                 setProjects(data)
                 const firstWithPushes = data.find((p: ProjectActivity) => p.pushes.length > 0)
                 if (firstWithPushes) {
@@ -260,9 +262,10 @@ export function ProjectActivityTracker() {
                 }
             } else {
                 // Try fetching all projects as fallback if activity endpoint fails
-                const projectsRes = await fetch('/api/projects')
-                if (projectsRes.ok) {
-                    const projectsData = await projectsRes.json()
+                const projectsRes = await fetch('/api/projects', { credentials: 'include' })
+                const projectsData = await projectsRes.json()
+
+                if (projectsRes.ok && Array.isArray(projectsData)) {
                     const transformed = projectsData.map((p: any) => ({
                         id: p.id,
                         name: p.name,
