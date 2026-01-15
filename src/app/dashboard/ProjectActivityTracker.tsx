@@ -258,6 +258,26 @@ export function ProjectActivityTracker() {
                 } else if (data.length > 0) {
                     setSelectedProject(data[0].id)
                 }
+            } else {
+                // Try fetching all projects as fallback if activity endpoint fails
+                const projectsRes = await fetch('/api/projects')
+                if (projectsRes.ok) {
+                    const projectsData = await projectsRes.json()
+                    const transformed = projectsData.map((p: any) => ({
+                        id: p.id,
+                        name: p.name,
+                        color: p.color || '#6b7280',
+                        totalTasks: 0,
+                        totalCompleted: 0,
+                        totalInReview: 0,
+                        completionRate: 0,
+                        pushes: []
+                    }))
+                    setProjects(transformed)
+                    if (transformed.length > 0) {
+                        setSelectedProject(transformed[0].id)
+                    }
+                }
             }
         } catch (error) {
             console.error('Failed to fetch project activity:', error)
