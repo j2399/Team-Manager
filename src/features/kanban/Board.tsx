@@ -13,7 +13,8 @@ import {
 import { arrayMove } from "@dnd-kit/sortable"
 import { useState, useEffect, useCallback, useRef } from "react"
 import { createPortal } from "react-dom"
-import { Plus, ChevronDown, CheckCircle2, Trash2, Pencil } from "lucide-react"
+import { Plus, ChevronDown, CheckCircle2, Pencil } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useRouter } from "next/navigation"
 
 import { PushDialog } from "@/features/pushes/PushDialog"
@@ -31,7 +32,7 @@ import {
 } from "@/components/ui/alert-dialog"
 
 import { updateTaskStatus } from "@/app/actions/kanban"
-import { deletePush, assignTaskToPush } from "@/app/actions/pushes"
+import { assignTaskToPush } from "@/app/actions/pushes"
 import { Column } from "./Column"
 import { TaskCard } from "./TaskCard"
 import { TaskDialog } from "./TaskDialog"
@@ -130,7 +131,6 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
         pushId: string | null
     } | null>(null)
 
-    const [deletePushId, setDeletePushId] = useState<string | null>(null)
     const [editingPush, setEditingPush] = useState<PushType | null>(null)
 
     const isAdmin = userRole === 'Admin' || userRole === 'Team Lead'
@@ -805,26 +805,9 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
         return !!push && push.taskCount > 0 && push.completedCount === push.taskCount
     }
 
-    const handleDeletePush = (e: React.MouseEvent, pushId: string) => {
-        e.stopPropagation()
-        setDeletePushId(pushId)
-    }
-
     const handleEditPush = (e: React.MouseEvent, push: PushType) => {
         e.stopPropagation()
         setEditingPush(push)
-    }
-
-    const confirmDeletePush = async () => {
-        if (!deletePushId) return
-
-        const result = await deletePush(deletePushId, projectId)
-        if (result.error) {
-            toast({ title: "Error", description: result.error, variant: "destructive" })
-        } else {
-            toast({ title: "Push Deleted", description: "The push has been removed." })
-        }
-        setDeletePushId(null)
     }
 
     const renderPushBoard = (pushColumns: ColumnData[], pushId: string | null) => (
@@ -938,10 +921,22 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
                                                 <span className="hidden md:inline">{push.endDate && push.endDate !== 'null' ? `Completed ${new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : 'Completed!'}</span>
                                                 <span className="md:hidden">Done</span>
                                             </span>
-                                        ) : (
-                                            <span className="text-[10px] md:text-xs text-muted-foreground bg-muted/50 px-1.5 md:px-2 py-0.5 rounded shrink-0">
-                                                {push.completedCount}/{push.taskCount}
-                                            </span>
+                                        ) : push.taskCount > 0 && (
+                                            <TooltipProvider delayDuration={100}>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <div className="w-16 md:w-20 h-1.5 bg-muted/60 rounded-full overflow-hidden shrink-0">
+                                                            <div
+                                                                className="h-full bg-primary/50 rounded-full transition-all duration-300"
+                                                                style={{ width: `${(push.completedCount / push.taskCount) * 100}%` }}
+                                                            />
+                                                        </div>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="top" className="text-xs">
+                                                        {push.completedCount}/{push.taskCount} tasks completed
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
                                         )}
                                     </div>
 
@@ -969,24 +964,14 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
                                             </div>
                                         )}
                                         {isAdmin && (
-                                            <>
-                                                <div
-                                                    role="button"
-                                                    onClick={(e) => handleEditPush(e, push)}
-                                                    className="flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-md hover:bg-primary/10 hover:text-primary transition-colors relative z-10"
-                                                    title="Edit Push"
-                                                >
-                                                    <Pencil className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                                                </div>
-                                                <div
-                                                    role="button"
-                                                    onClick={(e) => handleDeletePush(e, push.id)}
-                                                    className="flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors relative z-10"
-                                                    title="Delete Push"
-                                                >
-                                                    <Trash2 className="h-3.5 w-3.5 md:h-4 md:w-4" />
-                                                </div>
-                                            </>
+                                            <div
+                                                role="button"
+                                                onClick={(e) => handleEditPush(e, push)}
+                                                className="flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-md hover:bg-primary/10 hover:text-primary transition-colors relative z-10"
+                                                title="Edit Push"
+                                            >
+                                                <Pencil className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                                            </div>
                                         )}
                                         <div className="h-7 w-7 md:h-8 md:w-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors relative z-10">
                                             <ChevronDown className={`h-4 w-4 md:h-5 md:w-5 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
@@ -1113,26 +1098,6 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
                         <AlertDialogCancel onClick={handleDoneMoveCancel}>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={handleDoneMoveConfirm}>
                             Move Task
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-
-            <AlertDialog open={!!deletePushId} onOpenChange={(open) => !open && setDeletePushId(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Push</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Tasks will be moved to backlog.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setDeletePushId(null)}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={confirmDeletePush}
-                            className="bg-destructive hover:bg-destructive/90 text-white"
-                        >
-                            Delete Push
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

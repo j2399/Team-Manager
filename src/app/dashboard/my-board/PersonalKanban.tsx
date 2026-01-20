@@ -3,11 +3,11 @@
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
-    Clock, MessageSquare, Paperclip, CheckSquare, HelpCircle,
-    Filter, ChevronRight, AlertTriangle, ChevronDown, MoreHorizontal
+    Clock, HelpCircle, Filter, AlertTriangle, CheckCircle2, CalendarDays
 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, getInitials } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -85,54 +85,105 @@ function getDueInfo(dueDate: string | null): { text: string; isOverdue: boolean;
     return { text: `${diffDays}d`, isOverdue: false, isUrgent: false }
 }
 
-function CompactTaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
+function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
     const isDone = task.columnName === 'Done'
+    const isReview = task.columnName === 'Review'
     const { text: rawDueText, isOverdue: rawOverdue, isUrgent: rawUrgent } = getDueInfo(task.dueDate)
     const isOverdue = isDone ? false : rawOverdue
-    const isUrgent = isDone ? false : rawUrgent
-    const dueText = isDone ? '' : rawDueText
+    const daysLeft = isDone ? null : (task.dueDate ? Math.ceil((new Date(task.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null)
 
+    // Done column variant - matches project board
+    if (isDone) {
+        return (
+            <button
+                onClick={onClick}
+                className={cn(
+                    "w-full text-left group relative flex flex-col gap-1.5 p-3 rounded-lg border transition-colors transition-shadow duration-200",
+                    "bg-emerald-50/40 border-emerald-100 hover:border-emerald-200 hover:shadow-sm dark:bg-emerald-900/10 dark:border-emerald-900/30 dark:hover:border-emerald-800/50"
+                )}
+                style={{
+                    background: `linear-gradient(to right, ${task.projectColor}15 0%, transparent 4px)`
+                }}
+            >
+                <div className="flex items-start justify-between gap-2">
+                    <h4 className="text-xs font-medium text-emerald-950/80 dark:text-emerald-100/80 leading-snug line-clamp-2">
+                        {task.title}
+                    </h4>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                </div>
+                <div className="flex items-center gap-1 text-[10px] text-emerald-600/70 dark:text-emerald-400/60">
+                    <span className="truncate">{task.projectName}</span>
+                </div>
+            </button>
+        )
+    }
+
+    // Standard / Review card - matches project board TaskCard
     return (
         <button
             onClick={onClick}
             className={cn(
-                "w-full text-left p-2 rounded-md border transition-all duration-150",
-                "hover:shadow-sm hover:border-border/80 active:scale-[0.99]",
-                isDone
-                    ? "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900/50"
-                    : "bg-card",
-                task.hasHelpRequest && !isDone && "ring-1 ring-amber-300/50"
+                "w-full text-left group relative flex flex-col rounded-lg border bg-card p-3 shadow-sm transition-colors transition-shadow duration-200",
+                "hover:shadow-md hover:border-primary/20",
+                isReview ? "border-orange-200 bg-orange-50/10" : "border-border",
+                task.hasHelpRequest && "ring-1 ring-amber-300/50"
             )}
+            style={{
+                background: `linear-gradient(to right, ${task.projectColor}20 0%, transparent 4px), ${isReview ? 'rgb(255 247 237 / 0.1)' : 'var(--card)'}`
+            }}
         >
-            <div className="flex items-start gap-2">
-                <div
-                    className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0"
-                    style={{ backgroundColor: task.projectColor }}
-                />
-                <div className="flex-1 min-w-0">
-                    <h4 className="text-xs font-medium leading-snug line-clamp-1">
-                        {task.title}
-                    </h4>
-                    <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[9px] text-muted-foreground truncate">
-                            {task.projectName}
-                        </span>
-                        {dueText && (
-                            <span className={cn(
-                                "text-[9px] flex items-center gap-0.5 shrink-0",
-                                isOverdue ? "text-red-500" : isUrgent ? "text-amber-500" : "text-muted-foreground"
-                            )}>
-                                <Clock className="h-2 w-2" />
-                                {dueText}
+            {/* Title */}
+            <h4 className="text-sm font-medium leading-snug text-foreground mb-3 line-clamp-2">
+                {task.title}
+            </h4>
+
+            {/* Meta Row: Project name, Date & Help indicator */}
+            <div className="flex items-center justify-between gap-2 mt-auto">
+                <div className="flex items-center gap-1.5 min-w-0">
+                    {/* Project name badge */}
+                    <div
+                        className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium border bg-muted/50 text-muted-foreground border-transparent truncate max-w-[100px]"
+                    >
+                        <div
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ backgroundColor: task.projectColor }}
+                        />
+                        <span className="truncate">{task.projectName}</span>
+                    </div>
+
+                    {/* Status / Date Badge */}
+                    {daysLeft !== null && (
+                        <div className={cn(
+                            "flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium border truncate",
+                            isOverdue
+                                ? "bg-red-50 text-red-600 border-red-100"
+                                : daysLeft <= 2
+                                    ? "bg-orange-50 text-orange-600 border-orange-100"
+                                    : "bg-muted text-muted-foreground border-transparent"
+                        )}>
+                            <Clock className="w-3 h-3 shrink-0" />
+                            <span className="truncate">
+                                {isOverdue ? `${Math.abs(daysLeft)}d overdue` : daysLeft === 0 ? "Today" : `${daysLeft}d`}
                             </span>
-                        )}
-                        {task.hasHelpRequest && !isDone && (
-                            <HelpCircle className="h-2.5 w-2.5 text-amber-500 shrink-0" />
-                        )}
+                        </div>
+                    )}
+
+                    {/* Help request indicator */}
+                    {task.hasHelpRequest && (
+                        <HelpCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    )}
+                </div>
+            </div>
+
+            {/* Review Footer */}
+            {isReview && (
+                <div className="mt-3 pt-2.5 border-t border-orange-100 flex items-center justify-center">
+                    <div className="w-full text-center text-[10px] font-medium text-orange-600/70 flex items-center justify-center gap-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
+                        Pending Review
                     </div>
                 </div>
-                <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0 mt-1" />
-            </div>
+            )}
         </button>
     )
 }
@@ -152,9 +203,9 @@ function KanbanColumn({
             isDoneColumn ? "bg-green-50/30 dark:bg-green-950/10" : "bg-muted/30"
         )}>
             {/* Column Header */}
-            <div className="shrink-0 p-2.5 border-b border-border/50">
+            <div className="shrink-0 p-3 border-b border-border/50">
                 <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-medium">{column.name}</h3>
+                    <h3 className="text-sm font-medium">{column.name}</h3>
                     <span className={cn(
                         "text-[10px] px-1.5 py-0.5 rounded",
                         isDoneColumn ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400" : "bg-muted text-muted-foreground"
@@ -165,17 +216,17 @@ function KanbanColumn({
             </div>
 
             {/* Tasks */}
-            <div className="flex-1 p-2 space-y-1.5">
+            <div className="flex-1 p-2 space-y-2">
                 {column.tasks.length > 0 ? (
                     column.tasks.map(task => (
-                        <CompactTaskCard
+                        <PersonalTaskCard
                             key={task.id}
                             task={task}
                             onClick={() => onTaskClick(task)}
                         />
                     ))
                 ) : (
-                    <div className="text-center py-6 text-[10px] text-muted-foreground">
+                    <div className="text-center py-8 text-xs text-muted-foreground">
                         No tasks
                     </div>
                 )}

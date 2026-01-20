@@ -9,10 +9,21 @@ import {
     DialogTitle,
     DialogFooter,
 } from "@/components/ui/dialog"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { createPush, updatePush } from "@/app/actions/pushes"
+import { Trash2 } from "lucide-react"
+import { createPush, updatePush, deletePush } from "@/app/actions/pushes"
 
 type PushType = {
     id: string
@@ -42,6 +53,8 @@ export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogPr
     const [endDate, setEndDate] = useState(push?.endDate ? new Date(push.endDate).toISOString().split('T')[0] : "")
     const [error, setError] = useState<string | null>(null)
     const [isPending, startTransition] = useTransition()
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
 
     // Reset dates when dialog opens or push changes
     useEffect(() => {
@@ -50,8 +63,25 @@ export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogPr
             setStartDate(push?.startDate ? new Date(push.startDate).toISOString().split('T')[0] : getDefaultStartDate())
             setEndDate(push?.endDate ? new Date(push.endDate).toISOString().split('T')[0] : "")
             setError(null)
+            setShowDeleteConfirm(false)
+            setIsDeleting(false)
         }
     }, [open, push])
+
+    const handleDelete = async () => {
+        if (!push) return
+        setIsDeleting(true)
+        const result = await deletePush(push.id, projectId)
+        if (result.error) {
+            setError(result.error)
+            setIsDeleting(false)
+            setShowDeleteConfirm(false)
+        } else {
+            setShowDeleteConfirm(false)
+            onOpenChange(false)
+            router.refresh()
+        }
+    }
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
@@ -160,16 +190,51 @@ export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogPr
                             </div>
                         )}
                     </div>
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={handleClose}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={isPending}>
-                            {isPending ? (push ? "Updating..." : "Creating...") : (push ? "Update Push" : "Create Push")}
-                        </Button>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        {push && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() => setShowDeleteConfirm(true)}
+                                disabled={isPending || isDeleting}
+                                className="mr-auto text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        )}
+                        <div className="flex gap-2">
+                            <Button type="button" variant="outline" onClick={handleClose}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={isPending}>
+                                {isPending ? (push ? "Updating..." : "Creating...") : (push ? "Update Push" : "Create Push")}
+                            </Button>
+                        </div>
                     </DialogFooter>
                 </form>
             </DialogContent>
+
+            <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Push</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete "{push?.name}"? Tasks will be moved to backlog.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDelete}
+                            disabled={isDeleting}
+                            className="bg-destructive hover:bg-destructive/90 text-white"
+                        >
+                            {isDeleting ? "Deleting..." : "Delete Push"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Dialog>
     )
 }
