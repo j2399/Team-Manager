@@ -242,13 +242,11 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                     !isActive && "hover:bg-muted/50"
                 )}
             >
-                {/* Active gradient indicator */}
+                {/* Active gradient indicator - animates width from right */}
                 <div
-                    className={cn(
-                        "absolute inset-0 rounded-md transition-all duration-300 ease-out",
-                        isActive ? "opacity-100" : "opacity-0"
-                    )}
+                    className="absolute inset-y-0 right-0 rounded-md transition-all duration-300 ease-out"
                     style={{
+                        width: isActive ? '100%' : '0%',
                         background: `linear-gradient(to left, var(--project-active-bg), transparent 60%)`,
                     }}
                 />

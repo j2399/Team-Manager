@@ -475,7 +475,6 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
                                         isMentioned && "bg-yellow-500/10 hover:bg-yellow-500/20"
                                     )}
                                 >
-                                    {isMentioned && <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-yellow-500" />}
                                     {!isGrouped ? (
                                         <Avatar className="w-8 h-8 shrink-0 mt-0.5">
                                             <AvatarImage src={displayAvatar || undefined} />
