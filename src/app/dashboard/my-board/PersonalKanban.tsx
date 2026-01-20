@@ -92,14 +92,38 @@ function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }
     const isOverdue = isDone ? false : rawOverdue
     const daysLeft = isDone ? null : (task.dueDate ? Math.ceil((new Date(task.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null)
 
+    // Calculate time progress
+    const now = new Date().getTime()
+    const startTime = task.startDate ? new Date(task.startDate).getTime() : null
+    const endTime = task.endDate ? new Date(task.endDate).getTime() : null
+    let timeProgress: number | null = null
+
+    if (startTime && endTime) {
+        const totalDuration = endTime - startTime
+        const elapsed = now - startTime
+        timeProgress = Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100)
+    }
+
+    const getProgressColor = () => {
+        if (isOverdue) return 'bg-red-500'
+        if (timeProgress && timeProgress > 90) return 'bg-orange-500'
+        return 'bg-primary/60'
+    }
+
+    const getManualProgressColorClass = (val: number) => {
+        if (val < 30) return "bg-red-500"
+        if (val < 70) return "bg-yellow-500"
+        return "bg-green-500"
+    }
+
     // Done column variant - matches project board
     if (isDone) {
         return (
             <button
                 onClick={onClick}
                 className={cn(
-                    "w-full text-left group relative flex flex-col gap-1.5 p-3 rounded-lg border transition-colors transition-shadow duration-200",
-                    "bg-emerald-50/40 border-emerald-100 hover:border-emerald-200 hover:shadow-sm dark:bg-emerald-900/10 dark:border-emerald-900/30 dark:hover:border-emerald-800/50"
+                    "w-full text-left group relative flex flex-col gap-1.5 p-3 rounded-lg border transition-all duration-200 overflow-hidden",
+                    "bg-emerald-50/40 border-emerald-100/50 hover:border-emerald-200 hover:shadow-sm dark:bg-emerald-900/10 dark:border-emerald-900/30 dark:hover:border-emerald-800/50"
                 )}
             >
                 <div className="flex items-start justify-between gap-2">
@@ -108,8 +132,13 @@ function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }
                     </h4>
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-0.5" />
                 </div>
-                <div className="flex items-center gap-1 text-[10px] text-emerald-600/70 dark:text-emerald-400/60">
-                    <span className="truncate">{task.projectName}</span>
+                <div className="flex items-center justify-end mt-1">
+                    <div
+                        className="text-[10px] px-2 py-0.5 rounded-sm font-semibold text-foreground truncate max-w-[120px]"
+                        style={{ background: `linear-gradient(to right, ${task.projectColor}20, transparent)` }}
+                    >
+                        {task.projectName}
+                    </div>
                 </div>
             </button>
         )
@@ -120,7 +149,7 @@ function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }
         <button
             onClick={onClick}
             className={cn(
-                "w-full text-left group relative flex flex-col rounded-lg border bg-card p-3 shadow-sm transition-colors transition-shadow duration-200",
+                "w-full text-left group relative flex flex-col rounded-lg border bg-card p-3 shadow-sm transition-all duration-200 overflow-hidden",
                 "hover:shadow-md hover:border-primary/20",
                 isReview ? "border-orange-200 bg-orange-50/10" : "border-border",
                 task.hasHelpRequest && "ring-1 ring-amber-300/50"
@@ -131,21 +160,10 @@ function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }
                 {task.title}
             </h4>
 
-            {/* Meta Row: Project name, Date & Help indicator */}
+            {/* Meta Row */}
             <div className="flex items-center justify-between gap-2 mt-auto">
+                {/* Due Date Info (Left) */}
                 <div className="flex items-center gap-1.5 min-w-0">
-                    {/* Project name badge */}
-                    <div
-                        className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium border bg-muted/50 text-muted-foreground border-transparent truncate max-w-[100px]"
-                    >
-                        <div
-                            className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ backgroundColor: task.projectColor }}
-                        />
-                        <span className="truncate">{task.projectName}</span>
-                    </div>
-
-                    {/* Status / Date Badge */}
                     {daysLeft !== null && (
                         <div className={cn(
                             "flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium border truncate",
@@ -165,7 +183,34 @@ function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }
                         <HelpCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                     )}
                 </div>
+
+                {/* Project Badge (Right) */}
+                <div
+                    className="text-[10px] px-2 py-0.5 rounded-sm font-semibold text-foreground truncate max-w-[120px]"
+                    style={{ background: `linear-gradient(to right, ${task.projectColor}20, transparent)` }}
+                >
+                    {task.projectName}
+                </div>
             </div>
+
+            {/* Progress Bar */}
+            {task.enableProgress ? (
+                <div className="mt-3 h-1 w-full bg-muted rounded-full overflow-hidden">
+                    <div
+                        className={cn("h-full rounded-full transition-all duration-300", getManualProgressColorClass(task.progress))}
+                        style={{ width: `${task.progress}%` }}
+                    />
+                </div>
+            ) : (
+                timeProgress !== null && !isReview && (
+                    <div className="mt-3 h-1 w-full bg-muted rounded-full overflow-hidden">
+                        <div
+                            className={cn("h-full rounded-full transition-all duration-300", getProgressColor())}
+                            style={{ width: `${timeProgress}%` }}
+                        />
+                    </div>
+                )
+            )}
 
             {/* Review Footer */}
             {isReview && (
@@ -188,27 +233,37 @@ function KanbanColumn({
     onTaskClick: (task: Task) => void
 }) {
     const isDoneColumn = column.name === 'Done'
+    const isReviewColumn = column.name === 'Review'
+
+    const getBgClass = () => {
+        if (isDoneColumn) return 'bg-emerald-50/50 dark:bg-emerald-900/10'
+        if (isReviewColumn) return 'bg-gray-100/80 dark:bg-gray-800/40'
+        return 'bg-muted/50'
+    }
 
     return (
         <div className={cn(
-            "flex flex-col rounded-lg border border-border/50",
-            isDoneColumn ? "bg-green-50/30 dark:bg-green-950/10" : "bg-muted/30"
+            "flex h-full w-full min-w-0 flex-col rounded-lg p-3 transition-all min-h-[150px]",
+            getBgClass()
         )}>
             {/* Column Header */}
-            <div className="shrink-0 p-3 border-b border-border/50">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium">{column.name}</h3>
-                    <span className={cn(
-                        "text-[10px] px-1.5 py-0.5 rounded",
-                        isDoneColumn ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400" : "bg-muted text-muted-foreground"
-                    )}>
-                        {column.tasks.length}
-                    </span>
-                </div>
+            <div className="flex items-center gap-2 mb-3 px-1">
+                <h3 className={cn(
+                    "font-medium text-sm",
+                    isDoneColumn ? "text-emerald-700 dark:text-emerald-400" : ""
+                )}>
+                    {column.name}
+                </h3>
+                <span className={cn(
+                    "text-xs",
+                    isDoneColumn ? "text-emerald-600 dark:text-emerald-500/80" : "text-muted-foreground"
+                )}>
+                    {column.tasks.length}
+                </span>
             </div>
 
             {/* Tasks */}
-            <div className="flex-1 p-2 space-y-2">
+            <div className="space-y-2 px-2 pb-2 pt-1">
                 {column.tasks.length > 0 ? (
                     column.tasks.map(task => (
                         <PersonalTaskCard
@@ -218,9 +273,9 @@ function KanbanColumn({
                         />
                     ))
                 ) : (
-                    <div className="text-center py-8 text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground text-center py-4">
                         No tasks
-                    </div>
+                    </p>
                 )}
             </div>
         </div>

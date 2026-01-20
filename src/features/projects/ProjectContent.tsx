@@ -169,7 +169,7 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                 />
                 <div className="relative flex items-center justify-between gap-2 p-3">
                     <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                        <TooltipProvider delayDuration={1000}>
+                        <TooltipProvider delayDuration={500}>
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <h1 className="text-base md:text-lg font-semibold truncate cursor-default">{project.name}</h1>
@@ -182,7 +182,7 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                             </Tooltip>
                         </TooltipProvider>
                         {view === 'kanban' && (
-                            <TooltipProvider delayDuration={2000}>
+                            <TooltipProvider delayDuration={1000}>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <Button

@@ -84,6 +84,9 @@ export async function POST(request: Request) {
 
         // -- Discord Integration Start --
         try {
+            // Only proceed if there's a potential mention ('@')
+            if (!content.includes('@')) return NextResponse.json(message)
+
             // Import dynamically to avoid circular deps if any (though static import is fine usually)
             const { sendDiscordNotification } = await import('@/lib/discord')
 

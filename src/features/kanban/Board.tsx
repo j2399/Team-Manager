@@ -935,11 +935,10 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
                                                         setCreatingPushId(push.id)
                                                     }
                                                 }}
-                                                className={`h-7 flex items-center gap-1 px-2 rounded-md border transition-all relative z-10 shrink-0 text-xs ${
-                                                    isComplete
+                                                className={`h-7 flex items-center gap-1 px-2 rounded-md border transition-all relative z-10 shrink-0 text-xs ${isComplete
                                                         ? "border-border/50 text-muted-foreground/50 hover:bg-muted/50 hover:text-muted-foreground"
                                                         : "border-border bg-background hover:bg-muted/50"
-                                                }`}
+                                                    }`}
                                             >
                                                 <Plus className="h-3.5 w-3.5" />
                                                 <span className="hidden sm:inline">Add Task</span>

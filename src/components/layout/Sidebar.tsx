@@ -173,25 +173,16 @@ const SortableProjectRow = React.memo(({
             >
                 <GripVertical className="h-4 w-4" />
             </button>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Link
-                        href={`/dashboard/projects/${project.id}`}
-                        onClick={() => !isActive && setNavigatingTo(`/dashboard/projects/${project.id}`)}
-                        className={cn(
-                            "relative z-10 flex-1 flex items-center rounded-md px-3 py-1.5 text-sm transition-colors truncate",
-                            isActive ? "font-medium" : "text-muted-foreground group-hover:text-foreground"
-                        )}
-                    >
-                        <span className="truncate">{project.name}</span>
-                    </Link>
-                </TooltipTrigger>
-                {project.lead && (
-                    <TooltipContent side="right" align="center">
-                        <p className="text-xs">Lead: {project.lead.name}</p>
-                    </TooltipContent>
+            <Link
+                href={`/dashboard/projects/${project.id}`}
+                onClick={() => !isActive && setNavigatingTo(`/dashboard/projects/${project.id}`)}
+                className={cn(
+                    "relative z-10 flex-1 flex items-center rounded-md px-3 py-1.5 text-sm transition-colors truncate",
+                    isActive ? "font-medium" : "text-muted-foreground group-hover:text-foreground"
                 )}
-            </Tooltip>
+            >
+                <span className="truncate">{project.name}</span>
+            </Link>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button
@@ -649,8 +640,8 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
             </div>
 
             <div className={cn(
-                "shrink-0 flex flex-col min-h-0 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
-                chatState === 'large' ? "grow basis-0" : chatState === 'hidden' ? "h-0 grow-0 basis-0 opacity-0 overflow-hidden" : "grow-0 basis-[320px] border-t"
+                "shrink-0 flex flex-col min-h-0 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] overflow-hidden",
+                chatState === 'large' ? "grow basis-0" : chatState === 'hidden' ? "grow-0 basis-14 border-t" : "grow-0 basis-[320px] border-t"
             )}>
                 <GeneralChat
                     isExpanded={chatState === 'large'}
@@ -668,18 +659,6 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 "border-t transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] overflow-hidden",
                 chatState === 'large' ? "max-h-0 opacity-0 border-t-0 p-0" : "max-h-40 opacity-100 p-4"
             )}>
-                {chatState === 'hidden' && (
-                    <div className="flex items-center mb-3">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                            onClick={() => setChatState('small')}
-                        >
-                            <ChevronDown className="h-5 w-5 rotate-180" />
-                        </Button>
-                    </div>
-                )}
                 <div className="flex items-center gap-3 mb-3">
                     {userData.avatar ? (
                         <img

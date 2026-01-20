@@ -94,10 +94,12 @@ export async function createTask(input: CreateTaskInput) {
 
         // Verify assignee exists if provided
         if (assigneeId && assigneeId !== "") {
-            const user = await prisma.user.findUnique({
-                where: { id: assigneeId }
+            const assigneePromise = prisma.user.findUnique({
+                where: { id: assigneeId },
+                select: { id: true }
             })
-            if (!user) {
+            const [assignee] = await Promise.all([assigneePromise])
+            if (!assignee) {
                 return { error: 'Assignee not found' }
             }
         }
@@ -236,25 +238,24 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
             return { error: 'Unauthorized' }
         }
 
-        const targetColumn = await prisma.column.findUnique({
-            where: { id: columnId }
-        })
+        const [targetColumn, task] = await Promise.all([
+            prisma.column.findUnique({ where: { id: columnId } }),
+            prisma.task.findUnique({
+                where: { id: taskId },
+                select: {
+                    id: true,
+                    title: true,
+                    requireAttachment: true,
+                    submittedAt: true,
+                    column: true,
+                    attachments: { select: { id: true } }
+                }
+            })
+        ])
 
         if (!targetColumn) {
             return { error: 'Target column not found' }
         }
-
-        const task = await prisma.task.findUnique({
-            where: { id: taskId },
-            select: {
-                id: true,
-                title: true,
-                requireAttachment: true,
-                submittedAt: true,
-                column: true,
-                attachments: { select: { id: true } }
-            }
-        })
 
         if (!task) {
             return { error: 'Task not found' }
@@ -350,28 +351,22 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
                 select: {
                     name: true,
                     workspaceId: true,
-                    lead: { select: { name: true, discordId: true } }
+                    lead: { select: { name: true, discordId: true } },
+                    workspace: { select: { discordChannelId: true } }
                 }
             })
 
-            if (project?.workspaceId && project.lead?.discordId) {
-                const workspace = await prisma.workspace.findUnique({
-                    where: { id: project.workspaceId },
-                    select: { discordChannelId: true }
-                })
-                const webhookUrl = workspace?.discordChannelId || null
-                if (webhookUrl) {
-                    await sendDiscordNotification(
-                        "",
-                        [{
-                            title: "🔍 Needs Review",
-                            description: `<@${project.lead.discordId}>, **${updatedTask.title}** needs review`,
-                            color: 0xFEE75C,
-                            timestamp: new Date().toISOString(),
-                        }],
-                        webhookUrl
-                    )
-                }
+            if (project?.workspaceId && project.lead?.discordId && project.workspace?.discordChannelId) {
+                await sendDiscordNotification(
+                    "",
+                    [{
+                        title: "🔍 Needs Review",
+                        description: `<@${project.lead.discordId}>, **${updatedTask.title}** needs review`,
+                        color: 0xFEE75C,
+                        timestamp: new Date().toISOString(),
+                    }],
+                    project.workspace.discordChannelId
+                )
             }
         }
 
@@ -390,18 +385,43 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
             return { error: 'Unauthorized' }
         }
 
-        const task = await prisma.task.findUnique({
-            where: { id: taskId },
-            include: {
-                assignees: { select: { userId: true } },
-                column: { include: { board: { include: { project: { select: { id: true, name: true, workspaceId: true } } } } } },
-                assignee: { select: { name: true } }
-            }
-        })
+        const [task, newAssignee] = await Promise.all([
+            prisma.task.findUnique({
+                where: { id: taskId },
+                include: {
+                    assignees: { select: { userId: true } },
+                    column: {
+                        include: {
+                            board: {
+                                include: {
+                                    project: {
+                                        select: {
+                                            id: true,
+                                            name: true,
+                                            workspaceId: true,
+                                            workspace: { select: { discordChannelId: true } }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    assignee: { select: { name: true } }
+                }
+            }),
+            input.assigneeId !== undefined && input.assigneeId !== "" ? prisma.user.findUnique({
+                where: { id: input.assigneeId },
+                select: { name: true, discordId: true }
+            }) : Promise.resolve(null)
+        ])
 
         if (!task) {
             return { error: 'Task not found' }
         }
+
+        const project = task.column?.board?.project
+        const workspaceId = project?.workspaceId
+        const webhookUrl = project?.workspace?.discordChannelId
 
         // Members cannot edit tasks in Review or Done
         if (user.role === 'Member') {
@@ -430,10 +450,6 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
         let newAssigneeName = oldAssigneeName
 
         if (input.assigneeId !== undefined && input.assigneeId !== task.assigneeId) {
-            const newAssignee = input.assigneeId ? await prisma.user.findUnique({
-                where: { id: input.assigneeId },
-                select: { name: true }
-            }) : null
             newAssigneeName = newAssignee?.name || 'Unassigned'
 
             changes.push({
@@ -552,40 +568,31 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
 
         // Discord: only ping when someone is newly assigned
         if (newlyAssignedIds.length > 0) {
-            const workspaceId = task.column?.board?.project?.workspaceId
-            const projectName = task.column?.board?.project?.name || 'Unknown Project'
-            const projectId = task.column?.board?.project?.id
+            const projectName = project?.name || 'Unknown Project'
+            const projectId = project?.id
 
-            if (workspaceId && projectId) {
-                const workspace = await prisma.workspace.findUnique({
-                    where: { id: workspaceId },
-                    select: { discordChannelId: true }
+            if (workspaceId && projectId && webhookUrl) {
+                const assignedUsers = await prisma.user.findMany({
+                    where: { id: { in: newlyAssignedIds }, discordId: { not: null } },
+                    select: { discordId: true }
                 })
-                const webhookUrl = workspace?.discordChannelId || null
+                const mentions = assignedUsers.map((u) => (u.discordId ? `<@${u.discordId}>` : "")).filter(Boolean).join(" ")
 
-                if (webhookUrl) {
-                    const assignedUsers = await prisma.user.findMany({
-                        where: { id: { in: newlyAssignedIds }, discordId: { not: null } },
-                        select: { discordId: true }
-                    })
-                    const mentions = assignedUsers.map((u) => (u.discordId ? `<@${u.discordId}>` : "")).filter(Boolean).join(" ")
-
-                    if (mentions) {
-                        const dueDate =
-                            input.endDate !== undefined
-                                ? (input.endDate ? parseDateInput(input.endDate, "endOfDay") : null)
-                                : (task.endDate ?? null)
-                        await sendDiscordNotification(
-                            "",
-                            [{
-                                title: "📌 Task Assignment",
-                                description: `${mentions}, you have been assigned **${task.title}** in project **${projectName}**\n${formatDueLine(dueDate)}`,
-                                color: 0x5865F2,
-                                timestamp: new Date().toISOString(),
-                            }],
-                            webhookUrl
-                        )
-                    }
+                if (mentions) {
+                    const dueDate =
+                        input.endDate !== undefined
+                            ? (input.endDate ? parseDateInput(input.endDate, "endOfDay") : null)
+                            : (task.endDate ?? null)
+                    await sendDiscordNotification(
+                        "",
+                        [{
+                            title: "📌 Task Assignment",
+                            description: `${mentions}, you have been assigned **${task.title}** in project **${projectName}**\n${formatDueLine(dueDate)}`,
+                            color: 0x5865F2,
+                            timestamp: new Date().toISOString(),
+                        }],
+                        webhookUrl
+                    )
                 }
             }
         }

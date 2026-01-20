@@ -18,14 +18,17 @@ export async function GET(
         const { searchParams } = new URL(request.url)
         const since = searchParams.get("since") // ISO timestamp
 
-        // Verify project access
-        const project = await prisma.project.findUnique({
-            where: { id: projectId },
-            select: { id: true, workspaceId: true }
+        // Verify project existence and access in one combined check
+        const project = await prisma.project.findFirst({
+            where: {
+                id: projectId,
+                workspaceId: user.workspaceId
+            },
+            select: { id: true }
         })
 
-        if (!project || project.workspaceId !== user.workspaceId) {
-            return NextResponse.json({ error: "Project not found" }, { status: 404 })
+        if (!project) {
+            return NextResponse.json({ error: "Project not found or access denied" }, { status: 404 })
         }
 
         // Build query for tasks updated since timestamp
