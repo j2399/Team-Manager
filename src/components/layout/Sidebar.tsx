@@ -231,16 +231,21 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
             transition,
             opacity: isDragging ? 0.6 : 1,
             ["--project-hover-bg" as any]: hexToRgba(projectColor, 0.08),
-            ["--project-active-bg" as any]: hexToRgba(projectColor, 0.14),
+            ["--project-active-bg" as any]: hexToRgba(projectColor, 0.18),
         }
 
         return (
             <div
                 ref={setNodeRef}
-                style={style}
+                style={{
+                    ...style,
+                    ...(isActive && {
+                        background: `linear-gradient(to left, var(--project-active-bg), transparent 70%)`
+                    })
+                }}
                 className={cn(
                     "group flex items-center gap-1 rounded-md transition-colors",
-                    isActive ? "bg-[var(--project-active-bg)]" : "hover:bg-[var(--project-hover-bg)]"
+                    !isActive && "hover:bg-[var(--project-hover-bg)]"
                 )}
             >
                 <button

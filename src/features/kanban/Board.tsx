@@ -915,7 +915,10 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
                                 >
                                     <div className="flex items-center gap-2 md:gap-3 min-w-0">
                                         <span className="font-semibold text-base md:text-lg tracking-tight truncate">{push.name}</span>
-                                        {isAdmin && !isComplete && (
+                                        {isComplete && (
+                                            <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                                        )}
+                                        {isAdmin && (
                                             <div
                                                 role="button"
                                                 onClick={(e) => {
@@ -935,14 +938,15 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
                                                         setCreatingPushId(push.id)
                                                     }
                                                 }}
-                                                className="h-6 md:h-7 flex items-center gap-1 px-2 rounded-md border border-border hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-all relative z-10 shrink-0 text-xs text-muted-foreground"
+                                                className={`h-6 md:h-7 flex items-center gap-1 px-2 rounded-md border transition-all relative z-10 shrink-0 text-xs ${
+                                                    isComplete
+                                                        ? "border-border/50 text-muted-foreground/50 hover:bg-muted/50 hover:text-muted-foreground"
+                                                        : "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
+                                                }`}
                                             >
                                                 <Plus className="h-3 w-3" />
                                                 <span className="hidden sm:inline">Add Task</span>
                                             </div>
-                                        )}
-                                        {isComplete && (
-                                            <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
                                         )}
                                     </div>
 
