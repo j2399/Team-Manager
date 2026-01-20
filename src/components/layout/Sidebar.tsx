@@ -39,6 +39,12 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { RemoveScroll } from "react-remove-scroll"
 import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
     Dialog,
     DialogContent,
     DialogDescription,
@@ -167,16 +173,25 @@ const SortableProjectRow = React.memo(({
             >
                 <GripVertical className="h-4 w-4" />
             </button>
-            <Link
-                href={`/dashboard/projects/${project.id}`}
-                onClick={() => !isActive && setNavigatingTo(`/dashboard/projects/${project.id}`)}
-                className={cn(
-                    "relative z-10 flex-1 flex items-center rounded-md px-3 py-1.5 text-sm transition-colors truncate",
-                    isActive ? "font-medium" : "text-muted-foreground group-hover:text-foreground"
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Link
+                        href={`/dashboard/projects/${project.id}`}
+                        onClick={() => !isActive && setNavigatingTo(`/dashboard/projects/${project.id}`)}
+                        className={cn(
+                            "relative z-10 flex-1 flex items-center rounded-md px-3 py-1.5 text-sm transition-colors truncate",
+                            isActive ? "font-medium" : "text-muted-foreground group-hover:text-foreground"
+                        )}
+                    >
+                        <span className="truncate">{project.name}</span>
+                    </Link>
+                </TooltipTrigger>
+                {project.lead && (
+                    <TooltipContent side="right" align="center">
+                        <p className="text-xs">Lead: {project.lead.name}</p>
+                    </TooltipContent>
                 )}
-            >
-                <span className="truncate">{project.name}</span>
-            </Link>
+            </Tooltip>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button
@@ -593,20 +608,22 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                         collisionDetection={closestCenter}
                                         onDragEnd={handleProjectDragEnd}
                                     >
-                                        <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-                                            {projects.map((project) => (
-                                                <SortableProjectRow
-                                                    key={project.id}
-                                                    project={project}
-                                                    pathname={pathname}
-                                                    navigatingTo={navigatingTo}
-                                                    isAdmin={isAdmin}
-                                                    setNavigatingTo={setNavigatingTo}
-                                                    setEditingProject={setEditingProject}
-                                                    setDeleteConfirm={setDeleteConfirm}
-                                                />
-                                            ))}
-                                        </SortableContext>
+                                        <TooltipProvider delayDuration={1000}>
+                                            <SortableContext items={projects.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+                                                {projects.map((project) => (
+                                                    <SortableProjectRow
+                                                        key={project.id}
+                                                        project={project}
+                                                        pathname={pathname}
+                                                        navigatingTo={navigatingTo}
+                                                        isAdmin={isAdmin}
+                                                        setNavigatingTo={setNavigatingTo}
+                                                        setEditingProject={setEditingProject}
+                                                        setDeleteConfirm={setDeleteConfirm}
+                                                    />
+                                                ))}
+                                            </SortableContext>
+                                        </TooltipProvider>
                                     </DndContext>
                                 )}
                             </CollapsibleContent>
@@ -652,15 +669,16 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 chatState === 'large' ? "max-h-0 opacity-0 border-t-0 p-0" : "max-h-40 opacity-100 p-4"
             )}>
                 {chatState === 'hidden' && (
-                    <Button
-                        variant="ghost"
-                        className="w-full justify-start gap-2 h-9 text-sm mb-3"
-                        size="sm"
-                        onClick={() => setChatState('small')}
-                    >
-                        <Smile className="h-4 w-4" />
-                        Restore Chat
-                    </Button>
+                    <div className="flex items-center mb-3">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            onClick={() => setChatState('small')}
+                        >
+                            <ChevronDown className="h-5 w-5 rotate-180" />
+                        </Button>
+                    </div>
                 )}
                 <div className="flex items-center gap-3 mb-3">
                     {userData.avatar ? (
