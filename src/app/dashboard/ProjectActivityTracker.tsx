@@ -362,7 +362,7 @@ export function ProjectActivityTracker() {
                 <h2 className="text-sm font-medium">Activity Log</h2>
             </div>
 
-            <TooltipProvider delayDuration={500}>
+            <TooltipProvider delayDuration={500} skipDelayDuration={0}>
                 {/* Project Selector */}
                 <div className="flex gap-1 mb-4 overflow-x-auto pb-1 scrollbar-hide shrink-0 relative">
                     {projects.map(project => {
