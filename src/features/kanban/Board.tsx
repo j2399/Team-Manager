@@ -911,7 +911,7 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
                                     aria-expanded={isOpen}
                                     aria-controls={contentId}
                                     onClick={() => togglePushCollapse(push.id)}
-                                    className={`w-full flex items-center justify-between p-3 md:p-4 transition-colors ${isOpen ? "rounded-t-lg" : "rounded-lg"} relative overflow-hidden ${isComplete ? 'bg-green-100 dark:bg-green-900/20 hover:bg-green-200/50 dark:hover:bg-green-900/30' : 'hover:bg-accent/50 dark:hover:bg-accent/20'}`}
+                                    className={`w-full flex items-center justify-between p-3 md:p-4 transition-colors ${isOpen ? "rounded-t-lg" : "rounded-lg"} relative overflow-hidden hover:bg-accent/50 dark:hover:bg-accent/20`}
                                 >
                                     <div className="flex items-center gap-2 md:gap-3 min-w-0">
                                         <span className="font-semibold text-base md:text-lg tracking-tight truncate">{push.name}</span>
@@ -942,11 +942,7 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
                                             </div>
                                         )}
                                         {isComplete && (
-                                            <span className="hidden sm:flex items-center gap-1 text-xs font-medium text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full ring-1 ring-inset ring-green-600/20 dark:ring-green-400/20 shrink-0">
-                                                <CheckCircle2 className="w-3 h-3" />
-                                                <span className="hidden md:inline">{push.endDate && push.endDate !== 'null' ? `Completed ${new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}` : 'Completed!'}</span>
-                                                <span className="md:hidden">Done</span>
-                                            </span>
+                                            <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
                                         )}
                                     </div>
 
