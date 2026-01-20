@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import {
     LayoutDashboard, Users, LogOut, Settings, ChevronDown,
     Plus, MoreHorizontal, FolderKanban, Pencil, Trash2, User, GripVertical,
-    Kanban, Loader2
+    Kanban, Loader2, Smile
 } from "lucide-react"
 import { DiscordIcon } from "@/components/icons/DiscordIcon"
 import { SpinningDots } from "@/components/ui/spinning-dots"
@@ -243,7 +243,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     const [deleteConfirmName, setDeleteConfirmName] = React.useState<string>("")
     const [isSubmitting, setIsSubmitting] = React.useState(false)
     const [navigatingTo, setNavigatingTo] = React.useState<string | null>(null)
-    const [isChatExpanded, setIsChatExpanded] = React.useState(false)
+    const [chatState, setChatState] = React.useState<'small' | 'large' | 'hidden'>('small')
     const createProjectDialogContentRef = React.useRef<HTMLDivElement | null>(null)
     const editProjectDialogContentRef = React.useRef<HTMLDivElement | null>(null)
     const [settingsSpinNonce, setSettingsSpinNonce] = React.useState(0)
@@ -496,7 +496,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
         <div className="flex h-full flex-col bg-background w-64 border-r overflow-hidden">
             <div className={cn(
                 "relative flex items-center px-0 h-10 border-b transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] overflow-hidden",
-                isChatExpanded ? "max-h-0 opacity-0 border-b-0" : "max-h-10 opacity-100"
+                chatState === 'large' ? "max-h-0 opacity-0 border-b-0" : "max-h-10 opacity-100"
             )}>
                 <h1 className="text-sm font-semibold truncate pl-4 pr-12 w-full min-w-0">
                     {userData.workspaceName ?? ""}
@@ -535,7 +535,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
 
             <div className={cn(
                 "transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] overflow-hidden",
-                isChatExpanded ? "flex-[0.001] opacity-0" : "flex-1 opacity-100"
+                chatState === 'large' ? "flex-[0.001] opacity-0" : chatState === 'hidden' ? "flex-1 opacity-100" : "flex-1 opacity-100"
             )}>
                 <ScrollArea className="h-full">
                     <nav className="p-3">
@@ -633,18 +633,35 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
 
             <div className={cn(
                 "shrink-0 flex flex-col min-h-0 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
-                isChatExpanded ? "grow basis-0" : "grow-0 basis-[320px] border-t"
+                chatState === 'large' ? "grow basis-0" : chatState === 'hidden' ? "h-0 grow-0 basis-0 opacity-0 overflow-hidden" : "grow-0 basis-[320px] border-t"
             )}>
                 <GeneralChat
-                    isExpanded={isChatExpanded}
-                    onToggleExpand={() => setIsChatExpanded(!isChatExpanded)}
+                    isExpanded={chatState === 'large'}
+                    onToggleExpand={() => {
+                        setChatState(current => {
+                            if (current === 'small') return 'large'
+                            if (current === 'large') return 'hidden'
+                            return 'small'
+                        })
+                    }}
                 />
             </div>
 
             <div className={cn(
                 "border-t transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] overflow-hidden",
-                isChatExpanded ? "max-h-0 opacity-0 border-t-0 p-0" : "max-h-40 opacity-100 p-4"
+                chatState === 'large' ? "max-h-0 opacity-0 border-t-0 p-0" : "max-h-40 opacity-100 p-4"
             )}>
+                {chatState === 'hidden' && (
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start gap-2 h-9 text-sm mb-3"
+                        size="sm"
+                        onClick={() => setChatState('small')}
+                    >
+                        <Smile className="h-4 w-4" />
+                        Restore Chat
+                    </Button>
+                )}
                 <div className="flex items-center gap-3 mb-3">
                     {userData.avatar ? (
                         <img
