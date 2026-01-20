@@ -920,16 +920,25 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
                                                 role="button"
                                                 onClick={(e) => {
                                                     e.stopPropagation()
+                                                    // Expand push if collapsed
+                                                    if (collapsedPushes.has(push.id)) {
+                                                        setCollapsedPushes(prev => {
+                                                            const next = new Set(prev)
+                                                            next.delete(push.id)
+                                                            return next
+                                                        })
+                                                        loadPushTasks(push.id)
+                                                    }
                                                     const todoColumn = columns.find(c => c.name === 'Todo' || c.name === 'To Do')
                                                     if (todoColumn) {
                                                         setCreatingColumnId(todoColumn.id)
                                                         setCreatingPushId(push.id)
                                                     }
                                                 }}
-                                                className="h-6 w-6 md:h-7 md:w-7 flex items-center justify-center rounded-md border border-border hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-all relative z-10 shrink-0"
-                                                title="Add Task"
+                                                className="h-6 md:h-7 flex items-center gap-1 px-2 rounded-md border border-border hover:bg-primary/10 hover:border-primary/30 hover:text-primary transition-all relative z-10 shrink-0 text-xs text-muted-foreground"
                                             >
-                                                <Plus className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                                                <Plus className="h-3 w-3" />
+                                                <span className="hidden sm:inline">Add Task</span>
                                             </div>
                                         )}
                                         {isComplete && (

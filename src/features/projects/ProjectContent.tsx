@@ -159,8 +159,15 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
 
     return (
         <div className="flex flex-col h-full animate-fade-in-up">
-            <div className="shrink-0 border-b bg-background">
-                <div className="flex items-center justify-between gap-2 p-3">
+            <div className="shrink-0 border-b bg-background relative overflow-hidden">
+                {/* Project color gradient */}
+                <div
+                    className="absolute inset-y-0 left-0 w-32 pointer-events-none"
+                    style={{
+                        background: `linear-gradient(to right, ${projectColor}20, transparent)`
+                    }}
+                />
+                <div className="relative flex items-center justify-between gap-2 p-3">
                     <div className="flex items-center gap-2 md:gap-3 min-w-0">
                         <h1 className="text-base md:text-lg font-semibold truncate">{project.name}</h1>
                         {view === 'kanban' && (
@@ -170,17 +177,10 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className={`h-7 px-2 shrink-0 border-[color:var(--push-btn-border)] bg-[color:var(--push-btn-bg)] hover:bg-[color:var(--push-btn-bg-hover)] hover:border-[color:var(--push-btn-border-hover)] transition-opacity ${canManagePushes ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                                            style={{
-                                                ["--push-btn-bg" as any]: hexToRgba(projectColor, 0.10),
-                                                ["--push-btn-bg-hover" as any]: hexToRgba(projectColor, 0.16),
-                                                ["--push-btn-border" as any]: hexToRgba(projectColor, 0.22),
-                                                ["--push-btn-border-hover" as any]: hexToRgba(projectColor, 0.34),
-                                                ["--push-btn-icon" as any]: projectColor,
-                                            }}
+                                            className={`h-7 px-2 shrink-0 transition-opacity ${canManagePushes ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                                             onClick={() => setShowPushDialog(true)}
                                         >
-                                            <Plus className="w-3.5 h-3.5 mr-1 text-[color:var(--push-btn-icon)]" />
+                                            <Plus className="w-3.5 h-3.5 mr-1" />
                                             <span className="text-xs">Add Push</span>
                                         </Button>
                                     </TooltipTrigger>
