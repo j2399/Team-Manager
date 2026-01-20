@@ -470,7 +470,7 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
                                     key={msg.id}
                                     id={`msg-${msg.id}`}
                                     className={cn(
-                                        "px-2 py-0.5 group flex items-start gap-2 relative -mx-3 px-5",
+                                        "py-0.5 group flex items-start gap-2 relative -ml-4 -mr-5 pl-4 pr-5",
                                         !isGrouped && "mt-2",
                                         isMentioned && "bg-yellow-500/10 hover:bg-yellow-500/20"
                                     )}

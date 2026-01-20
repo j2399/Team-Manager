@@ -242,16 +242,15 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                     !isActive && "hover:bg-muted/50"
                 )}
             >
-                {/* Active gradient indicator - scales from right */}
-                <div
-                    className={cn(
-                        "absolute inset-0 rounded-md origin-right transition-transform duration-300 ease-out",
-                        isActive ? "scale-x-100" : "scale-x-0"
-                    )}
-                    style={{
-                        background: `linear-gradient(to left, var(--project-active-bg), transparent 60%)`,
-                    }}
-                />
+                {/* Active gradient indicator - animates from right */}
+                {isActive && (
+                    <div
+                        className="absolute inset-0 rounded-md animate-sidebar-gradient"
+                        style={{
+                            background: `linear-gradient(to left, var(--project-active-bg), transparent 60%)`,
+                        }}
+                    />
+                )}
                 <button
                     type="button"
                     className="relative z-10 h-6 w-6 shrink-0 flex items-center justify-center rounded-md cursor-grab active:cursor-grabbing opacity-60 group-hover:opacity-100"
