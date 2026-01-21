@@ -95,16 +95,13 @@ export function DisplayNameSettings({ initialName }: DisplayNameSettingsProps) {
                     </Button>
                 </div>
             ) : (
-                <div className="flex items-center gap-2">
-                    <Input value={savedName} disabled className="flex-1" />
-                    <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-9 w-9"
-                        onClick={() => setIsEditing(true)}
-                    >
-                        <Pencil className="h-4 w-4" />
-                    </Button>
+                <div
+                    className="flex-1 cursor-pointer group"
+                    onClick={() => setIsEditing(true)}
+                >
+                    <div className="flex items-center justify-between p-2 rounded-md border border-input bg-background hover:bg-accent/50 hover:border-accent transition-all">
+                        <span className="text-sm">{savedName}</span>
+                    </div>
                 </div>
             )}
 
