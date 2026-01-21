@@ -194,12 +194,18 @@ function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }
                     ) : (
                         // Show due date for other cards
                         daysLeft !== null && (
-                            <div className={cn(
-                                "flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium border truncate",
-                                isOverdue
-                                    ? "bg-red-50 text-red-600 border-red-100"
-                                    : "bg-muted text-muted-foreground border-transparent"
-                            )}>
+                            <div
+                                className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium border truncate"
+                                style={isOverdue ? {
+                                    background: 'linear-gradient(to right, rgba(239, 68, 68, 0.15), transparent)',
+                                    borderColor: 'rgba(239, 68, 68, 0.3)',
+                                    color: 'rgb(220, 38, 38)'
+                                } : {
+                                    background: 'linear-gradient(to right, rgba(156, 163, 175, 0.15), transparent)',
+                                    borderColor: 'rgba(156, 163, 175, 0.3)',
+                                    color: 'rgb(107, 114, 128)'
+                                }}
+                            >
                                 <Clock className="w-3 h-3 shrink-0" />
                                 <span className="truncate">
                                     {isOverdue ? `${Math.abs(daysLeft)}d overdue` : daysLeft === 0 ? "Today" : `${daysLeft}d`}

@@ -56,10 +56,18 @@ export function TaskRow({ task }: TaskRowProps) {
             <div className="flex items-center justify-between gap-2 mt-auto">
                 <div className="flex items-center gap-1.5 min-w-0">
                     {task.dueText && (
-                        <div className={cn(
-                            "flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium border truncate",
-                            task.isOverdue ? "bg-red-50 text-red-600 border-red-100" : "bg-muted text-muted-foreground border-transparent"
-                        )}>
+                        <div
+                            className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium border truncate"
+                            style={task.isOverdue ? {
+                                background: 'linear-gradient(to right, rgba(239, 68, 68, 0.15), transparent)',
+                                borderColor: 'rgba(239, 68, 68, 0.3)',
+                                color: 'rgb(220, 38, 38)'
+                            } : {
+                                background: 'linear-gradient(to right, rgba(156, 163, 175, 0.15), transparent)',
+                                borderColor: 'rgba(156, 163, 175, 0.3)',
+                                color: 'rgb(107, 114, 128)'
+                            }}
+                        >
                             <Clock className="w-3 h-3 shrink-0" />
                             <span className="truncate">{task.dueText}</span>
                         </div>
@@ -190,7 +198,14 @@ export function ApprovalRow({ task, onApproved, onDenied }: ApprovalRowProps) {
 
                     {/* Pending Review Time */}
                     {pendingText && (
-                        <div className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium border bg-muted text-muted-foreground border-transparent truncate">
+                        <div
+                            className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium border truncate"
+                            style={{
+                                background: 'linear-gradient(to right, rgba(156, 163, 175, 0.15), transparent)',
+                                borderColor: 'rgba(156, 163, 175, 0.3)',
+                                color: 'rgb(107, 114, 128)'
+                            }}
+                        >
                             <Clock className="w-3 h-3 shrink-0" />
                             <span className="truncate">{pendingText}</span>
                         </div>
