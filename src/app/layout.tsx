@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "CuPI Platform",
   description: "Cornell Physical Intelligence Team Management",
+  icons: {
+    icon: "/CUPI logos.png",
+    shortcut: "/CUPI logos.png",
+    apple: "/CUPI logos.png",
+  },
 };
 
 export const viewport: Viewport = {
