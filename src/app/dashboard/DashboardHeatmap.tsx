@@ -359,15 +359,11 @@ function UserDetailDialog({
 
                         {/* Stats + Assign */}
                         <div className="flex items-center gap-2 pr-6 h-10">
-                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium bg-muted/30 px-2.5 py-1 rounded-full border border-border/50">
-                                <span><span className="text-foreground/80">{user.activeTasks}</span> Active</span>
-                                <span className="opacity-30">•</span>
-                                <span><span className="text-foreground/80">{doneTasks.length}</span> Done</span>
+                            <div className="flex items-center gap-3.5 text-[10px] text-muted-foreground font-medium pr-4 mt-0.5">
+                                <span><span className="text-foreground/90 font-semibold">{user.activeTasks}</span> Active</span>
+                                <span><span className="text-foreground/90 font-semibold">{doneTasks.length}</span> Done</span>
                                 {(user.overdueTasks > 0 || user.stuckTasks > 0 || user.helpRequestTasks > 0) && (
-                                    <>
-                                        <span className="opacity-30">•</span>
-                                        <span><span className="text-foreground/80">{user.overdueTasks + user.stuckTasks + user.helpRequestTasks}</span> Issues</span>
-                                    </>
+                                    <span><span className="text-foreground/90 font-semibold">{user.overdueTasks + user.stuckTasks + user.helpRequestTasks}</span> Issues</span>
                                 )}
                             </div>
 

@@ -250,24 +250,15 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
                 </div>
             </div>
 
-            {/* Review Actions Footer */}
-            {isReviewColumn && (
+            {/* Review Actions Footer (Admin/Lead Only) */}
+            {isReviewColumn && isAdmin && (
                 <div className="mt-3 pt-2.5 border-t border-border flex items-center justify-between gap-2">
-                    {isAdmin ? (
-                        <>
-                            <div className="flex items-center gap-1 text-[10px] font-medium text-red-500/80 group-hover:text-red-600 transition-colors">
-                                <ArrowLeft className="w-3 h-3" /> Reject
-                            </div>
-                            <div className="flex items-center gap-1 text-[10px] font-medium text-emerald-600/80 group-hover:text-emerald-700 transition-colors">
-                                Approve <ArrowRight className="w-3 h-3" />
-                            </div>
-                        </>
-                    ) : (
-                        <div className="w-full text-center text-[10px] font-medium text-orange-600/70 flex items-center justify-center gap-1.5">
-                            <div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
-                            Pending Review
-                        </div>
-                    )}
+                    <div className="flex items-center gap-1 text-[10px] font-medium text-red-500/80 group-hover:text-red-600 transition-colors">
+                        <ArrowLeft className="w-3 h-3" /> Reject
+                    </div>
+                    <div className="flex items-center gap-1 text-[10px] font-medium text-emerald-600/80 group-hover:text-emerald-700 transition-colors">
+                        Approve <ArrowRight className="w-3 h-3" />
+                    </div>
                 </div>
             )}
         </div>
