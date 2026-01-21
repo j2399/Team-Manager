@@ -647,16 +647,6 @@ export function DashboardHeatmap({
                             onClick={() => setSelectedUser(user)}
                             className="relative p-3 rounded-lg border border-border text-left transition-all hover:shadow-md overflow-hidden bg-card"
                         >
-                            {/* Bottom gradient */}
-                            <div
-                                className={cn(
-                                    "absolute inset-x-0 bottom-0 h-12 pointer-events-none",
-                                    status === 'struggling' && "bg-gradient-to-t from-red-100/80 dark:from-red-950/40 to-transparent",
-                                    status === 'available' && "bg-gradient-to-t from-blue-100/80 dark:from-blue-950/40 to-transparent",
-                                    status === 'on-track' && "bg-gradient-to-t from-emerald-100/80 dark:from-emerald-950/40 to-transparent"
-                                )}
-                            />
-
                             {/* User header */}
                             <div className="relative flex items-center gap-2 mb-2">
                                 {user.avatar ? (
@@ -683,7 +673,21 @@ export function DashboardHeatmap({
 
                             {/* Status */}
                             <div className="relative flex items-center justify-between mt-2 pt-2 border-t border-border/50">
-                                <span className="text-[9px] font-medium text-black dark:text-gray-100">
+                                <span
+                                    className="text-[9px] font-medium px-1.5 py-0.5 rounded-sm"
+                                    style={{
+                                        background: status === 'struggling'
+                                            ? 'linear-gradient(to right, rgba(239, 68, 68, 0.2), transparent)'
+                                            : status === 'available'
+                                            ? 'linear-gradient(to right, rgba(59, 130, 246, 0.2), transparent)'
+                                            : 'linear-gradient(to right, rgba(34, 197, 94, 0.2), transparent)',
+                                        color: status === 'struggling'
+                                            ? 'rgb(185, 28, 28)'
+                                            : status === 'available'
+                                            ? 'rgb(37, 99, 235)'
+                                            : 'rgb(22, 163, 74)'
+                                    }}
+                                >
                                     {status === 'struggling' ? 'Struggling' : status === 'available' ? 'Available' : 'On track'}
                                 </span>
                                 <span className="text-[9px] text-muted-foreground">

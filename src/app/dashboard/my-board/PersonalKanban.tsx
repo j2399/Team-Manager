@@ -130,30 +130,6 @@ function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }
     const isOverdue = isDone ? false : (task.dueDate ? new Date(task.dueDate).getTime() < Date.now() : false)
     const daysLeft = isDone ? null : (task.dueDate ? Math.ceil((new Date(task.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null)
 
-    // Calculate time progress
-    const now = new Date().getTime()
-    const startTime = task.startDate ? new Date(task.startDate).getTime() : null
-    const endTime = task.endDate ? new Date(task.endDate).getTime() : null
-    let timeProgress: number | null = null
-
-    if (startTime && endTime) {
-        const totalDuration = endTime - startTime
-        const elapsed = now - startTime
-        timeProgress = Math.min(Math.max((elapsed / totalDuration) * 100, 0), 100)
-    }
-
-    const getProgressColor = () => {
-        if (isOverdue) return 'bg-red-500'
-        if (timeProgress && timeProgress > 90) return 'bg-orange-500'
-        return 'bg-primary/60'
-    }
-
-    const getManualProgressColorClass = (val: number) => {
-        if (val < 30) return "bg-red-500"
-        if (val < 70) return "bg-yellow-500"
-        return "bg-green-500"
-    }
-
     // Done column variant
     if (isDone) {
         return (
@@ -246,25 +222,6 @@ function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }
                     {task.projectName}
                 </div>
             </div>
-
-            {/* Progress Bar */}
-            {task.enableProgress ? (
-                <div className="mt-3 h-1 w-full bg-muted rounded-full overflow-hidden">
-                    <div
-                        className={cn("h-full rounded-full transition-all duration-300", getManualProgressColorClass(task.progress))}
-                        style={{ width: `${task.progress}%` }}
-                    />
-                </div>
-            ) : (
-                timeProgress !== null && !isReview && (
-                    <div className="mt-3 h-1 w-full bg-muted rounded-full overflow-hidden">
-                        <div
-                            className={cn("h-full rounded-full transition-all duration-300", getProgressColor())}
-                            style={{ width: `${timeProgress}%` }}
-                        />
-                    </div>
-                )
-            )}
         </button>
     )
 }

@@ -905,7 +905,7 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
                         const contentId = `push-${push.id}-content`
 
                         return (
-                            <div key={push.id} className="w-full min-w-0 max-w-full rounded-lg border bg-card shadow-sm hover:shadow-md transition-shadow duration-200">
+                            <div key={push.id} className={`w-full min-w-0 max-w-full rounded-lg border shadow-sm hover:shadow-md transition-all duration-200 ${isComplete ? "bg-muted/40 border-border/50" : "bg-card"}`}>
                                 <button
                                     type="button"
                                     aria-expanded={isOpen}
@@ -914,7 +914,7 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
                                     className={`w-full flex items-center justify-between p-3 md:p-4 transition-colors ${isOpen ? "rounded-t-lg" : "rounded-lg"} relative overflow-hidden hover:bg-accent/50 dark:hover:bg-accent/20`}
                                 >
                                     <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                                        <span className="font-semibold text-base md:text-lg tracking-tight truncate">{push.name}</span>
+                                        <span className={`font-semibold text-base md:text-lg tracking-tight truncate ${isComplete ? "text-muted-foreground" : ""}`}>{push.name}</span>
                                         {isAdmin && (
                                             <div
                                                 role="button"
@@ -976,13 +976,13 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
                                             <div
                                                 role="button"
                                                 onClick={(e) => handleEditPush(e, push)}
-                                                className="flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-md hover:bg-primary/10 hover:text-primary transition-colors relative z-10"
+                                                className={`flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-md hover:bg-primary/10 hover:text-primary transition-colors relative z-10 ${isComplete ? "text-muted-foreground/50" : ""}`}
                                                 title="Edit Push"
                                             >
                                                 <Pencil className="h-3.5 w-3.5 md:h-4 md:w-4" />
                                             </div>
                                         )}
-                                        <div className="h-7 w-7 md:h-8 md:w-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors relative z-10">
+                                        <div className={`h-7 w-7 md:h-8 md:w-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors relative z-10 ${isComplete ? "text-muted-foreground/50" : ""}`}>
                                             <ChevronDown className={`h-4 w-4 md:h-5 md:w-5 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
                                         </div>
                                     </div>
@@ -994,7 +994,7 @@ export function Board({ board, projectId, users, pushes = [], highlightTaskId, e
                                     style={{ gridTemplateRows: isOpen ? "1fr" : "0fr" }}
                                 >
                                     <div className={`min-h-0 ${isOpen ? "overflow-visible" : "overflow-hidden"}`}>
-                                        <div className={`p-4 pt-0 border-t bg-muted/10 rounded-b-lg transition-opacity duration-150 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+                                        <div className={`p-4 pt-0 border-t rounded-b-lg transition-opacity duration-150 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"} ${isComplete ? "bg-muted/20 border-border/30" : "bg-muted/10"}`}>
                                             <div className="pt-4">
                                                 {loadingPushes[push.id] ? (
                                                     <div className="h-[180px] rounded-lg border bg-background/60 animate-pulse" />
