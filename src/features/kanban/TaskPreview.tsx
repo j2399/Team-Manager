@@ -839,9 +839,8 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                 <Collapsible open={taskDetailsExpanded} onOpenChange={setTaskDetailsExpanded}>
                                     <CollapsibleTrigger asChild>
                                         <button className="flex items-center justify-between w-full py-2 px-2 -mx-2 rounded hover:bg-muted/50 transition-colors group">
-                                            <span className="text-xs font-bold text-red-600 flex items-center gap-1.5">
-                                                <FileText className="h-3.5 w-3.5" />
-                                                Task Details
+                                            <span className="text-xs font-bold text-red-600">
+                                                Instructions:
                                             </span>
                                             <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${taskDetailsExpanded ? 'rotate-180' : ''}`} />
                                         </button>
@@ -933,8 +932,8 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                             {/* Files Section */}
                             <div className="border-t pt-2">
                                 <div className="flex items-center justify-between mb-1.5">
-                                    <span className="text-[10px] font-medium flex items-center gap-1">
-                                        <Paperclip className="h-2.5 w-2.5" />Files ({attachments.length})
+                                    <span className="text-[10px] font-medium">
+                                        Files ({attachments.length})
                                     </span>
                                     {attachments.length > 0 && (
                                         <button
@@ -1101,14 +1100,11 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
 
                             {/* Comments Section */}
                             <div className="border-t pt-2 flex flex-col min-h-0">
-                                <div className="flex items-center justify-between mb-1.5 shrink-0">
-                                    <span className="text-[10px] font-medium flex items-center gap-1">
-                                        Comments ({comments.length})
-                                    </span>
-                                    {isLoadingComments && (
+                                {isLoadingComments && (
+                                    <div className="mb-1.5 shrink-0">
                                         <span className="text-[8px] text-muted-foreground">Loading...</span>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
 
                                 {commentError && (
                                     <div className="mb-2 p-1.5 bg-destructive/10 border border-destructive/20 rounded text-[9px] text-destructive shrink-0">

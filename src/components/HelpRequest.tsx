@@ -219,15 +219,18 @@ export function HelpRequest({ taskId, taskTitle, currentUserId, userRole }: Help
     // Show "Ask for Help" button
     return (
         <>
-            <Button
-                variant="outline"
-                size="sm"
-                className="h-6 text-[10px] px-2 border-amber-300 text-muted-foreground hover:bg-amber-50/50 hover:text-muted-foreground dark:border-amber-700 dark:hover:bg-amber-950/30"
+            <button
                 onClick={() => setShowAskDialog(true)}
+                className="h-6 text-[10px] px-2 rounded-md font-medium border flex items-center gap-1 transition-colors hover:opacity-80"
+                style={{
+                    background: 'linear-gradient(to right, rgba(251, 191, 36, 0.15), transparent)',
+                    borderColor: 'rgba(251, 191, 36, 0.4)',
+                    color: 'rgb(107, 114, 128)',
+                }}
             >
-                <HelpCircle className="h-3 w-3 mr-1 text-amber-500" />
+                <HelpCircle className="h-3 w-3 text-amber-400" />
                 Ask for Help
-            </Button>
+            </button>
 
             <Dialog open={showAskDialog} onOpenChange={setShowAskDialog}>
                 <DialogContent className="sm:max-w-md">

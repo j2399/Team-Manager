@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -434,7 +435,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                         id="title"
                                         value={title}
                                         onChange={(e) => setTitle(e.target.value)}
-                                        placeholder="e.g., Implement User Authentication"
+                                        autoComplete="off"
                                         className="h-10"
                                     />
                                 </div>
@@ -445,7 +446,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                         id="description"
                                         value={description}
                                         onChange={(e) => setDescription(e.target.value)}
-                                        placeholder="Detailed explanation of the task..."
+                                        autoComplete="off"
                                         className="min-h-[100px] resize-y"
                                     />
                                 </div>
@@ -518,11 +519,10 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
                                 <div className="space-y-2">
                                     <Label htmlFor="startDate" className="text-sm font-medium">Start Date</Label>
-                                    <Input
+                                    <DatePicker
                                         id="startDate"
-                                        type="date"
                                         value={startDate}
-                                        onChange={(e) => setStartDate(e.target.value)}
+                                        onChange={setStartDate}
                                         className="h-10"
                                     />
                                 </div>
@@ -550,11 +550,10 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                         </div>
                                     )}
                                 </div>
-                                <Input
+                                <DatePicker
                                     id="endDate"
-                                    type="date"
                                     value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
+                                    onChange={setEndDate}
                                     min={startDate}
                                     className="h-10"
                                 />
@@ -643,7 +642,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                                     <Input
                                                         value={newChecklistItem}
                                                         onChange={(e) => setNewChecklistItem(e.target.value)}
-                                                        placeholder="Add a checklist item..."
+                                                        autoComplete="off"
                                                         className="h-9 text-sm"
                                                         onKeyDown={(e) => {
                                                             if (e.key === 'Enter') {

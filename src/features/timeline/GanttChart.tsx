@@ -66,10 +66,12 @@ export function GanttChart({ pushes }: GanttChartProps) {
 
                     return (
                         <div key={push.id} className="relative h-7 flex items-center">
-                            <div className="w-20 pr-1 text-[10px] font-medium text-right truncate shrink-0">
+                            <div className="w-20 pr-1 text-[10px] font-bold text-right truncate shrink-0">
                                 {push.name}
                             </div>
                             <div className="flex-1 relative h-full">
+                                {/* Full-width horizontal baseline */}
+                                <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-border" />
                                 <div
                                     className="absolute h-5 top-1 rounded bg-primary/80 text-[10px] text-primary-foreground flex items-center px-1.5 gap-1"
                                     style={{ left: `${left}%`, width: `${width}%` }}

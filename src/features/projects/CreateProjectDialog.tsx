@@ -77,11 +77,11 @@ export function CreateProjectDialog({ users }: Props) {
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
                             <Label htmlFor="name">Name</Label>
-                            <Input id="name" name="name" required />
+                            <Input id="name" name="name" required autoComplete="off" />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="description">Description</Label>
-                            <Textarea id="description" name="description" />
+                            <Textarea id="description" name="description" autoComplete="off" />
                         </div>
                         <div className="grid gap-2">
                             <Label className="flex items-center gap-1">

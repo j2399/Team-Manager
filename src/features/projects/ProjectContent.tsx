@@ -267,7 +267,7 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                         </div>
                     )
                 ) : (
-                    <div className="p-4 h-full overflow-auto">
+                    <div className="">
                         <ProjectGanttChart
                             tasks={allTasks}
                             projectId={project.id}

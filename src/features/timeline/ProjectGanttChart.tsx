@@ -1,9 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { CheckCircle2 } from "lucide-react"
+import { getInitials } from "@/lib/utils"
 
 type Task = {
     id: string
@@ -12,7 +16,8 @@ type Task = {
     endDate: Date | string | null
     updatedAt?: Date | string | null
     column?: { name: string } | null
-    assignee?: { name: string } | null
+    assignee?: { id?: string; name: string } | null
+    assignees?: { user: { id: string; name: string } }[]
     push?: { id: string; name: string; color: string; status: string } | null
 }
 
@@ -38,34 +43,15 @@ const formatDateShort = (date: Date) => {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-const formatTimeAgo = (date: Date | string) => {
-    const diff = new Date().getTime() - new Date(date).getTime()
-    const minutes = Math.floor(diff / 60000)
-    const hours = Math.floor(minutes / 60)
-    const days = Math.floor(hours / 24)
-    if (days > 0) return `${days}d ago`
-    if (hours > 0) return `${hours}h ago`
-    if (minutes > 0) return `${minutes}m ago`
-    return 'Just now'
-}
-
-const getDayName = (date: Date) => {
-    return date.toLocaleDateString('en-US', { weekday: 'short' }).charAt(0)
-}
-
-const getDayNumber = (date: Date) => {
-    return date.getDate()
-}
-
-const getTaskDuration = (start: Date | string, end: Date | string) => {
-    const days = Math.ceil((new Date(end).getTime() - new Date(start).getTime()) / (1000 * 60 * 60 * 24))
-    return days
+const formatDateFull = (date: Date) => {
+    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
 export function ProjectGanttChart({ tasks, projectId, pushes = [] }: ProjectGanttChartProps) {
+    const [hoveredTask, setHoveredTask] = useState<string | null>(null)
+
     const tasksWithDates = tasks.filter(t => t.startDate).map(t => {
         const start = new Date(t.startDate!)
-        // Default to 1 day if no end date
         const end = t.endDate ? new Date(t.endDate) : new Date(start.getTime() + 24 * 60 * 60 * 1000)
         return { ...t, startDate: start, endDate: end }
     })
@@ -79,51 +65,84 @@ export function ProjectGanttChart({ tasks, projectId, pushes = [] }: ProjectGant
         )
     }
 
+    // Group tasks by push
+    const tasksByPush = new Map<string, typeof tasksWithDates>()
+    const backlogTasks: typeof tasksWithDates = []
+
+    tasksWithDates.forEach(task => {
+        if (task.push?.id) {
+            const existing = tasksByPush.get(task.push.id) || []
+            existing.push(task)
+            tasksByPush.set(task.push.id, existing)
+        } else {
+            backlogTasks.push(task)
+        }
+    })
+
+    // Order pushes and include backlog at the end
+    const orderedGroups: { id: string; name: string; color: string; tasks: typeof tasksWithDates }[] = []
+
+    pushes.forEach(push => {
+        const pushTasks = tasksByPush.get(push.id)
+        if (pushTasks && pushTasks.length > 0) {
+            orderedGroups.push({
+                id: push.id,
+                name: push.name,
+                color: push.color,
+                tasks: pushTasks
+            })
+        }
+    })
+
+    if (backlogTasks.length > 0) {
+        orderedGroups.push({
+            id: 'backlog',
+            name: 'Backlog',
+            color: '#94a3b8',
+            tasks: backlogTasks
+        })
+    }
+
     const dates = tasksWithDates.flatMap(t => [new Date(t.startDate!), new Date(t.endDate!)])
     const minDate = new Date(Math.min(...dates.map(d => d.getTime())))
     const maxDate = new Date(Math.max(...dates.map(d => d.getTime())))
 
-    // Extend range to show full weeks
+    // Extend range with padding
     const startObj = new Date(minDate)
-    startObj.setDate(startObj.getDate() - startObj.getDay()) // Start from Sunday
+    startObj.setDate(startObj.getDate() - 3)
     const endObj = new Date(maxDate)
-    endObj.setDate(endObj.getDate() + (6 - endObj.getDay()) + 7) // End on Saturday + buffer
+    endObj.setDate(endObj.getDate() + 7)
 
     const startTime = startObj.getTime()
     const endTime = endObj.getTime()
     const totalDuration = endTime - startTime || 1
-    const totalDays = Math.ceil(totalDuration / (1000 * 60 * 60 * 24))
 
     const getPosition = (date: Date) => {
         return ((date.getTime() - startTime) / totalDuration) * 100
     }
 
-    const todayPos = getPosition(new Date())
     const today = new Date()
+    const todayPos = getPosition(today)
 
-    // Generate day columns
-    const dayColumns: { date: Date; pos: number; width: number; isWeekend: boolean; isToday: boolean }[] = []
+    // Generate week markers
+    const weekMarkers: { date: Date; pos: number }[] = []
     const currentDate = new Date(startObj)
-    const dayWidth = 100 / totalDays
-
-    while (currentDate <= endObj) {
-        const pos = getPosition(currentDate)
-        const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6
-        const isToday = currentDate.toDateString() === today.toDateString()
-        dayColumns.push({
-            date: new Date(currentDate),
-            pos,
-            width: dayWidth,
-            isWeekend,
-            isToday
-        })
+    while (currentDate.getDay() !== 1) {
         currentDate.setDate(currentDate.getDate() + 1)
     }
+    while (currentDate <= endObj) {
+        weekMarkers.push({
+            date: new Date(currentDate),
+            pos: getPosition(currentDate)
+        })
+        currentDate.setDate(currentDate.getDate() + 7)
+    }
 
-    // Generate month headers instead of week headers
-    const monthHeaders: { month: string; pos: number; width: number }[] = []
+    // Generate month headers
+    const monthHeaders: { month: string; year: string; pos: number; width: number; showYear: boolean }[] = []
     let currentMonth = new Date(startObj)
     currentMonth.setDate(1)
+    let lastYear = -1
     while (currentMonth <= endObj) {
         const monthStart = new Date(Math.max(currentMonth.getTime(), startObj.getTime()))
         const nextMonth = new Date(currentMonth)
@@ -131,161 +150,274 @@ export function ProjectGanttChart({ tasks, projectId, pushes = [] }: ProjectGant
         const monthEnd = new Date(Math.min(nextMonth.getTime() - 1, endObj.getTime()))
         const pos = getPosition(monthStart)
         const endPos = getPosition(monthEnd)
+        const year = currentMonth.getFullYear()
+        const showYear = year !== lastYear
+        lastYear = year
         monthHeaders.push({
-            month: currentMonth.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+            month: currentMonth.toLocaleDateString('en-US', { month: 'short' }),
+            year: `'${String(year).slice(-2)}`,
             pos,
-            width: endPos - pos
+            width: endPos - pos,
+            showYear
         })
         currentMonth = nextMonth
     }
 
-
-
     // Stats
     const totalTasks = tasksWithDates.length
     const doneTasks = tasksWithDates.filter(t => t.column?.name === 'Done').length
-    const inProgressTasks = tasksWithDates.filter(t => t.column?.name === 'In Progress').length
+
+    const getTaskDuration = (start: Date, end: Date) => {
+        return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+    }
+
+    const ROW_HEIGHT = 36
+
+    // Calculate max push name length for consistent column width
+    const maxPushNameLength = Math.max(...orderedGroups.map(g => g.name.length), 6)
+    const pushColumnWidth = Math.min(Math.max(maxPushNameLength * 7 + 24, 80), 160)
 
     return (
-        <div className="h-full flex flex-col">
-            {/* Header with Legend and Stats */}
-            <div className="flex items-center justify-between mb-3 pb-2 border-b shrink-0">
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-3 text-xs overflow-x-auto max-w-[600px] scrollbar-hide py-1">
+        <TooltipProvider delayDuration={100}>
+            <div className="h-full flex flex-col">
 
-                        {/* Push Legends */}
-                        {pushes.map(push => (
-                            <div key={push.id} className="flex items-center gap-1 shrink-0">
-                                <div
-                                    className="w-3 h-3 rounded-full"
-                                    style={{ backgroundColor: push.color }}
-                                />
-                                <span>{push.name}</span>
+
+                {/* Main Chart Area */}
+                <div className="flex-1 min-h-0 flex flex-col overflow-x-auto custom-scrollbar">
+                    <div className="min-w-max flex-1 flex flex-col">
+                        {/* Timeline Header */}
+                        <div className="flex shrink-0 border-b">
+                            <div className="sticky left-0 z-30 shrink-0 border-r bg-background px-2 py-2" style={{ width: `${pushColumnWidth}px` }}>
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Push</span>
                             </div>
-                        ))}
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                        {doneTasks}/{totalTasks} Complete
-                    </Badge>
-                </div>
-            </div>
-
-            {/* Main Chart Area */}
-            <div className="flex-1 min-h-0 flex flex-col">
-                {/* Timeline Header */}
-                <div className="flex shrink-0 border-b">
-                    {/* Task column header */}
-                    <div className="w-48 shrink-0 border-r bg-muted/30 px-2 py-1">
-                        <span className="text-xs font-medium text-muted-foreground">Task</span>
-                    </div>
-                    {/* Timeline header */}
-                    <div className="flex-1 relative">
-                        {/* Month row */}
-                        <div className="h-5 relative border-b">
-                            {monthHeaders.map((month, i) => (
-                                <div
-                                    key={i}
-                                    className="absolute top-0 h-full flex items-center justify-center text-[10px] font-medium border-r bg-muted/20"
-                                    style={{ left: `${month.pos}%`, width: `${month.width}%` }}
-                                >
-                                    {month.month}
-                                </div>
-                            ))}
-                        </div>
-                        {/* Day row */}
-                        <div className="h-8 relative">
-                            {dayColumns.map((day, i) => (
-                                <div
-                                    key={i}
-                                    className={`absolute top-0 h-full flex flex-col items-center justify-center border-r ${day.isToday ? 'bg-blue-100 dark:bg-blue-900/30' : day.isWeekend ? 'bg-muted/40' : 'bg-background'
-                                        }`}
-                                    style={{ left: `${day.pos}%`, width: `${day.width}%` }}
-                                >
-                                    <span className={`text-[8px] ${day.isToday ? 'text-blue-600 font-bold' : 'text-muted-foreground'}`}>
-                                        {getDayName(day.date)}
-                                    </span>
-                                    <span className={`text-[9px] ${day.isToday ? 'text-blue-600 font-bold' : ''}`}>
-                                        {getDayNumber(day.date)}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Task Rows */}
-                <ScrollArea className="flex-1">
-                    <div className="relative">
-                        {tasksWithDates.map((task, index) => {
-                            const left = getPosition(new Date(task.startDate!))
-                            const right = getPosition(new Date(task.endDate!))
-                            const width = Math.max(right - left, 1)
-                            const status = task.column?.name
-                            const duration = getTaskDuration(task.startDate!, task.endDate!)
-                            const startStr = formatDateShort(new Date(task.startDate!))
-                            const endStr = formatDateShort(new Date(task.endDate!))
-                            const lastUpdated = task.updatedAt ? formatTimeAgo(task.updatedAt) : null
-
-                            return (
-                                <div key={task.id} className={`flex h-10 border-b ${index % 2 === 0 ? 'bg-background' : 'bg-muted/20'}`}>
-                                    {/* Task name column */}
-                                    <div className="w-48 shrink-0 border-r px-2 flex items-center gap-2">
+                            <div className="sticky z-30 shrink-0 border-r bg-background px-2 py-2" style={{ width: '160px', left: `${pushColumnWidth}px` }}>
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Task</span>
+                            </div>
+                            <div className="flex-1 relative h-10 overflow-hidden">
+                                {/* Month labels */}
+                                {monthHeaders.map((month, i) => (
+                                    <div
+                                        key={i}
+                                        className="absolute top-0 h-5 flex items-center gap-1 px-2 text-[10px] font-medium text-muted-foreground border-b border-r border-border/50 bg-muted/20 overflow-hidden"
+                                        style={{ left: `${month.pos}%`, width: `${month.width}%` }}
+                                    >
+                                        <span className="truncate">{month.month}</span>
+                                        {month.showYear && <span className="text-muted-foreground/50 shrink-0">{month.year}</span>}
+                                    </div>
+                                ))}
+                                {/* Week markers */}
+                                <div className="absolute top-5 left-0 right-0 h-5">
+                                    {weekMarkers.map((marker, i) => (
                                         <div
-                                            className="w-2 h-2 rounded-full shrink-0"
-                                            style={{ backgroundColor: task.push?.color || '#94a3b8' }}
-                                        />
-                                        <Link
-                                            href={`/dashboard/projects/${projectId}?task=${task.id}`}
-                                            className="text-xs truncate hover:text-primary transition-colors"
-                                            title={task.title}
+                                            key={i}
+                                            className="absolute top-0 h-full flex items-center text-[9px] text-muted-foreground/70"
+                                            style={{ left: `${marker.pos}%` }}
                                         >
-                                            {task.title}
-                                        </Link>
-                                    </div>
-
-                                    {/* Bar area */}
-                                    <div className="flex-1 relative">
-                                        {/* Day grid background */}
-                                        {dayColumns.map((day, i) => (
-                                            <div
-                                                key={i}
-                                                className={`absolute top-0 h-full border-r ${day.isToday ? 'bg-blue-50' : day.isWeekend ? 'bg-muted/30' : ''
-                                                    }`}
-                                                style={{ left: `${day.pos}%`, width: `${day.width}%` }}
-                                            />
-                                        ))}
-                                        {/* Task bar */}
-                                        <Link
-                                            href={`/dashboard/projects/${projectId}?task=${task.id}`}
-                                            className="absolute h-6 top-2 rounded text-white flex items-center justify-center px-1.5 transition-all shadow-sm hover:shadow cursor-pointer z-10 overflow-hidden hover:opacity-90"
-                                            style={{
-                                                left: `${left}%`,
-                                                width: `${width}%`,
-                                                minWidth: '24px',
-                                                backgroundColor: task.push?.color || '#94a3b8'
-                                            }}
-                                            title={`${task.title}\nPush: ${task.push?.name || 'Backlog'}\n${startStr} - ${endStr} (${duration}d)${lastUpdated ? `\nUpdated: ${lastUpdated}` : ''}`}
-
-                                        >
-                                            {status === 'Done' && (
-                                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-green-500 fill-white" />
-                                            )}
-                                        </Link>
-                                    </div>
+                                            <div className="absolute inset-y-0 left-0 w-px bg-border/40" />
+                                            <span className="pl-1">{marker.date.getDate()}</span>
+                                        </div>
+                                    ))}
                                 </div>
-                            )
-                        })}
-                    </div>
-                </ScrollArea>
-            </div>
+                            </div>
+                        </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-between mt-2 pt-2 border-t text-xs text-muted-foreground shrink-0">
-                <span>Range: {formatDateShort(minDate)} - {formatDateShort(maxDate)}</span>
-                <span>{totalTasks} tasks • {totalDays} days</span>
+                        {/* Task Rows grouped by Push */}
+                        <div className="flex-1 relative">
+                            {/* Today line overlay - rendered on top of everything */}
+                            {todayPos >= 0 && todayPos <= 100 && (
+                                <div
+                                    className="absolute top-0 w-0.5 bg-foreground pointer-events-none"
+                                    style={{
+                                        left: `calc(${pushColumnWidth + 160}px + (100% - ${pushColumnWidth + 160}px) * ${todayPos / 100})`,
+                                        height: `${orderedGroups.reduce((acc, g) => acc + g.tasks.length * ROW_HEIGHT, 0)}px`,
+                                        zIndex: 9999
+                                    }}
+                                />
+                            )}
+                            <div className="relative">
+                                {orderedGroups.map((group, groupIndex) => {
+                                    const groupHeight = group.tasks.length * ROW_HEIGHT
+                                    const globalStartIndex = orderedGroups.slice(0, groupIndex).reduce((acc, g) => acc + g.tasks.length, 0)
+
+                                    return (
+                                        <div key={group.id} className="flex border-b">
+                                            {/* Push name column - spans entire group */}
+                                            <div
+                                                className="sticky left-0 z-20 shrink-0 border-r bg-background px-2 flex flex-col items-center justify-center text-center relative"
+                                                style={{ width: `${pushColumnWidth}px`, height: `${groupHeight}px` }}
+                                            >
+                                                {/* Task separators in push column to match task rows */}
+                                                {group.tasks.map((_, i) => (
+                                                    i < group.tasks.length - 1 && (
+                                                        <div
+                                                            key={`sep-${i}`}
+                                                            className="absolute left-0 right-0 h-px bg-border/50"
+                                                            style={{ top: `${(i + 1) * ROW_HEIGHT}px` }}
+                                                        />
+                                                    )
+                                                ))}
+                                                {/* Task baselines in push column to match task rows */}
+                                                {group.tasks.map((_, i) => (
+                                                    <div
+                                                        key={`base-${i}`}
+                                                        className="absolute left-0 right-0 h-px bg-border/10"
+                                                        style={{ top: `${(i + 0.5) * ROW_HEIGHT}px` }}
+                                                    />
+                                                ))}
+                                                <span className="relative z-10 text-[11px] font-bold whitespace-nowrap overflow-hidden text-ellipsis max-w-full bg-background/80 px-1 py-0.5 rounded shadow-sm">
+                                                    {group.name}
+                                                </span>
+                                            </div>
+
+                                            {/* Tasks column */}
+                                            <div className="flex-1">
+                                                {group.tasks.map((task, index) => {
+                                                    const left = getPosition(new Date(task.startDate!))
+                                                    const right = getPosition(new Date(task.endDate!))
+                                                    const width = Math.max(right - left, 1.5)
+                                                    const status = task.column?.name
+                                                    const duration = getTaskDuration(new Date(task.startDate!), new Date(task.endDate!))
+                                                    const isHovered = hoveredTask === task.id
+                                                    const isLast = index === group.tasks.length - 1
+                                                    const globalIndex = globalStartIndex + index
+
+                                                    return (
+                                                        <div
+                                                            key={task.id}
+                                                            className={`relative flex transition-colors ${!isLast ? 'border-b border-border/50' : ''} ${isHovered ? 'bg-accent/30' : globalIndex % 2 === 0 ? 'bg-background' : 'bg-muted/10'}`}
+                                                            style={{ height: `${ROW_HEIGHT}px` }}
+                                                        >
+                                                            {/* Full-width horizontal baseline spanning all columns */}
+                                                            <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-border/10 pointer-events-none" />
+                                                            {/* Task name column */}
+                                                            <div className="sticky z-20 shrink-0 border-r bg-background px-2 flex items-center" style={{ width: '160px', left: `${pushColumnWidth}px` }}>
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <Link
+                                                                            href={`/dashboard/projects/${projectId}?task=${task.id}`}
+                                                                            className="text-[11px] truncate hover:text-primary transition-colors"
+                                                                        >
+                                                                            {task.title}
+                                                                        </Link>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent
+                                                                        side="top"
+                                                                        sideOffset={8}
+                                                                        hideArrow
+                                                                        className="bg-popover text-popover-foreground border shadow-lg px-3 py-2"
+                                                                    >
+                                                                        <div className="text-[11px] font-medium">{task.title}</div>
+                                                                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                                                                            {formatDateFull(new Date(task.startDate!))} → {formatDateFull(new Date(task.endDate!))}
+                                                                        </div>
+                                                                        <div className="text-[9px] text-muted-foreground/70">
+                                                                            {duration} day{duration !== 1 ? 's' : ''} • {group.name}
+                                                                        </div>
+                                                                        {(task.assignees && task.assignees.length > 0) || task.assignee ? (
+                                                                            <div className="flex -space-x-1.5 mt-2 pt-2 border-t">
+                                                                                {task.assignees && task.assignees.length > 0 ? (
+                                                                                    task.assignees.map((a) => (
+                                                                                        <Avatar key={a.user.id} className="h-5 w-5 ring-1 ring-background">
+                                                                                            <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
+                                                                                                {getInitials(a.user.name)}
+                                                                                            </AvatarFallback>
+                                                                                        </Avatar>
+                                                                                    ))
+                                                                                ) : task.assignee ? (
+                                                                                    <Avatar className="h-5 w-5 ring-1 ring-background">
+                                                                                        <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
+                                                                                            {getInitials(task.assignee.name)}
+                                                                                        </AvatarFallback>
+                                                                                    </Avatar>
+                                                                                ) : null}
+                                                                            </div>
+                                                                        ) : null}
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </div>
+
+                                                            {/* Bar area */}
+                                                            <div className="flex-1 relative">
+                                                                {/* Week grid lines */}
+                                                                {weekMarkers.map((marker, i) => (
+                                                                    <div
+                                                                        key={i}
+                                                                        className="absolute top-0 bottom-0 w-px bg-border/40"
+                                                                        style={{ left: `${marker.pos}%` }}
+                                                                    />
+                                                                ))}
+                                                                {/* Full-width horizontal baseline */}
+                                                                <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-px bg-border/10" />
+
+
+                                                                {/* Task bar with tooltip */}
+                                                                <Tooltip>
+                                                                    <TooltipTrigger asChild>
+                                                                        <Link
+                                                                            href={`/dashboard/projects/${projectId}?task=${task.id}`}
+                                                                            className="absolute h-5 top-1/2 -translate-y-1/2 rounded text-white flex items-center justify-center transition-all hover:brightness-110 cursor-pointer z-10"
+                                                                            style={{
+                                                                                left: `${left}%`,
+                                                                                width: `${width}%`,
+                                                                                minWidth: '20px',
+                                                                                backgroundColor: group.color
+                                                                            }}
+                                                                            onMouseEnter={() => setHoveredTask(task.id)}
+                                                                            onMouseLeave={() => setHoveredTask(null)}
+                                                                        >
+                                                                            {status === 'Done' && (
+                                                                                <CheckCircle2 className="w-3 h-3 shrink-0 text-green-400" />
+                                                                            )}
+                                                                        </Link>
+                                                                    </TooltipTrigger>
+                                                                    <TooltipContent
+                                                                        side="top"
+                                                                        sideOffset={8}
+                                                                        hideArrow
+                                                                        className="bg-popover text-popover-foreground border shadow-lg px-3 py-2"
+                                                                    >
+                                                                        <div className="text-[11px] font-medium">{task.title}</div>
+                                                                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                                                                            {formatDateFull(new Date(task.startDate!))} → {formatDateFull(new Date(task.endDate!))}
+                                                                        </div>
+                                                                        <div className="text-[9px] text-muted-foreground/70">
+                                                                            {duration} day{duration !== 1 ? 's' : ''} • {group.name}
+                                                                        </div>
+                                                                        {/* Assignees */}
+                                                                        {(task.assignees && task.assignees.length > 0) || task.assignee ? (
+                                                                            <div className="flex -space-x-1.5 mt-2 pt-2 border-t">
+                                                                                {task.assignees && task.assignees.length > 0 ? (
+                                                                                    task.assignees.map((a) => (
+                                                                                        <Avatar key={a.user.id} className="h-5 w-5 ring-1 ring-background">
+                                                                                            <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
+                                                                                                {getInitials(a.user.name)}
+                                                                                            </AvatarFallback>
+                                                                                        </Avatar>
+                                                                                    ))
+                                                                                ) : task.assignee ? (
+                                                                                    <Avatar className="h-5 w-5 ring-1 ring-background">
+                                                                                        <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
+                                                                                            {getInitials(task.assignee.name)}
+                                                                                        </AvatarFallback>
+                                                                                    </Avatar>
+                                                                                ) : null}
+                                                                            </div>
+                                                                        ) : null}
+                                                                    </TooltipContent>
+                                                                </Tooltip>
+                                                            </div>
+                                                        </div>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
+        </TooltipProvider>
     )
 }

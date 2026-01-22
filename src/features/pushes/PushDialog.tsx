@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Trash2 } from "lucide-react"
 import { createPush, updatePush, deletePush } from "@/app/actions/pushes"
 
@@ -157,18 +158,17 @@ export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogPr
                                 id="name"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                placeholder="e.g., Push 1 - Core Features"
+                                autoComplete="off"
                                 autoFocus
                             />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label htmlFor="startDate">Start Date</Label>
-                                <Input
+                                <DatePicker
                                     id="startDate"
-                                    type="date"
                                     value={startDate}
-                                    onChange={(e) => setStartDate(e.target.value)}
+                                    onChange={setStartDate}
                                 />
                             </div>
                             <div className="grid gap-2">
@@ -176,11 +176,11 @@ export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogPr
                                     <Label htmlFor="endDate">End Date</Label>
                                     <span className="text-[10px] text-muted-foreground">(Optional)</span>
                                 </div>
-                                <Input
+                                <DatePicker
                                     id="endDate"
-                                    type="date"
                                     value={endDate}
-                                    onChange={(e) => setEndDate(e.target.value)}
+                                    onChange={setEndDate}
+                                    min={startDate}
                                 />
                             </div>
                         </div>
