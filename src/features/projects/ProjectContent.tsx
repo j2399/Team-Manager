@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
-import { LayoutGrid, Calendar, Plus } from "lucide-react"
+import { LayoutGrid, Calendar, Plus, Pencil } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { TaskDialog } from "@/features/kanban/TaskDialog"
 import { TaskPreview } from "@/features/kanban/TaskPreview"
@@ -212,7 +212,7 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                                             onClick={() => setShowTimelineDialog(true)}
                                         >
                                             <Plus className="w-3.5 h-3.5 mr-1" />
-                                            <span className="text-xs">Add Push</span>
+                                            <span className="text-xs">Edit Pushes</span>
                                         </Button>
                                     </TooltipTrigger>
                                     <TooltipContent side="bottom" className="max-w-[200px] text-center">

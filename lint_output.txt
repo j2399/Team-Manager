@@ -1,0 +1,274 @@
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/app/actions/pushes.ts
+   67:18  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  127:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  261:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  265:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/app/api/projects/route.ts
+   51:13  error  'whereClause' is never reassigned. Use 'const' instead      prefer-const
+   51:26  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+  137:17  error  'uniqueMemberIds' is never reassigned. Use 'const' instead  prefer-const
+  198:75  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+  209:21  error  Unexpected any. Specify a different type                    @typescript-eslint/no-explicit-any
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/app/dashboard/projects/[id]/page.tsx
+   60:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   65:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   77:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   79:38  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   94:58  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   94:73  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  103:43  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  125:50  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  126:53  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  128:45  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/features/kanban/Board.tsx
+   13:10  warning  'arrayMove' is defined but never used                   @typescript-eslint/no-unused-vars
+   19:21  warning  'useSearchParams' is defined but never used             @typescript-eslint/no-unused-vars
+  117:12  warning  'isPersisting' is assigned a value but never used       @typescript-eslint/no-unused-vars
+  436:22  warning  'error' is defined but never used                       @typescript-eslint/no-unused-vars
+  498:25  warning  'event' is defined but never used                       @typescript-eslint/no-unused-vars
+  861:11  warning  'getParentPushName' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/features/timeline-editor/TimelineBar.tsx
+    7:85  warning  'startOfDay' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+   38:5   warning  'onDelete' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+   74:43  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setHasMoved`, but the source dependencies were [readOnly, push.tempId, onSelect]. Inferred different dependency than source.
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/features/timeline-editor/TimelineBar.tsx:74:43
+  72 |     const widthPercent = getPositionPercent(pushEnd) - leftPercent
+  73 |
+> 74 |     const handlePointerDown = useCallback((e: React.PointerEvent, type: DragType) => {
+     |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 75 |         if (readOnly) return
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 76 |         e.preventDefault()
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 87 |         onSelect(push.tempId)
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 88 |     }, [readOnly, push.tempId, onSelect])
+     | ^^^^^^ Could not preserve existing manual memoization
+  89 |
+  90 |     const handlePointerMove = useCallback((e: React.PointerEvent) => {
+  91 |         if (!isDragging || !barRef.current) return                     react-hooks/preserve-manual-memoization
+   90:43  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setHasMoved`, but the source dependencies were [isDragging, startPos]. Inferred different dependency than source.
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/features/timeline-editor/TimelineBar.tsx:90:43
+   88 |     }, [readOnly, push.tempId, onSelect])
+   89 |
+>  90 |     const handlePointerMove = useCallback((e: React.PointerEvent) => {
+      |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  91 |         if (!isDragging || !barRef.current) return
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>  92 |
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 107 |         setDragOffset(prev => ({ x: prev.x + deltaPercent }))
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 108 |     }, [isDragging, startPos])
+      | ^^^^^^ Could not preserve existing manual memoization
+  109 |
+  110 |     const handlePointerUp = useCallback((e: React.PointerEvent) => {
+  111 |         if (!isDragging) return            react-hooks/preserve-manual-memoization
+  110:41  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. This value was memoized in source but not in compilation output.
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/features/timeline-editor/TimelineBar.tsx:110:41
+  108 |     }, [isDragging, startPos])
+  109 |
+> 110 |     const handlePointerUp = useCallback((e: React.PointerEvent) => {
+      |                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 111 |         if (!isDragging) return
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 112 |
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 167 |         setHasMoved(false)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 168 |     }, [isDragging, hasMoved, dragOffset, dragType, push, pushEnd, totalDuration, onUpdate, onClick])
+      | ^^^^^^ Could not preserve existing memoization
+  169 |
+  170 |     // Chain drag handlers
+  171 |     const handleChainPointerDown = useCallback((e: React.PointerEvent) => {                                                                                                                                                                                                                                                                                                               react-hooks/preserve-manual-memoization
+  168:8   warning  React Hook useCallback has a missing dependency: 'otherPushesOnSameRow'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           react-hooks/exhaustive-deps
+  171:48  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setIsChainDragging`, but the source dependencies were []. Inferred dependency not present in source.
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/features/timeline-editor/TimelineBar.tsx:171:48
+  169 |
+  170 |     // Chain drag handlers
+> 171 |     const handleChainPointerDown = useCallback((e: React.PointerEvent) => {
+      |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 172 |         e.preventDefault()
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 173 |         e.stopPropagation()
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 181 |         setChainDragEnd(null)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 182 |     }, [])
+      | ^^^^^^ Could not preserve existing manual memoization
+  183 |
+  184 |     const handleChainPointerMove = useCallback((e: React.PointerEvent) => {
+  185 |         if (!isChainDragging || !getDateFromX) return                                                                                                                        react-hooks/preserve-manual-memoization
+  171:48  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setHasMoved`, but the source dependencies were []. Inferred dependency not present in source.
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/features/timeline-editor/TimelineBar.tsx:171:48
+  169 |
+  170 |     // Chain drag handlers
+> 171 |     const handleChainPointerDown = useCallback((e: React.PointerEvent) => {
+      |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 172 |         e.preventDefault()
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 173 |         e.stopPropagation()
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 181 |         setChainDragEnd(null)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 182 |     }, [])
+      | ^^^^^^ Could not preserve existing manual memoization
+  183 |
+  184 |     const handleChainPointerMove = useCallback((e: React.PointerEvent) => {
+  185 |         if (!isChainDragging || !getDateFromX) return                                                                                                                               react-hooks/preserve-manual-memoization
+  171:48  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setChainDragEnd`, but the source dependencies were []. Inferred dependency not present in source.
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/features/timeline-editor/TimelineBar.tsx:171:48
+  169 |
+  170 |     // Chain drag handlers
+> 171 |     const handleChainPointerDown = useCallback((e: React.PointerEvent) => {
+      |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 172 |         e.preventDefault()
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 173 |         e.stopPropagation()
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 181 |         setChainDragEnd(null)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 182 |     }, [])
+      | ^^^^^^ Could not preserve existing manual memoization
+  183 |
+  184 |     const handleChainPointerMove = useCallback((e: React.PointerEvent) => {
+  185 |         if (!isChainDragging || !getDateFromX) return                                                                                                                           react-hooks/preserve-manual-memoization
+  184:48  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setHasMoved`, but the source dependencies were [isChainDragging, startPos, getDateFromX, pushEnd]. Inferred different dependency than source.
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/features/timeline-editor/TimelineBar.tsx:184:48
+  182 |     }, [])
+  183 |
+> 184 |     const handleChainPointerMove = useCallback((e: React.PointerEvent) => {
+      |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 185 |         if (!isChainDragging || !getDateFromX) return
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 186 |
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 194 |         }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 195 |     }, [isChainDragging, startPos, getDateFromX, pushEnd])
+      | ^^^^^^ Could not preserve existing manual memoization
+  196 |
+  197 |     const handleChainPointerUp = useCallback((e: React.PointerEvent) => {
+  198 |         if (!isChainDragging) return      react-hooks/preserve-manual-memoization
+  184:48  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setChainDragEnd`, but the source dependencies were [isChainDragging, startPos, getDateFromX, pushEnd]. Inferred different dependency than source.
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/features/timeline-editor/TimelineBar.tsx:184:48
+  182 |     }, [])
+  183 |
+> 184 |     const handleChainPointerMove = useCallback((e: React.PointerEvent) => {
+      |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 185 |         if (!isChainDragging || !getDateFromX) return
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 186 |
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 194 |         }
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 195 |     }, [isChainDragging, startPos, getDateFromX, pushEnd])
+      | ^^^^^^ Could not preserve existing manual memoization
+  196 |
+  197 |     const handleChainPointerUp = useCallback((e: React.PointerEvent) => {
+  198 |         if (!isChainDragging) return  react-hooks/preserve-manual-memoization
+  197:46  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setIsChainDragging`, but the source dependencies were [isChainDragging, hasMoved, chainDragEnd, push.tempId, onAddChained]. Inferred different dependency than source.
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/features/timeline-editor/TimelineBar.tsx:197:46
+  195 |     }, [isChainDragging, startPos, getDateFromX, pushEnd])
+  196 |
+> 197 |     const handleChainPointerUp = useCallback((e: React.PointerEvent) => {
+      |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |         if (!isChainDragging) return
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 199 |
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 211 |         setHasMoved(false)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 212 |     }, [isChainDragging, hasMoved, chainDragEnd, push.tempId, onAddChained])
+      | ^^^^^^ Could not preserve existing manual memoization
+  213 |
+  214 |     let visualLeft = leftPercent
+  215 |     let visualWidth = widthPercent             react-hooks/preserve-manual-memoization
+  197:46  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setChainDragEnd`, but the source dependencies were [isChainDragging, hasMoved, chainDragEnd, push.tempId, onAddChained]. Inferred different dependency than source.
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/features/timeline-editor/TimelineBar.tsx:197:46
+  195 |     }, [isChainDragging, startPos, getDateFromX, pushEnd])
+  196 |
+> 197 |     const handleChainPointerUp = useCallback((e: React.PointerEvent) => {
+      |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |         if (!isChainDragging) return
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 199 |
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 211 |         setHasMoved(false)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 212 |     }, [isChainDragging, hasMoved, chainDragEnd, push.tempId, onAddChained])
+      | ^^^^^^ Could not preserve existing manual memoization
+  213 |
+  214 |     let visualLeft = leftPercent
+  215 |     let visualWidth = widthPercent                react-hooks/preserve-manual-memoization
+  197:46  error    Compilation Skipped: Existing memoization could not be preserved
+
+React Compiler has skipped optimizing this component because the existing manual memoization could not be preserved. The inferred dependencies did not match the manually specified dependencies, which could cause the value to change more or less frequently than expected. The inferred dependency was `setHasMoved`, but the source dependencies were [isChainDragging, hasMoved, chainDragEnd, push.tempId, onAddChained]. Inferred different dependency than source.
+
+/Users/andreboufama/Documents/CUPiProjects/cupi-platform/src/features/timeline-editor/TimelineBar.tsx:197:46
+  195 |     }, [isChainDragging, startPos, getDateFromX, pushEnd])
+  196 |
+> 197 |     const handleChainPointerUp = useCallback((e: React.PointerEvent) => {
+      |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 198 |         if (!isChainDragging) return
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 199 |
+      …
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 211 |         setHasMoved(false)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 212 |     }, [isChainDragging, hasMoved, chainDragEnd, push.tempId, onAddChained])
+      | ^^^^^^ Could not preserve existing manual memoization
+  213 |
+  214 |     let visualLeft = leftPercent
+  215 |     let visualWidth = widthPercent                    react-hooks/preserve-manual-memoization
+  241:19  warning  'nextWidth' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+
+✖ 40 problems (30 errors, 10 warnings)
+  2 errors and 0 warnings potentially fixable with the `--fix` option.
+

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from "react"
 import { cn } from "@/lib/utils"
-import { GripVertical, Lock, Plus } from "lucide-react"
+import { GripVertical, Lock, Plus, CheckCircle2 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { type PushDraft, type DragType, formatDateShort, differenceInDays, addDays, startOfDay } from "./types"
 
@@ -288,29 +288,42 @@ export function TimelineBar({
                     "absolute h-9 cursor-pointer transition-all select-none group z-10",
                     isDragging && hasMoved && "z-50 shadow-lg scale-[1.02]",
                     isSelected && !isDragging && "ring-2 ring-primary ring-offset-1",
-                    !isDragging && "hover:brightness-110",
+                    !isDragging && "hover:brightness-105",
                     leftEdgeRounded ? "rounded-l-lg" : "rounded-l-none",
-                    rightEdgeRounded ? "rounded-r-lg" : "rounded-r-none"
+                    rightEdgeRounded ? "rounded-r-lg" : "rounded-r-none",
+                    // Use standard card styling:
+                    push.status === 'Completed' ? "bg-muted/40 border border-border/50" : "bg-card border border-border"
                 )}
                 style={{
                     left: `${visualLeft}%`,
                     width: `${Math.max(visualWidth, 2)}%`,
                     top: `${rowIndex * ROW_HEIGHT + 6}px`,
-                    background: isGreyedOut
-                        ? `linear-gradient(90deg, #94a3b8dd, #94a3b8bb)`
-                        : `linear-gradient(90deg, ${push.color}ee, ${push.color}bb)`,
                     transform: isDragging && hasMoved ? 'scale(1.02)' : undefined,
-                    transition: isDragging ? 'none' : 'all 0.2s cubic-bezier(0.34,1.56,0.64,1)'
+                    transition: isDragging ? 'none' : 'all 0.2s cubic-bezier(0.34,1.56,0.64,1)',
                 }}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
                 onPointerCancel={handlePointerUp}
             >
+                {/* Subtle color tint for active pushes - slightly more vibrant */}
+                {push.status !== 'Completed' && (
+                    <div
+                        className={cn(
+                            "absolute inset-0 opacity-20 mix-blend-multiply dark:mix-blend-screen pointer-events-none",
+                            leftEdgeRounded && "rounded-l-lg",
+                            rightEdgeRounded && "rounded-r-lg"
+                        )}
+                        style={{
+                            backgroundColor: push.color,
+                        }}
+                    />
+                )}
+
                 {/* Left resize handle */}
                 {!readOnly && (
                     <div
                         className={cn(
-                            "absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 transition-colors",
+                            "absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-muted/30 transition-colors z-20",
                             leftEdgeRounded && "rounded-l-lg"
                         )}
                         onPointerDown={(e) => handlePointerDown(e, 'resize-start')}
@@ -327,18 +340,26 @@ export function TimelineBar({
                     onPointerDown={(e) => !readOnly && handlePointerDown(e, 'move')}
                 >
                     {!readOnly && (
-                        <GripVertical className="h-3 w-3 text-white/60 shrink-0" />
+                        <GripVertical className="h-3 w-3 text-muted-foreground/40 shrink-0" />
                     )}
 
                     {isGreyedOut && (
-                        <Lock className="h-3 w-3 text-white/60 shrink-0" />
+                        <Lock className="h-3 w-3 text-muted-foreground/50 shrink-0" />
                     )}
 
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <span className="text-xs font-medium text-white truncate">
-                                {push.name || 'Untitled'}
-                            </span>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <span className={cn(
+                                    "text-xs font-semibold truncate select-none",
+                                    push.status === 'Completed' ? "text-muted-foreground" : "text-foreground"
+                                )}>
+                                    {push.name || 'Untitled'}
+                                </span>
+                                {push.status === 'Completed' && (
+                                    <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />
+                                )}
+                            </div>
                         </TooltipTrigger>
                         <TooltipContent side="top" className="text-xs">
                             <div className="font-medium">{push.name || 'Untitled'}</div>
@@ -356,7 +377,7 @@ export function TimelineBar({
                 {!readOnly && (
                     <div
                         className={cn(
-                            "absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 transition-colors",
+                            "absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-muted/30 transition-colors z-20",
                             rightEdgeRounded && "rounded-r-lg"
                         )}
                         onPointerDown={(e) => handlePointerDown(e, 'resize-end')}
@@ -370,10 +391,10 @@ export function TimelineBar({
                             <div
                                 className={cn(
                                     "absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full",
-                                    "bg-white border-2 border-muted-foreground/40 flex items-center justify-center",
+                                    "bg-background border border-border shadow-sm flex items-center justify-center",
                                     "opacity-0 group-hover:opacity-100 transition-all duration-200 group/plus",
-                                    "hover:bg-primary hover:border-primary hover:scale-110 cursor-pointer z-30 shadow-md",
-                                    isChainDragging && "opacity-100 bg-primary border-primary scale-110"
+                                    "hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer z-30",
+                                    isChainDragging && "opacity-100 bg-primary text-primary-foreground scale-110"
                                 )}
                                 onPointerDown={handleChainPointerDown}
                                 onPointerMove={handleChainPointerMove}
@@ -387,9 +408,8 @@ export function TimelineBar({
                             >
                                 <Plus
                                     className={cn(
-                                        "h-3.5 w-3.5 text-muted-foreground transition-colors",
-                                        "group-hover/plus:text-primary-foreground",
-                                        isChainDragging && "text-primary-foreground"
+                                        "h-3.5 w-3.5 transition-colors",
+                                        !isChainDragging && "text-muted-foreground group-hover:text-primary-foreground"
                                     )}
                                 />
                             </div>
@@ -404,7 +424,7 @@ export function TimelineBar({
             {/* Chain drag preview - renders behind plus button */}
             {isChainDragging && hasMoved && chainDragEnd && (
                 <div
-                    className="absolute h-9 rounded-lg bg-primary/40 border-2 border-dashed border-primary pointer-events-none z-0"
+                    className="absolute h-9 rounded-lg bg-primary/10 border-2 border-dashed border-primary/50 pointer-events-none z-0"
                     style={{
                         left: `${chainPreviewLeft}%`,
                         width: `${Math.max(chainPreviewWidth, 2)}%`,

@@ -33,10 +33,8 @@ type TimelineEditorProps = {
     pushes: PushDraft[]
     onPushesChange: (pushes: PushDraft[]) => void
     viewRange?: TimelineViewRange
-    onViewRangeChange?: (range: TimelineViewRange) => void
     readOnly?: boolean
     minHeight?: number
-    showConnections?: boolean
 }
 
 const ROW_HEIGHT = 48
@@ -49,10 +47,8 @@ export function TimelineEditor({
     pushes,
     onPushesChange,
     viewRange: externalViewRange,
-    onViewRangeChange,
     readOnly = false,
-    minHeight = 200,
-    showConnections = true
+    minHeight = 200
 }: TimelineEditorProps) {
     const containerRef = useRef<HTMLDivElement>(null)
     const [selectedPushId, setSelectedPushId] = useState<string | null>(null)
@@ -135,7 +131,7 @@ export function TimelineEditor({
             const chainIds: string[] = [root.tempId]
             processed.add(root.tempId)
 
-            let chainStart = root.startDate.getTime()
+            const chainStart = root.startDate.getTime()
             let chainEnd = (root.endDate || addDays(root.startDate, 14)).getTime()
 
             let current = root
@@ -252,9 +248,8 @@ export function TimelineEditor({
         if (distanceDragged >= MIN_DRAG_DISTANCE) {
             setHasDragged(true)
             const currentDate = getDateFromClientX(e.clientX)
-            let start = currentDate < createStart.date ? currentDate : createStart.date
-            let end = currentDate < createStart.date ? createStart.date : currentDate
-            end = addDays(end, 1)
+            const start = currentDate < createStart.date ? currentDate : createStart.date
+            const end = addDays(currentDate < createStart.date ? createStart.date : currentDate, 1)
 
             // Collision check for creation preview
             const isOverlapping = pushes.some(other => {

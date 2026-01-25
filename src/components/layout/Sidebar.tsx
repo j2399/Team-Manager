@@ -178,12 +178,12 @@ const SortableProjectRow = React.memo(({
                 href={`/dashboard/projects/${project.id}`}
                 onClick={() => !isActive && setNavigatingTo(`/dashboard/projects/${project.id}`)}
                 className={cn(
-                    "relative z-10 rounded-md pl-2 py-1.5 text-sm transition-colors",
+                    "relative z-10 rounded-md pl-2 py-1.5 text-sm transition-colors flex-1 min-w-0",
                     isActive ? "font-medium" : "text-muted-foreground group-hover:text-foreground"
                 )}
                 title={project.name}
             >
-                <span className="block truncate max-w-[100px]">{project.name}</span>
+                <span className="block truncate">{project.name}</span>
             </Link>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 
 import {
@@ -12,12 +12,10 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { acceptReviewTask, denyReviewTask } from "@/app/actions/kanban"
 import {
     Pencil, Calendar, User, Clock,
-    Paperclip, Send, FileText, Upload, Reply, X, Download, Maximize2, Trash2, CheckCircle, XCircle, ChevronDown, ListChecks
+    Send, FileText, Upload, Reply, X, Download, Maximize2, Trash2, CheckCircle, XCircle, ListChecks
 } from "lucide-react"
 import { getInitials } from "@/lib/utils"
 import { TaskChecklist } from "@/components/TaskChecklist"
@@ -231,7 +229,7 @@ const buildCommentTree = (comments: Comment[]): CommentWithReplies[] => {
     comments.forEach(comment => {
         // Break references to avoid mutation issues if comments are reused
         // and ensure we don't accidentally create cycles if IDs are messy
-        // @ts-ignore
+
         commentMap.set(comment.id, { ...comment, replies: [] })
     })
 
@@ -260,7 +258,6 @@ const buildCommentTree = (comments: Comment[]): CommentWithReplies[] => {
 }
 
 export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTaskUpdated }: TaskPreviewProps) {
-    const router = useRouter()
     const [comments, setComments] = useState<Comment[]>([])
     const [attachments, setAttachments] = useState<Attachment[]>([])
     const [newComment, setNewComment] = useState("")
@@ -276,7 +273,6 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const [instructionsFile, setInstructionsFile] = useState<{ url: string; name: string } | null>(null)
     const [showInstructionsFullscreen, setShowInstructionsFullscreen] = useState(false)
-    const [taskDetailsExpanded, setTaskDetailsExpanded] = useState(true)
     const commentsEndRef = useRef<HTMLDivElement>(null)
     const [uploadProgress, setUploadProgress] = useState<number | null>(null)
     const [uploadingFileName, setUploadingFileName] = useState<string | null>(null)
@@ -351,7 +347,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                     // Append new comments
                     setComments(prev => {
                         const newOnes = data.comments.filter(
-                            (c: any) => !prev.some(p => p.id === c.id)
+                            (c: Comment) => !prev.some(p => p.id === c.id)
                         )
                         if (newOnes.length > 0) {
                             const updated = [...prev, ...newOnes]
@@ -463,8 +459,10 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                 })
             })
 
+
+
             let responseText = ''
-            let data: any = null
+            let data: Comment | { error?: string, message?: string, details?: string, id?: string } | null = null
 
             try {
                 responseText = await res.text()
@@ -475,17 +473,18 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                     console.warn('Empty response body')
                     data = {}
                 }
-            } catch (parseError: any) {
+            } catch (parseError: unknown) {
                 console.error('Failed to parse response:', parseError)
                 console.error('Response text that failed to parse:', responseText)
-                setCommentError(`Invalid response from server: ${parseError?.message || 'Parse error'}`)
+                setCommentError(`Invalid response from server: ${(parseError as Error)?.message || 'Parse error'}`)
                 setIsSubmitting(false)
                 return
             }
 
             if (res.ok) {
-                if (data && data.id) {
-                    setComments(prev => [...prev, data])
+                if (data && 'id' in data && typeof data.id === 'string') {
+                    const comment = data as Comment
+                    setComments(prev => [...prev, comment])
                     setNewComment("")
                     setReplyingTo(null)
                     setCommentError(null)
@@ -494,12 +493,13 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
             }
 
             // More descriptive error for debugging
-            const errorMessage = data?.error || data?.message || data?.details || `Server error (${res?.status || 'unknown'} ${res?.statusText || ''})`
+            const errorData = data as { error?: string, message?: string, details?: string } | null
+            const errorMessage = errorData?.error || errorData?.message || errorData?.details || `Server error (${res?.status || 'unknown'} ${res?.statusText || ''})`
             console.error('[COMMENT ERROR]', { status: res.status, data });
             setCommentError(errorMessage)
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Failed to add comment:', err)
-            setCommentError(err?.message || 'Network error. Please try again.')
+            setCommentError((err as Error)?.message || 'Network error. Please try again.')
         } finally {
             setIsSubmitting(false)
         }
@@ -522,7 +522,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
             // Use XMLHttpRequest for progress tracking
             const xhr = new XMLHttpRequest()
 
-            const uploadPromise = new Promise<any>((resolve, reject) => {
+            const uploadPromise = new Promise<Attachment>((resolve, reject) => {
                 xhr.upload.addEventListener('progress', (event) => {
                     if (event.lengthComputable) {
                         const progress = Math.round((event.loaded / event.total) * 100)
@@ -559,9 +559,9 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
             setAttachments(prev => [...prev, attachment])
             // Refresh attachments list to get proper order
             fetchAttachments()
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Upload error:', err)
-            setCommentError(err.message || 'Failed to upload file. Please try again.')
+            setCommentError((err as Error).message || 'Failed to upload file. Please try again.')
         } finally {
             setIsSubmitting(false)
             setUploadProgress(null)
@@ -834,99 +834,104 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                     {/* Main Content - Native Scrollable Div */}
                     <div className="flex-1 min-h-0 overflow-y-auto">
                         <div className="p-3 space-y-3">
-                            {/* Task Details - Collapsible section with description and instructions */}
+                            {/* Task Details - Description and Instructions */}
                             {(task.description || instructionsFile) && (
-                                <Collapsible open={taskDetailsExpanded} onOpenChange={setTaskDetailsExpanded}>
-                                    <CollapsibleTrigger asChild>
-                                        <button className="flex items-center justify-between w-full py-2 px-2 -mx-2 rounded hover:bg-muted/50 transition-colors group">
-                                            <span className="text-xs font-bold text-red-600">
-                                                Instructions:
-                                            </span>
-                                            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${taskDetailsExpanded ? 'rotate-180' : ''}`} />
-                                        </button>
-                                    </CollapsibleTrigger>
-                                    <CollapsibleContent>
-                                        <div className="border border-red-200/50 rounded-lg bg-red-50/10 p-3 space-y-3 mt-1 text-xs">
-                                            {/* Description */}
-                                            {task.description && (
-                                                <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
-                                                    <p className="text-muted-foreground whitespace-pre-wrap break-words leading-relaxed">
-                                                        {task.description.split(/(https?:\/\/[^\s]+)/g).map((part, i) => {
-                                                            if (part.match(/^https?:\/\//)) {
-                                                                return (
-                                                                    <a
-                                                                        key={i}
-                                                                        href={part}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="text-primary hover:underline break-all"
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                    >
-                                                                        {part}
-                                                                    </a>
-                                                                )
-                                                            }
-                                                            return <span key={i}>{part}</span>
-                                                        })}
-                                                    </p>
-                                                </div>
-                                            )}
+                                <div className="space-y-3 pt-1">
+                                    <div className="rounded-lg bg-muted/30 p-3 space-y-3">
+                                        {/* Description */}
+                                        {task.description && (
+                                            <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                                                <p className="text-sm text-foreground/90 whitespace-pre-wrap break-words leading-relaxed">
+                                                    {task.description.split(/(https?:\/\/[^\s]+)/g).map((part, i) => {
+                                                        if (part.match(/^https?:\/\//)) {
+                                                            return (
+                                                                <a
+                                                                    key={i}
+                                                                    href={part}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-primary hover:underline break-all"
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                >
+                                                                    {part}
+                                                                </a>
+                                                            )
+                                                        }
+                                                        return <span key={i}>{part}</span>
+                                                    })}
+                                                </p>
+                                            </div>
+                                        )}
 
-                                            {/* Separator if both exist */}
-                                            {task.description && instructionsFile && (
-                                                <div className="h-px bg-red-200/30" />
-                                            )}
+                                        {/* Separator if both exist */}
+                                        {task.description && instructionsFile && (
+                                            <div className="h-px bg-border/50" />
+                                        )}
 
-                                            {/* Instructions File */}
-                                            {instructionsFile && (
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="font-medium text-muted-foreground flex items-center gap-1">
-                                                            <FileText className="h-3 w-3" />
-                                                            Instructions File
-                                                        </span>
-                                                        <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation()
-                                                                forceDownload(instructionsFile.url, instructionsFile.name)
-                                                            }}
-                                                            className="h-5 text-[9px] gap-1 px-2 inline-flex items-center hover:bg-red-100/50 rounded transition-colors"
-                                                            title="Download"
-                                                        >
-                                                            <Download className="h-2.5 w-2.5" />
-                                                            Download
-                                                        </button>
-                                                    </div>
-                                                    <div
-                                                        className="bg-background/50 rounded border border-red-100 overflow-hidden cursor-pointer hover:ring-1 ring-red-200 transition-all"
-                                                        onClick={() => setShowInstructionsFullscreen(true)}
+                                        {/* Instructions File */}
+                                        {instructionsFile && (
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                                                        <FileText className="h-3.5 w-3.5" />
+                                                        Instructions File
+                                                    </span>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            forceDownload(instructionsFile.url, instructionsFile.name)
+                                                        }}
+                                                        className="h-6 text-[10px] gap-1 px-2.5 inline-flex items-center bg-background border rounded-full hover:bg-muted transition-colors shadow-sm"
+                                                        title="Download"
                                                     >
-                                                        {isImageFile(instructionsFile.name) ? (
+                                                        <Download className="h-3 w-3" />
+                                                        Download
+                                                    </button>
+                                                </div>
+                                                <div
+                                                    className="bg-background rounded-md border overflow-hidden cursor-pointer hover:ring-2 ring-primary/20 transition-all shadow-sm group/preview"
+                                                    onClick={() => setShowInstructionsFullscreen(true)}
+                                                >
+                                                    {isImageFile(instructionsFile.name) ? (
+                                                        <div className="relative">
                                                             <img
                                                                 src={instructionsFile.url}
                                                                 alt="Instructions"
-                                                                className={`w-full max-h-32 object-contain ${isSvgFile(instructionsFile.name) ? 'dark:bg-white dark:rounded dark:p-1' : ''}`}
+                                                                className={`w-full max-h-48 object-contain bg-muted/20 ${isSvgFile(instructionsFile.name) ? 'dark:bg-white p-2' : ''}`}
                                                             />
-                                                        ) : isPdfFile(instructionsFile.name) ? (
-                                                            <div className="h-32 flex items-center justify-center bg-white">
-                                                                <iframe
-                                                                    src={instructionsFile.url}
-                                                                    className="w-full h-full pointer-events-none opacity-80"
-                                                                    title="Instructions PDF"
-                                                                />
+                                                            <div className="absolute inset-0 bg-black/0 group-hover/preview:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover/preview:opacity-100">
+                                                                <span className="bg-background/90 text-foreground text-[10px] font-medium px-2 py-1 rounded shadow-sm">
+                                                                    Click to expand
+                                                                </span>
                                                             </div>
-                                                        ) : (
-                                                            <div className="p-3 text-center">
-                                                                <FileText className="h-6 w-6 mx-auto text-muted-foreground mb-1" />
-                                                                <p className="text-xs font-medium truncate">{instructionsFile.name}</p>
+                                                        </div>
+                                                    ) : isPdfFile(instructionsFile.name) ? (
+                                                        <div className="h-40 flex items-center justify-center bg-white relative">
+                                                            <div className="absolute inset-0 bg-transparent z-10" /> {/* Click overlay */}
+                                                            <iframe
+                                                                src={instructionsFile.url}
+                                                                className="w-full h-full opacity-60"
+                                                                title="Instructions PDF"
+                                                            />
+                                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                                <div className="bg-white/90 px-3 py-1.5 rounded-full shadow-sm text-xs font-medium text-slate-700 flex items-center gap-1.5">
+                                                                    <Maximize2 className="h-3 w-3" />
+                                                                    Preview PDF
+                                                                </div>
                                                             </div>
-                                                        )}
-                                                    </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="p-4 text-center bg-muted/10">
+                                                            <FileText className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                                                            <p className="text-sm font-medium truncate px-4">{instructionsFile.name}</p>
+                                                            <p className="text-[10px] text-muted-foreground mt-1">Click to download</p>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            )}
-                                        </div>
-                                    </CollapsibleContent>
-                                </Collapsible>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             )}
 
                             {/* Files Section */}

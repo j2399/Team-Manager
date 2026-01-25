@@ -735,26 +735,33 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                             </div>
                         </div>
 
-                        <div className="p-6 pt-2 border-t mt-auto bg-background">
-                            {!isValid && (
-                                <div className="mb-4 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-md border border-amber-100 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50">
-                                    Please fill in all required fields: {getValidationErrors().join(", ")}
+                        <div className="p-6 pt-2 border-t mt-auto bg-background rounded-b-lg">
+
+                            <DialogFooter className="flex w-full items-center justify-between sm:justify-between gap-2">
+                                <div className="flex-1 mr-2 min-w-0">
+                                    {(task || !isValid) && (
+                                        <div className="flex items-center gap-2">
+                                            {task && (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="icon"
+                                                    onClick={() => setShowDeleteConfirm(true)}
+                                                    disabled={isLoading}
+                                                    className="shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            )}
+                                            {!isValid && (
+                                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium text-amber-600 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200/50 dark:from-amber-950/40 dark:to-amber-900/40 dark:text-amber-400 dark:border-amber-900">
+                                                    <span>Please fill required fields: {getValidationErrors().join(", ")}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                            <DialogFooter className="gap-2 sm:gap-0">
-                                {task && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        onClick={() => setShowDeleteConfirm(true)}
-                                        disabled={isLoading}
-                                        className="mr-auto text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                )}
-                                <div className="flex gap-2 w-full sm:w-auto justify-end">
+                                <div className="flex gap-2 shrink-0">
                                     <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
                                     <Button type="submit" disabled={isLoading || !isValid}>
                                         {isLoading ? 'Saving...' : (task ? "Save Changes" : "Create Task")}
