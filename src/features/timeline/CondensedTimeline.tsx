@@ -15,6 +15,7 @@ type Push = {
     endDate: Date | string | null
     status: string
     color: string
+    dependsOnId?: string | null
 }
 
 type CondensedTimelineProps = {
@@ -33,7 +34,8 @@ export function CondensedTimeline({ pushes, projectId, onPushUpdate }: Condensed
             name: p.name,
             startDate: new Date(p.startDate),
             endDate: p.endDate ? new Date(p.endDate) : null,
-            color: p.color
+            color: p.color,
+            dependsOn: p.dependsOnId || null
         }))
     }, [pushes])
 

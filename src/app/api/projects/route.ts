@@ -165,19 +165,39 @@ export async function POST(request: Request) {
 
             // Create pushes if provided
             if (pushes && Array.isArray(pushes) && pushes.length > 0) {
+                // First pass: create all pushes and build tempId -> realId mapping
+                const tempIdToRealId = new Map<string, string>()
+
                 for (let i = 0; i < pushes.length; i++) {
                     const push = pushes[i]
                     if (push.name && push.startDate) {
-                        await tx.push.create({
+                        const createdPush = await tx.push.create({
                             data: {
                                 name: push.name,
                                 projectId: p.id,
                                 startDate: new Date(push.startDate),
                                 endDate: push.endDate ? new Date(push.endDate) : null,
-                                color: PUSH_COLORS[i % PUSH_COLORS.length],
+                                color: push.color || PUSH_COLORS[i % PUSH_COLORS.length],
                                 status: 'Active'
                             }
                         })
+                        if (push.tempId) {
+                            tempIdToRealId.set(push.tempId, createdPush.id)
+                        }
+                    }
+                }
+
+                // Second pass: update dependencies
+                for (const push of pushes) {
+                    if (push.dependsOn && push.tempId) {
+                        const realId = tempIdToRealId.get(push.tempId)
+                        const dependsOnRealId = tempIdToRealId.get(push.dependsOn)
+                        if (realId && dependsOnRealId) {
+                            await tx.push.update({
+                                where: { id: realId },
+                                data: { dependsOnId: dependsOnRealId }
+                            })
+                        }
                     }
                 }
             }

@@ -80,6 +80,7 @@ export async function updatePush(input: {
     endDate?: string | null
     status?: string
     color?: string
+    dependsOnId?: string | null
 }) {
     const user = await getCurrentUser()
     if (!user || !user.id || user.id === 'pending') {
@@ -111,6 +112,11 @@ export async function updatePush(input: {
 
         if (input.status) updateData.status = input.status
         if (input.color) updateData.color = input.color
+
+        // Handle dependsOnId explicitly if passed (can be null)
+        if (input.dependsOnId !== undefined) {
+            updateData.dependsOnId = input.dependsOnId || null
+        }
 
         await prisma.push.update({
             where: { id: input.id },
@@ -250,6 +256,7 @@ export async function getPushes(projectId: string) {
 
         return pushes.map(push => ({
             ...push,
+            dependsOnId: push.dependsOnId,
             taskCount: push.tasks.length,
             completedCount: push.tasks.filter(t => t.column?.name === 'Done').length
         }))
