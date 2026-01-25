@@ -468,48 +468,43 @@ export function TimelineEditor({
             <Dialog open={namePromptOpen} onOpenChange={(open) => {
                 if (!open) handleDialogClose()
             }}>
-                <DialogContent className="sm:max-w-sm">
-                    <DialogHeader>
-                        <DialogTitle>Name this push</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="new-push-name">Name</Label>
-                            <Input
-                                id="new-push-name"
-                                value={newPushName}
-                                onChange={(e) => setNewPushName(e.target.value)}
-                                placeholder="Enter push name"
-                                autoFocus
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && newPushName.trim()) handleNameSubmit()
-                                }}
-                            />
-                        </div>
-                        {pendingPush?.dependsOn && (
-                            <div className="space-y-2">
-                                <Label htmlFor="new-push-end">End Date</Label>
-                                <Input
-                                    id="new-push-end"
-                                    type="date"
-                                    value={newPushEndDate}
-                                    onChange={(e) => setNewPushEndDate(e.target.value)}
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    Starts {formatDateShort(pendingPush.startDate)}
-                                </p>
+                <DialogContent showCloseButton={false} className="sm:max-w-[280px] p-4">
+                    <div className="space-y-3">
+                        <Input
+                            id="new-push-name"
+                            value={newPushName}
+                            onChange={(e) => setNewPushName(e.target.value)}
+                            placeholder="Push name..."
+                            autoFocus
+                            className="h-9"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && newPushName.trim()) handleNameSubmit()
+                            }}
+                        />
+
+                        <div className="flex items-center justify-between gap-2">
+                            {pendingPush?.dependsOn ? (
+                                <div className="flex items-center gap-2 flex-1">
+                                    <Input
+                                        id="new-push-end"
+                                        type="date"
+                                        value={newPushEndDate}
+                                        onChange={(e) => setNewPushEndDate(e.target.value)}
+                                        className="h-8 text-xs py-1"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="text-[10px] text-muted-foreground">
+                                    {pendingPush && formatDateShort(pendingPush.startDate)} − {pendingPush && formatDateShort(pendingPush.endDate || addDays(pendingPush.startDate, 14))}
+                                </div>
+                            )}
+
+                            <div className="flex gap-2 shrink-0">
+                                <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => setNamePromptOpen(false)}>Cancel</Button>
+                                <Button size="sm" className="h-8 px-3 text-xs" onClick={handleNameSubmit} disabled={!newPushName.trim()}>Create</Button>
                             </div>
-                        )}
-                        {pendingPush && !pendingPush.dependsOn && (
-                            <p className="text-xs text-muted-foreground">
-                                {formatDateShort(pendingPush.startDate)} − {formatDateShort(pendingPush.endDate || addDays(pendingPush.startDate, 14))}
-                            </p>
-                        )}
+                        </div>
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setNamePromptOpen(false)}>Cancel</Button>
-                        <Button onClick={handleNameSubmit} disabled={!newPushName.trim()}>Create</Button>
-                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
