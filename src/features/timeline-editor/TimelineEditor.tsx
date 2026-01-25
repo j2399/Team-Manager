@@ -42,6 +42,7 @@ const ROW_HEIGHT = 48
 const MIN_ROWS = 3
 const HEADER_HEIGHT = 48
 const MIN_DRAG_DISTANCE = 20
+const DEFAULT_CHAINED_DURATION = 14 // Default duration for chained pushes in days
 
 export function TimelineEditor({
     pushes,
@@ -69,9 +70,6 @@ export function TimelineEditor({
     const [editName, setEditName] = useState("")
     const [editStartDate, setEditStartDate] = useState("")
     const [editEndDate, setEditEndDate] = useState("")
-
-    // Connection state - which push we're connecting FROM
-    const [connectingFrom, setConnectingFrom] = useState<string | null>(null)
 
     // Calculate dynamic view range based on pushes with extra space
     const calculatedViewRange = useMemo(() => {
@@ -114,17 +112,47 @@ export function TimelineEditor({
         return ((date.getTime() - viewRange.start.getTime()) / totalDuration) * 100
     }, [viewRange, totalDuration])
 
+    // Calculate which pushes are chained (one starts immediately after another ends)
+    const chainInfo = useMemo(() => {
+        const info: Record<string, { isChainedWithNext: boolean; isChainedWithPrev: boolean }> = {}
+
+        // Sort pushes by start date to find chains
+        const sortedPushes = [...pushes].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+
+        sortedPushes.forEach((push, i) => {
+            const pushEnd = push.endDate || addDays(push.startDate, 14)
+            const nextPush = sortedPushes[i + 1]
+            const prevPush = sortedPushes[i - 1]
+
+            // Check if chained with next (this push ends when next starts, or next depends on this)
+            const isChainedWithNext = nextPush && (
+                (nextPush.dependsOn === push.tempId) ||
+                (Math.abs(pushEnd.getTime() - nextPush.startDate.getTime()) < 1000 * 60 * 60 * 24) // Within a day
+            )
+
+            // Check if chained with previous
+            const isChainedWithPrev = prevPush && (
+                (push.dependsOn === prevPush.tempId) ||
+                (() => {
+                    const prevEnd = prevPush.endDate || addDays(prevPush.startDate, 14)
+                    return Math.abs(prevEnd.getTime() - push.startDate.getTime()) < 1000 * 60 * 60 * 24
+                })()
+            )
+
+            info[push.tempId] = {
+                isChainedWithNext: !!isChainedWithNext,
+                isChainedWithPrev: !!isChainedWithPrev
+            }
+        })
+
+        return info
+    }, [pushes])
+
     // Handlers for creating new pushes by dragging
     const handleMouseDown = useCallback((e: React.MouseEvent) => {
         if (readOnly) return
         if ((e.target as HTMLElement).closest('[data-timeline-bar]')) return
         if ((e.target as HTMLElement).closest('button')) return
-
-        // If connecting, cancel connection mode on background click
-        if (connectingFrom) {
-            setConnectingFrom(null)
-            return
-        }
 
         const date = getDateFromClientX(e.clientX)
         setIsCreating(true)
@@ -132,7 +160,7 @@ export function TimelineEditor({
         setCreatePreview(null)
         setHasDragged(false)
         setSelectedPushId(null)
-    }, [readOnly, getDateFromClientX, connectingFrom])
+    }, [readOnly, getDateFromClientX])
 
     const handleMouseMove = useCallback((e: React.MouseEvent) => {
         if (!isCreating || !createStart) return
@@ -177,6 +205,27 @@ export function TimelineEditor({
         setHasDragged(false)
     }, [isCreating, hasDragged, createPreview, pushes.length])
 
+    // Handle adding a chained push after an existing one
+    const handleAddChained = useCallback((afterPushId: string) => {
+        const sourcePush = pushes.find(p => p.tempId === afterPushId)
+        if (!sourcePush) return
+
+        const sourceEnd = sourcePush.endDate || addDays(sourcePush.startDate, 14)
+
+        const newPush: PushDraft = {
+            tempId: generateTempId(),
+            name: "",
+            startDate: sourceEnd,
+            endDate: addDays(sourceEnd, DEFAULT_CHAINED_DURATION),
+            color: sourcePush.color, // Same color for visual continuity
+            dependsOn: afterPushId
+        }
+
+        setPendingPush(newPush)
+        setNewPushName(`Push ${pushes.length + 1}`)
+        setNamePromptOpen(true)
+    }, [pushes])
+
     // Handle name prompt submission
     const handleNameSubmit = useCallback(() => {
         if (pendingPush && newPushName.trim()) {
@@ -191,40 +240,11 @@ export function TimelineEditor({
 
     // Handle push click to open edit popup
     const handlePushClick = useCallback((push: PushDraft) => {
-        // If we're in connection mode, complete the connection
-        if (connectingFrom) {
-            if (connectingFrom !== push.tempId) {
-                const fromPush = pushes.find(p => p.tempId === connectingFrom)
-                if (fromPush) {
-                    const fromEnd = fromPush.endDate || addDays(fromPush.startDate, 14)
-                    // Only allow connection if this push starts after the source ends
-                    if (push.startDate >= fromEnd) {
-                        onPushesChange(pushes.map(p =>
-                            p.tempId === push.tempId ? { ...p, dependsOn: connectingFrom } : p
-                        ))
-                    }
-                }
-            }
-            setConnectingFrom(null)
-            return
-        }
-
-        // Otherwise open edit dialog
         setEditingPush(push)
         setEditName(push.name)
         setEditStartDate(formatDateISO(push.startDate))
         setEditEndDate(push.endDate ? formatDateISO(push.endDate) : "")
-    }, [connectingFrom, pushes, onPushesChange])
-
-    // Handle starting a connection from a push
-    const handleStartConnection = useCallback((pushId: string) => {
-        if (connectingFrom === pushId) {
-            // Toggle off
-            setConnectingFrom(null)
-        } else {
-            setConnectingFrom(pushId)
-        }
-    }, [connectingFrom])
+    }, [])
 
     // Handle edit save
     const handleEditSave = useCallback(() => {
@@ -273,31 +293,6 @@ export function TimelineEditor({
     const gridHeight = Math.max((pushes.length + 1) * ROW_HEIGHT, MIN_ROWS * ROW_HEIGHT)
     const totalHeight = HEADER_HEIGHT + gridHeight
 
-    // Get dependency lines to draw
-    const dependencyLines = useMemo(() => {
-        if (!showConnections) return []
-
-        return pushes
-            .filter(p => p.dependsOn)
-            .map(p => {
-                const fromPush = pushes.find(dep => dep.tempId === p.dependsOn)
-                if (!fromPush) return null
-
-                const fromIndex = pushes.findIndex(dep => dep.tempId === p.dependsOn)
-                const toIndex = pushes.findIndex(dep => dep.tempId === p.tempId)
-                const fromEnd = fromPush.endDate || addDays(fromPush.startDate, 14)
-
-                return {
-                    fromX: getPositionPercent(fromEnd),
-                    fromY: fromIndex * ROW_HEIGHT + ROW_HEIGHT / 2,
-                    toX: getPositionPercent(p.startDate),
-                    toY: toIndex * ROW_HEIGHT + ROW_HEIGHT / 2,
-                    pushId: p.tempId
-                }
-            })
-            .filter(Boolean) as { fromX: number; fromY: number; toX: number; toY: number; pushId: string }[]
-    }, [pushes, showConnections, getPositionPercent])
-
     // Find dependency name for display
     const getDependencyName = useCallback((dependsOnId: string | undefined | null) => {
         if (!dependsOnId) return null
@@ -316,23 +311,9 @@ export function TimelineEditor({
                             {formatDateShort(viewRange.start)} − {formatDateShort(viewRange.end)}
                         </span>
                     </div>
-                    {connectingFrom ? (
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs text-primary">Select target push</span>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 text-xs"
-                                onClick={() => setConnectingFrom(null)}
-                            >
-                                Cancel
-                            </Button>
-                        </div>
-                    ) : (
-                        <span className="text-xs text-muted-foreground">
-                            {pushes.length} push{pushes.length !== 1 ? 'es' : ''}
-                        </span>
-                    )}
+                    <span className="text-xs text-muted-foreground">
+                        {pushes.length} push{pushes.length !== 1 ? 'es' : ''}
+                    </span>
                 </div>
 
                 {/* Timeline area */}
@@ -340,8 +321,7 @@ export function TimelineEditor({
                     ref={containerRef}
                     className={cn(
                         "relative select-none",
-                        !readOnly && !connectingFrom && "cursor-crosshair",
-                        connectingFrom && "cursor-pointer"
+                        !readOnly && "cursor-crosshair"
                     )}
                     style={{ minHeight: `${Math.max(totalHeight, minHeight)}px` }}
                     onMouseDown={handleMouseDown}
@@ -361,30 +341,6 @@ export function TimelineEditor({
                         className="absolute left-0 right-0"
                         style={{ top: `${HEADER_HEIGHT}px`, height: `${gridHeight}px` }}
                     >
-                        {/* Dependency lines */}
-                        {showConnections && (
-                            <svg className="absolute inset-0 pointer-events-none overflow-visible" style={{ zIndex: 5 }}>
-                                {dependencyLines.map((line, i) => (
-                                    <g key={i}>
-                                        <path
-                                            d={`M ${line.fromX}% ${line.fromY} C ${line.fromX + 3}% ${line.fromY}, ${line.toX - 3}% ${line.toY}, ${line.toX}% ${line.toY}`}
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            strokeDasharray="4 2"
-                                            className="text-muted-foreground/50"
-                                        />
-                                        <circle
-                                            cx={`${line.toX}%`}
-                                            cy={line.toY}
-                                            r="4"
-                                            className="fill-muted-foreground/50"
-                                        />
-                                    </g>
-                                ))}
-                            </svg>
-                        )}
-
                         {pushes.map((push, index) => (
                             <TimelineBar
                                 key={push.tempId}
@@ -400,9 +356,9 @@ export function TimelineEditor({
                                 readOnly={readOnly}
                                 isDependent={!!push.dependsOn}
                                 dependencyCompleted={false}
-                                onStartConnection={showConnections ? handleStartConnection : undefined}
-                                isConnectionSource={connectingFrom === push.tempId}
-                                isConnectionTarget={connectingFrom !== null && connectingFrom !== push.tempId}
+                                onAddChained={handleAddChained}
+                                isChainedWithNext={chainInfo[push.tempId]?.isChainedWithNext || false}
+                                isChainedWithPrev={chainInfo[push.tempId]?.isChainedWithPrev || false}
                             />
                         ))}
 
@@ -506,7 +462,7 @@ export function TimelineEditor({
                             <div className="pt-2 border-t">
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs text-muted-foreground">
-                                        Depends on: <span className="font-medium text-foreground">{getDependencyName(editingPush.dependsOn)}</span>
+                                        Follows: <span className="font-medium text-foreground">{getDependencyName(editingPush.dependsOn)}</span>
                                     </span>
                                     <Button
                                         variant="ghost"
@@ -514,7 +470,7 @@ export function TimelineEditor({
                                         className="h-6 text-xs text-destructive hover:text-destructive"
                                         onClick={handleRemoveDependency}
                                     >
-                                        Remove
+                                        Unlink
                                     </Button>
                                 </div>
                             </div>

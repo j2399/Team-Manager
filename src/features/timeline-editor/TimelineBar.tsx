@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from "react"
 import { cn } from "@/lib/utils"
-import { GripVertical, Lock, Link2 } from "lucide-react"
+import { GripVertical, Lock, Plus } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { type PushDraft, type DragType, formatDateShort, differenceInDays, addDays, startOfDay } from "./types"
 
@@ -19,13 +19,13 @@ type TimelineBarProps = {
     readOnly?: boolean
     isDependent?: boolean
     dependencyCompleted?: boolean
-    onStartConnection?: (pushId: string) => void
-    isConnectionSource?: boolean
-    isConnectionTarget?: boolean
+    onAddChained?: (afterPushId: string) => void
+    isChainedWithNext?: boolean
+    isChainedWithPrev?: boolean
 }
 
 const ROW_HEIGHT = 48
-const MIN_MOVE_FOR_DRAG = 5 // Minimum pixels moved to count as a drag
+const MIN_MOVE_FOR_DRAG = 5
 
 export function TimelineBar({
     push,
@@ -40,9 +40,9 @@ export function TimelineBar({
     readOnly = false,
     isDependent = false,
     dependencyCompleted = true,
-    onStartConnection,
-    isConnectionSource = false,
-    isConnectionTarget = false
+    onAddChained,
+    isChainedWithNext = false,
+    isChainedWithPrev = false
 }: TimelineBarProps) {
     const barRef = useRef<HTMLDivElement>(null)
     const [isDragging, setIsDragging] = useState(false)
@@ -61,7 +61,6 @@ export function TimelineBar({
     const leftPercent = getPositionPercent(push.startDate)
     const widthPercent = getPositionPercent(pushEnd) - leftPercent
 
-    // Drag handlers
     const handlePointerDown = useCallback((e: React.PointerEvent, type: DragType) => {
         if (readOnly) return
         e.preventDefault()
@@ -81,7 +80,6 @@ export function TimelineBar({
     const handlePointerMove = useCallback((e: React.PointerEvent) => {
         if (!isDragging || !barRef.current) return
 
-        // Check if we've moved enough to count as a drag
         const distanceMoved = Math.sqrt(
             Math.pow(e.clientX - startPos.x, 2) + Math.pow(e.clientY - startPos.y, 2)
         )
@@ -105,7 +103,6 @@ export function TimelineBar({
         const target = e.currentTarget as HTMLElement
         target.releasePointerCapture(e.pointerId)
 
-        // Only apply changes if we actually moved
         if (hasMoved) {
             const daysDelta = Math.round((dragOffset.x / 100) * (totalDuration / (1000 * 60 * 60 * 24)))
 
@@ -128,7 +125,6 @@ export function TimelineBar({
                 }
             }
         } else if (onClick && dragType === 'move') {
-            // Only trigger click if we didn't move and it was a move drag (not resize)
             onClick()
         }
 
@@ -138,7 +134,6 @@ export function TimelineBar({
         setHasMoved(false)
     }, [isDragging, hasMoved, dragOffset, dragType, push, pushEnd, totalDuration, onUpdate, onClick])
 
-    // Calculate visual position during drag
     let visualLeft = leftPercent
     let visualWidth = widthPercent
 
@@ -154,8 +149,6 @@ export function TimelineBar({
     }
 
     const duration = differenceInDays(pushEnd, push.startDate)
-
-    // Determine if push is greyed out (dependent and dependency not completed)
     const isGreyedOut = isDependent && !dependencyCompleted
 
     return (
@@ -163,13 +156,14 @@ export function TimelineBar({
             ref={barRef}
             data-timeline-bar
             className={cn(
-                "absolute h-9 rounded-lg cursor-pointer transition-all select-none group",
+                "absolute h-9 cursor-pointer transition-all select-none group",
                 isDragging && hasMoved && "z-50 shadow-lg scale-[1.02]",
                 isSelected && !isDragging && "ring-2 ring-primary ring-offset-1",
                 !isDragging && "hover:brightness-110",
-                isConnectionSource && "ring-2 ring-primary animate-pulse",
-                isConnectionTarget && "ring-2 ring-green-500/70",
-                isGreyedOut && "opacity-50"
+                isGreyedOut && "opacity-50",
+                // Chained styling - connected appearance
+                isChainedWithPrev ? "rounded-l-none" : "rounded-l-lg",
+                isChainedWithNext ? "rounded-r-none" : "rounded-r-lg"
             )}
             style={{
                 left: `${visualLeft}%`,
@@ -185,8 +179,8 @@ export function TimelineBar({
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
         >
-            {/* Left resize handle */}
-            {!readOnly && (
+            {/* Left resize handle - only if not chained with previous */}
+            {!readOnly && !isChainedWithPrev && (
                 <div
                     className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 rounded-l-lg transition-colors"
                     onPointerDown={(e) => handlePointerDown(e, 'resize-start')}
@@ -227,44 +221,43 @@ export function TimelineBar({
                 </Tooltip>
             </div>
 
-            {/* Right resize handle */}
-            {!readOnly && (
+            {/* Right resize handle - only if not chained with next */}
+            {!readOnly && !isChainedWithNext && (
                 <div
                     className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 rounded-r-lg transition-colors"
                     onPointerDown={(e) => handlePointerDown(e, 'resize-end')}
                 />
             )}
 
-            {/* Connection handle - appears on hover */}
-            {!readOnly && onStartConnection && (
+            {/* Add chained push button - appears on hover, only if not already chained */}
+            {!readOnly && onAddChained && !isChainedWithNext && (
                 <Tooltip>
                     <TooltipTrigger asChild>
                         <button
                             type="button"
                             className={cn(
                                 "absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full",
-                                "bg-muted border-2 border-primary/70 flex items-center justify-center",
-                                "opacity-0 group-hover:opacity-100 transition-opacity",
-                                "hover:bg-primary hover:border-primary cursor-pointer z-10",
-                                isConnectionSource && "opacity-100 bg-primary border-primary"
+                                "bg-background border-2 border-muted-foreground/40 flex items-center justify-center",
+                                "opacity-0 group-hover:opacity-100 transition-all duration-200",
+                                "hover:bg-primary hover:border-primary hover:scale-110 cursor-pointer z-10"
                             )}
                             onClick={(e) => {
                                 e.stopPropagation()
-                                onStartConnection(push.tempId)
+                                onAddChained(push.tempId)
                             }}
                         >
-                            <Link2 className="h-3 w-3 text-primary-foreground" />
+                            <Plus className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary-foreground" />
                         </button>
                     </TooltipTrigger>
                     <TooltipContent side="right" className="text-xs">
-                        Link to another push
+                        Add connected push
                     </TooltipContent>
                 </Tooltip>
             )}
 
-            {/* Dependency indicator dot on left */}
-            {isDependent && (
-                <div className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-muted-foreground/70 border-2 border-background" />
+            {/* Chained indicator - small connector between chained pushes */}
+            {isChainedWithPrev && (
+                <div className="absolute -left-0.5 top-1/2 -translate-y-1/2 w-1 h-4 bg-white/30 rounded-full" />
             )}
         </div>
     )

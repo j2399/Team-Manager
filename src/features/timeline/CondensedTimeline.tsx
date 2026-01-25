@@ -197,7 +197,7 @@ export function CondensedTimeline({ pushes, projectId, onPushUpdate }: Condensed
                         />
 
                         <p className="text-xs text-muted-foreground">
-                            Drag to move • Resize edges • Click to edit • Hover for link
+                            Click to edit • Hover for + to chain pushes
                         </p>
                     </div>
                 </div>
