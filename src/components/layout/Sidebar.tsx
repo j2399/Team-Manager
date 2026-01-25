@@ -148,14 +148,14 @@ const SortableProjectRow = React.memo(({
             ref={setNodeRef}
             style={style}
             className={cn(
-                "group relative w-full flex items-center gap-1 rounded-md transition-all duration-300 overflow-hidden",
+                "group relative w-full flex items-center rounded-md transition-all duration-300",
                 !isActive && "hover:bg-muted/50"
             )}
         >
             {/* Active gradient indicator - animates from right */}
             <div
                 className={cn(
-                    "absolute inset-0 rounded-md",
+                    "absolute inset-0 rounded-md pointer-events-none",
                     isActive ? "animate-sidebar-gradient" : "scale-x-0 origin-right"
                 )}
                 style={{
@@ -177,19 +177,19 @@ const SortableProjectRow = React.memo(({
                 href={`/dashboard/projects/${project.id}`}
                 onClick={() => !isActive && setNavigatingTo(`/dashboard/projects/${project.id}`)}
                 className={cn(
-                    "relative z-10 flex-1 min-w-0 flex items-center rounded-md px-3 py-1.5 text-sm transition-colors overflow-hidden",
+                    "relative z-10 flex-1 min-w-0 rounded-md pl-3 pr-8 py-1.5 text-sm transition-colors",
                     isActive ? "font-medium" : "text-muted-foreground group-hover:text-foreground"
                 )}
                 title={project.name}
             >
-                <span className="truncate">{project.name}</span>
+                <span className="block truncate">{project.name}</span>
             </Link>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="relative z-20 h-6 w-6 shrink-0 text-muted-foreground/50 hover:text-muted-foreground"
+                        className="absolute right-0 z-20 h-6 w-6 text-muted-foreground/50 hover:text-muted-foreground"
                     >
                         {navigatingTo === `/dashboard/projects/${project.id}` ? (
                             <div className="flex items-center gap-[3px]">
