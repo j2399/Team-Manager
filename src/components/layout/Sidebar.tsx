@@ -148,7 +148,7 @@ const SortableProjectRow = React.memo(({
             ref={setNodeRef}
             style={style}
             className={cn(
-                "group relative flex items-center gap-1 rounded-md transition-all duration-300",
+                "group relative w-full flex items-center gap-1 rounded-md transition-all duration-300 overflow-hidden",
                 !isActive && "hover:bg-muted/50"
             )}
         >
@@ -596,7 +596,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                     <Plus className="h-4 w-4" />
                                 </Button>
                             </div>
-                            <CollapsibleContent className="pl-6 mt-1 space-y-1">
+                            <CollapsibleContent className="pl-6 pr-1 mt-1 space-y-1 overflow-hidden">
                                 {projects.length === 0 ? (
                                     <p className="text-sm text-muted-foreground px-3 py-1">No projects yet</p>
                                 ) : (
