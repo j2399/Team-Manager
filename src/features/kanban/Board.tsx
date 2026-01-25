@@ -990,7 +990,7 @@ export function Board({
                             const firstPush = chain[0]
 
                             return (
-                                <div key={`chain-${firstPush.id}`} className="rounded-xl border bg-card shadow-sm">
+                                <div key={`chain-${firstPush.id}`}>
                                     <PushChainStrip
                                         chain={chain}
                                         isComplete={isPushComplete}
