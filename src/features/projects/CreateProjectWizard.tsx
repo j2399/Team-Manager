@@ -314,7 +314,7 @@ export function CreateProjectWizard({
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Sparkles className="h-4 w-4 text-primary" />
                                 <span>
-                                    Drag on the timeline to create pushes (sprints), or click "Add Push" to add them manually.
+                                    Drag to create pushes. Click to edit. Hover for + to chain.
                                 </span>
                             </div>
 
@@ -326,8 +326,7 @@ export function CreateProjectWizard({
 
                             {pushes.length > 0 && (
                                 <p className="text-xs text-muted-foreground">
-                                    {pushes.length} push{pushes.length !== 1 ? 'es' : ''} planned.
-                                    Double-click a push to rename it.
+                                    {pushes.length} push{pushes.length !== 1 ? 'es' : ''} planned
                                 </p>
                             )}
                         </div>

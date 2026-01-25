@@ -42,7 +42,7 @@ const ROW_HEIGHT = 48
 const MIN_ROWS = 3
 const HEADER_HEIGHT = 48
 const MIN_DRAG_DISTANCE = 20
-const DEFAULT_CHAINED_DURATION = 14 // Default duration for chained pushes in days
+const DEFAULT_CHAINED_DURATION = 14
 
 export function TimelineEditor({
     pushes,
@@ -64,6 +64,7 @@ export function TimelineEditor({
     const [namePromptOpen, setNamePromptOpen] = useState(false)
     const [pendingPush, setPendingPush] = useState<PushDraft | null>(null)
     const [newPushName, setNewPushName] = useState("")
+    const [newPushEndDate, setNewPushEndDate] = useState("")
 
     // Edit popup state
     const [editingPush, setEditingPush] = useState<PushDraft | null>(null)
@@ -112,38 +113,70 @@ export function TimelineEditor({
         return ((date.getTime() - viewRange.start.getTime()) / totalDuration) * 100
     }, [viewRange, totalDuration])
 
-    // Calculate which pushes are chained (one starts immediately after another ends)
+    // Calculate row assignments - chained pushes go on the same row
+    const rowAssignments = useMemo(() => {
+        const assignments: Record<string, number> = {}
+
+        // Build dependency chains: find all root pushes (no dependencies) and their chains
+        const chains: string[][] = []
+        const processed = new Set<string>()
+
+        // Get all pushes that are roots (not dependent on anything)
+        const rootPushes = pushes.filter(p => !p.dependsOn)
+
+        for (const root of rootPushes) {
+            const chain: string[] = [root.tempId]
+            processed.add(root.tempId)
+
+            // Find all pushes that chain from this one
+            let current = root
+            while (true) {
+                const next = pushes.find(p => p.dependsOn === current.tempId && !processed.has(p.tempId))
+                if (!next) break
+                chain.push(next.tempId)
+                processed.add(next.tempId)
+                current = next
+            }
+
+            chains.push(chain)
+        }
+
+        // Add any remaining pushes (orphaned dependencies) as their own row
+        for (const push of pushes) {
+            if (!processed.has(push.tempId)) {
+                chains.push([push.tempId])
+            }
+        }
+
+        // Assign row indices
+        chains.forEach((chain, rowIndex) => {
+            chain.forEach(pushId => {
+                assignments[pushId] = rowIndex
+            })
+        })
+
+        return assignments
+    }, [pushes])
+
+    // Get the number of unique rows
+    const numRows = useMemo(() => {
+        const rows = new Set(Object.values(rowAssignments))
+        return Math.max(rows.size, 0)
+    }, [rowAssignments])
+
+    // Calculate which pushes are chained
     const chainInfo = useMemo(() => {
         const info: Record<string, { isChainedWithNext: boolean; isChainedWithPrev: boolean }> = {}
 
-        // Sort pushes by start date to find chains
-        const sortedPushes = [...pushes].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
-
-        sortedPushes.forEach((push, i) => {
-            const pushEnd = push.endDate || addDays(push.startDate, 14)
-            const nextPush = sortedPushes[i + 1]
-            const prevPush = sortedPushes[i - 1]
-
-            // Check if chained with next (this push ends when next starts, or next depends on this)
-            const isChainedWithNext = nextPush && (
-                (nextPush.dependsOn === push.tempId) ||
-                (Math.abs(pushEnd.getTime() - nextPush.startDate.getTime()) < 1000 * 60 * 60 * 24) // Within a day
-            )
-
-            // Check if chained with previous
-            const isChainedWithPrev = prevPush && (
-                (push.dependsOn === prevPush.tempId) ||
-                (() => {
-                    const prevEnd = prevPush.endDate || addDays(prevPush.startDate, 14)
-                    return Math.abs(prevEnd.getTime() - push.startDate.getTime()) < 1000 * 60 * 60 * 24
-                })()
-            )
+        for (const push of pushes) {
+            const hasNext = pushes.some(p => p.dependsOn === push.tempId)
+            const hasPrev = !!push.dependsOn
 
             info[push.tempId] = {
-                isChainedWithNext: !!isChainedWithNext,
-                isChainedWithPrev: !!isChainedWithPrev
+                isChainedWithNext: hasNext,
+                isChainedWithPrev: hasPrev
             }
-        })
+        }
 
         return info
     }, [pushes])
@@ -195,6 +228,7 @@ export function TimelineEditor({
                 }
                 setPendingPush(newPush)
                 setNewPushName(`Push ${pushes.length + 1}`)
+                setNewPushEndDate(formatDateISO(createPreview.end))
                 setNamePromptOpen(true)
             }
         }
@@ -211,32 +245,39 @@ export function TimelineEditor({
         if (!sourcePush) return
 
         const sourceEnd = sourcePush.endDate || addDays(sourcePush.startDate, 14)
+        const defaultEnd = addDays(sourceEnd, DEFAULT_CHAINED_DURATION)
 
         const newPush: PushDraft = {
             tempId: generateTempId(),
             name: "",
             startDate: sourceEnd,
-            endDate: addDays(sourceEnd, DEFAULT_CHAINED_DURATION),
+            endDate: defaultEnd,
             color: sourcePush.color, // Same color for visual continuity
             dependsOn: afterPushId
         }
 
         setPendingPush(newPush)
         setNewPushName(`Push ${pushes.length + 1}`)
+        setNewPushEndDate(formatDateISO(defaultEnd))
         setNamePromptOpen(true)
     }, [pushes])
 
     // Handle name prompt submission
     const handleNameSubmit = useCallback(() => {
         if (pendingPush && newPushName.trim()) {
-            const pushWithName = { ...pendingPush, name: newPushName.trim() }
+            const pushWithName: PushDraft = {
+                ...pendingPush,
+                name: newPushName.trim(),
+                endDate: newPushEndDate ? new Date(newPushEndDate) : pendingPush.endDate
+            }
             onPushesChange([...pushes, pushWithName])
             setSelectedPushId(pushWithName.tempId)
         }
         setNamePromptOpen(false)
         setPendingPush(null)
         setNewPushName("")
-    }, [pendingPush, newPushName, pushes, onPushesChange])
+        setNewPushEndDate("")
+    }, [pendingPush, newPushName, newPushEndDate, pushes, onPushesChange])
 
     // Handle push click to open edit popup
     const handlePushClick = useCallback((push: PushDraft) => {
@@ -289,8 +330,8 @@ export function TimelineEditor({
         setEditingPush({ ...editingPush, dependsOn: null })
     }, [editingPush, pushes, onPushesChange])
 
-    // Calculate grid height with extra row for new pushes
-    const gridHeight = Math.max((pushes.length + 1) * ROW_HEIGHT, MIN_ROWS * ROW_HEIGHT)
+    // Calculate grid height - one row per chain, plus one for new pushes
+    const gridHeight = Math.max((numRows + 1) * ROW_HEIGHT, MIN_ROWS * ROW_HEIGHT)
     const totalHeight = HEADER_HEIGHT + gridHeight
 
     // Find dependency name for display
@@ -341,7 +382,7 @@ export function TimelineEditor({
                         className="absolute left-0 right-0"
                         style={{ top: `${HEADER_HEIGHT}px`, height: `${gridHeight}px` }}
                     >
-                        {pushes.map((push, index) => (
+                        {pushes.map((push) => (
                             <TimelineBar
                                 key={push.tempId}
                                 push={push}
@@ -352,7 +393,7 @@ export function TimelineEditor({
                                 isSelected={selectedPushId === push.tempId}
                                 onSelect={setSelectedPushId}
                                 onClick={() => handlePushClick(push)}
-                                rowIndex={index}
+                                rowIndex={rowAssignments[push.tempId] ?? 0}
                                 readOnly={readOnly}
                                 isDependent={!!push.dependsOn}
                                 dependencyCompleted={false}
@@ -369,7 +410,7 @@ export function TimelineEditor({
                                 style={{
                                     left: `${getPositionPercent(createPreview.start)}%`,
                                     width: `${Math.max(getPositionPercent(createPreview.end) - getPositionPercent(createPreview.start), 2)}%`,
-                                    top: `${pushes.length * ROW_HEIGHT + 6}px`
+                                    top: `${numRows * ROW_HEIGHT + 6}px`
                                 }}
                             />
                         )}
@@ -386,7 +427,7 @@ export function TimelineEditor({
                 </div>
             </div>
 
-            {/* Name prompt dialog */}
+            {/* Name prompt dialog - includes end date for chained pushes */}
             <Dialog open={namePromptOpen} onOpenChange={(open) => {
                 if (!open) {
                     setNamePromptOpen(false)
@@ -397,18 +438,36 @@ export function TimelineEditor({
                     <DialogHeader>
                         <DialogTitle>Name this push</DialogTitle>
                     </DialogHeader>
-                    <div className="py-4">
-                        <Input
-                            value={newPushName}
-                            onChange={(e) => setNewPushName(e.target.value)}
-                            placeholder="Push name"
-                            autoFocus
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') handleNameSubmit()
-                            }}
-                        />
-                        {pendingPush && (
-                            <p className="text-xs text-muted-foreground mt-2">
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="new-push-name">Name</Label>
+                            <Input
+                                id="new-push-name"
+                                value={newPushName}
+                                onChange={(e) => setNewPushName(e.target.value)}
+                                placeholder="Push name"
+                                autoFocus
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleNameSubmit()
+                                }}
+                            />
+                        </div>
+                        {pendingPush?.dependsOn && (
+                            <div className="space-y-2">
+                                <Label htmlFor="new-push-end">End Date</Label>
+                                <Input
+                                    id="new-push-end"
+                                    type="date"
+                                    value={newPushEndDate}
+                                    onChange={(e) => setNewPushEndDate(e.target.value)}
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Starts {formatDateShort(pendingPush.startDate)}
+                                </p>
+                            </div>
+                        )}
+                        {pendingPush && !pendingPush.dependsOn && (
+                            <p className="text-xs text-muted-foreground">
                                 {formatDateShort(pendingPush.startDate)} − {formatDateShort(pendingPush.endDate || addDays(pendingPush.startDate, 14))}
                             </p>
                         )}
