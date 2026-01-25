@@ -322,10 +322,10 @@ export function TimelineBar({
                 )}
             </div>
 
-            {/* Chain drag preview */}
+            {/* Chain drag preview - renders behind plus button */}
             {isChainDragging && hasMoved && chainDragEnd && (
                 <div
-                    className="absolute h-9 rounded-l-none rounded-r-lg bg-primary/40 border-2 border-dashed border-primary pointer-events-none"
+                    className="absolute h-9 rounded-lg bg-primary/40 border-2 border-dashed border-primary pointer-events-none z-0"
                     style={{
                         left: `${chainPreviewLeft}%`,
                         width: `${Math.max(chainPreviewWidth, 2)}%`,

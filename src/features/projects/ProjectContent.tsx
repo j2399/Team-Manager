@@ -9,7 +9,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { TaskDialog } from "@/features/kanban/TaskDialog"
 import { TaskPreview } from "@/features/kanban/TaskPreview"
 import { ProjectGanttChart } from "@/features/timeline/ProjectGanttChart"
-import { CondensedTimeline } from "@/features/timeline/CondensedTimeline"
 import { PushDialog } from "@/features/pushes/PushDialog"
 
 function hexToRgba(hex: string, alpha: number) {
@@ -246,17 +245,6 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                         </div>
                     </div>
                 </div>
-
-                {/* Condensed Timeline for pushes */}
-                {pushes.length > 0 && (
-                    <div className="px-3 pb-3">
-                        <CondensedTimeline
-                            pushes={pushes}
-                            projectId={project.id}
-                            onPushUpdate={() => router.refresh()}
-                        />
-                    </div>
-                )}
             </div>
 
             <div className="flex-1 min-h-0">
