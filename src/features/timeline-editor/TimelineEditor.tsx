@@ -469,7 +469,7 @@ export function TimelineEditor({
             <Dialog open={namePromptOpen} onOpenChange={(open) => {
                 if (!open) handleDialogClose()
             }}>
-                <DialogContent showCloseButton={false} className="sm:max-w-[280px] p-4">
+                <DialogContent showCloseButton={false} className="sm:max-w-[320px] p-5">
                     <DialogTitle className="sr-only">Name this push</DialogTitle>
                     <DialogDescription className="sr-only">Enter a name for the new push you just created.</DialogDescription>
                     <div className="space-y-3">
@@ -485,7 +485,7 @@ export function TimelineEditor({
                             }}
                         />
 
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center justify-between gap-4">
                             {pendingPush?.dependsOn ? (
                                 <div className="flex items-center gap-2 flex-1">
                                     <Input
@@ -497,7 +497,7 @@ export function TimelineEditor({
                                     />
                                 </div>
                             ) : (
-                                <div className="text-[10px] text-muted-foreground">
+                                <div className="text-[10px] text-muted-foreground truncate">
                                     {pendingPush && formatDateShort(pendingPush.startDate)} − {pendingPush && formatDateShort(pendingPush.endDate || addDays(pendingPush.startDate, 14))}
                                 </div>
                             )}
