@@ -16,6 +16,17 @@ const PROJECT_COLORS = [
     "#ec4899", // pink
 ]
 
+const PUSH_COLORS = [
+    "#3b82f6", // blue
+    "#22c55e", // green
+    "#f59e0b", // amber
+    "#8b5cf6", // violet
+    "#ec4899", // pink
+    "#06b6d4", // cyan
+    "#f97316", // orange
+    "#84cc16", // lime
+]
+
 function normalizeHexColor(value: unknown): string | null {
     if (typeof value !== "string") return null
     const trimmed = value.trim()
@@ -93,7 +104,7 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json()
-        const { name, description, leadId, memberIds, color } = body
+        const { name, description, leadId, memberIds, color, pushes } = body
 
         if (!name || name.trim().length === 0) {
             return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -151,6 +162,26 @@ export async function POST(request: Request) {
                     }
                 }
             })
+
+            // Create pushes if provided
+            if (pushes && Array.isArray(pushes) && pushes.length > 0) {
+                for (let i = 0; i < pushes.length; i++) {
+                    const push = pushes[i]
+                    if (push.name && push.startDate) {
+                        await tx.push.create({
+                            data: {
+                                name: push.name,
+                                projectId: p.id,
+                                startDate: new Date(push.startDate),
+                                endDate: push.endDate ? new Date(push.endDate) : null,
+                                color: PUSH_COLORS[i % PUSH_COLORS.length],
+                                status: 'Active'
+                            }
+                        })
+                    }
+                }
+            }
+
             return p
         })
 

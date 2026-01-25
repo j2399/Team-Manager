@@ -57,6 +57,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { GeneralChat } from "@/components/layout/GeneralChat"
+import { CreateProjectWizard } from "@/features/projects/CreateProjectWizard"
 
 type Project = {
     id: string
@@ -694,95 +695,14 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 </Button>
             </div>
 
-            {/* Create Project Dialog */}
-            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                <DialogContent ref={createProjectDialogContentRef} className="sm:max-w-md">
-                    <form onSubmit={handleCreate}>
-                        <DialogHeader>
-                            <DialogTitle>New Project</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid gap-3 py-4">
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="name" className="text-xs">Name</Label>
-                                <Input id="name" name="name" required className="h-8 text-sm" />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label htmlFor="description" className="text-xs">Description</Label>
-                                <Textarea id="description" name="description" className="text-sm min-h-[60px]" />
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label className="text-xs flex items-center gap-1">
-                                    Project Lead <span className="text-red-500">*</span>
-                                </Label>
-                                <Select
-                                    value={newProjectLeadId}
-                                    onValueChange={setNewProjectLeadId}
-                                    required
-                                >
-                                    <SelectTrigger className="h-8 text-sm">
-                                        <SelectValue placeholder="Select lead" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">Select a User...</SelectItem>
-                                        {leadCandidates.map(user => (
-                                            <SelectItem key={user.id} value={user.id}>
-                                                {user.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid gap-1.5">
-                                <Label className="text-xs">Members</Label>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant="outline" className="w-full justify-between h-8 text-sm px-2 font-normal">
-                                            <span className="truncate">
-                                                {selectedMemberIds.length === 0
-                                                    ? "Select members..."
-                                                    : `${selectedMemberIds.length} selected`}
-                                            </span>
-                                            <ChevronDown className="h-4 w-4 opacity-50" />
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[200px] p-0" align="start">
-                                        <RemoveScroll shards={[createProjectDialogContentRef]}>
-                                            <div className="max-h-[200px] overflow-y-auto overscroll-contain p-1">
-                                                {allUsers.map(user => {
-                                                    const isLead = user.id === newProjectLeadId
-                                                    return (
-                                                        <div
-                                                            key={user.id}
-                                                            className={cn(
-                                                                "flex items-center space-x-2 px-2 py-1.5 rounded-sm",
-                                                                isLead ? "opacity-50 pointer-events-none" : "hover:bg-accent cursor-pointer"
-                                                            )}
-                                                            onClick={() => !isLead && toggleMember(user.id)}
-                                                        >
-                                                            <Checkbox
-                                                                checked={isLead || selectedMemberIds.includes(user.id)}
-                                                                disabled={isLead}
-                                                            />
-                                                            <div className="text-sm flex-1">
-                                                                {user.name} {isLead && <span className="text-xs text-muted-foreground ml-1">(Lead)</span>}
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        </RemoveScroll>
-                                    </PopoverContent>
-                                </Popover>
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button type="submit" disabled={isSubmitting} size="sm">
-                                {isSubmitting ? 'Creating...' : 'Create'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
+            {/* Create Project Wizard */}
+            <CreateProjectWizard
+                open={createDialogOpen}
+                onOpenChange={setCreateDialogOpen}
+                leadCandidates={leadCandidates}
+                allUsers={allUsers}
+                onProjectCreated={fetchProjects}
+            />
 
             {/* Edit Project Dialog */}
             <Dialog open={!!editingProject} onOpenChange={(open) => !open && setEditingProject(null)}>
