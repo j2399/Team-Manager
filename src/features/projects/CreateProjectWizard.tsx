@@ -215,6 +215,7 @@ export function CreateProjectWizard({
                                     onChange={(e) => setProjectData(prev => ({ ...prev, name: e.target.value }))}
                                     placeholder="Enter project name"
                                     className="h-10"
+                                    autoComplete="off"
                                 />
                             </div>
 
@@ -334,7 +335,7 @@ export function CreateProjectWizard({
                 </div>
 
                 {/* Footer with navigation */}
-                <DialogFooter className="flex-row justify-between sm:justify-between gap-2 pt-4 border-t">
+                <DialogFooter className="flex-row justify-between sm:justify-between gap-2 pt-4 border-t min-h-[52px]">
                     <div>
                         {currentStep > 0 && (
                             <Button

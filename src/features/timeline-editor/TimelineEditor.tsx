@@ -158,13 +158,37 @@ export function TimelineEditor({
         return Math.max(rows.size, 0)
     }, [rowAssignments])
 
-    // Check if push has a chained push after it
-    const chainInfo = useMemo(() => {
-        const info: Record<string, { isChainedWithNext: boolean }> = {}
+    // Check if push has a chained push after it and calculate touch info
+    const pushInfo = useMemo(() => {
+        const info: Record<string, {
+            isChainedWithNext: boolean
+            isTouchingPrevious: boolean
+            isTouchingNext: boolean
+        }> = {}
 
         for (const push of pushes) {
             const hasNext = pushes.some(p => p.dependsOn === push.tempId)
-            info[push.tempId] = { isChainedWithNext: hasNext }
+            const pushEnd = push.endDate || addDays(push.startDate, 14)
+
+            // Check if touching previous (this push starts exactly when its dependency ends)
+            let isTouchingPrevious = false
+            if (push.dependsOn) {
+                const prevPush = pushes.find(p => p.tempId === push.dependsOn)
+                if (prevPush) {
+                    const prevEnd = prevPush.endDate || addDays(prevPush.startDate, 14)
+                    // Same day = touching
+                    isTouchingPrevious = Math.abs(prevEnd.getTime() - push.startDate.getTime()) < 1000 * 60 * 60 * 24
+                }
+            }
+
+            // Check if touching next (a dependent push starts exactly when this ends)
+            let isTouchingNext = false
+            const nextPush = pushes.find(p => p.dependsOn === push.tempId)
+            if (nextPush) {
+                isTouchingNext = Math.abs(pushEnd.getTime() - nextPush.startDate.getTime()) < 1000 * 60 * 60 * 24
+            }
+
+            info[push.tempId] = { isChainedWithNext: hasNext, isTouchingPrevious, isTouchingNext }
         }
 
         return info
@@ -381,7 +405,9 @@ export function TimelineEditor({
                                 isDependent={!!push.dependsOn}
                                 dependencyCompleted={false}
                                 onAddChained={handleAddChained}
-                                isChainedWithNext={chainInfo[push.tempId]?.isChainedWithNext || false}
+                                isChainedWithNext={pushInfo[push.tempId]?.isChainedWithNext || false}
+                                isTouchingPrevious={pushInfo[push.tempId]?.isTouchingPrevious || false}
+                                isTouchingNext={pushInfo[push.tempId]?.isTouchingNext || false}
                                 getDateFromX={getDateFromClientX}
                             />
                         ))}

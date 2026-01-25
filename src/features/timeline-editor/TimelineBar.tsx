@@ -21,6 +21,8 @@ type TimelineBarProps = {
     dependencyCompleted?: boolean
     onAddChained?: (afterPushId: string, endDate?: Date) => void
     isChainedWithNext?: boolean
+    isTouchingPrevious?: boolean
+    isTouchingNext?: boolean
     getDateFromX?: (clientX: number) => Date
 }
 
@@ -42,6 +44,8 @@ export function TimelineBar({
     dependencyCompleted = true,
     onAddChained,
     isChainedWithNext = false,
+    isTouchingPrevious = false,
+    isTouchingNext = false,
     getDateFromX
 }: TimelineBarProps) {
     const barRef = useRef<HTMLDivElement>(null)
@@ -138,7 +142,7 @@ export function TimelineBar({
         setHasMoved(false)
     }, [isDragging, hasMoved, dragOffset, dragType, push, pushEnd, totalDuration, onUpdate, onClick])
 
-    // Chain drag handlers - for dragging the plus button to set duration
+    // Chain drag handlers
     const handleChainPointerDown = useCallback((e: React.PointerEvent) => {
         e.preventDefault()
         e.stopPropagation()
@@ -159,7 +163,6 @@ export function TimelineBar({
         if (distanceMoved > MIN_MOVE_FOR_DRAG) {
             setHasMoved(true)
             const endDate = getDateFromX(e.clientX)
-            // Only allow dragging to the right (after this push ends)
             if (endDate > pushEnd) {
                 setChainDragEnd(endDate)
             }
@@ -173,10 +176,8 @@ export function TimelineBar({
         target.releasePointerCapture(e.pointerId)
 
         if (hasMoved && chainDragEnd && onAddChained) {
-            // Create chained push with dragged end date
             onAddChained(push.tempId, chainDragEnd)
         } else if (onAddChained) {
-            // Just clicked, not dragged - use default duration
             onAddChained(push.tempId)
         }
 
@@ -206,17 +207,23 @@ export function TimelineBar({
     const chainPreviewLeft = getPositionPercent(pushEnd)
     const chainPreviewWidth = chainDragEnd ? getPositionPercent(chainDragEnd) - chainPreviewLeft : 0
 
+    // Determine edge styling based on whether pushes are touching
+    const leftEdgeRounded = !isTouchingPrevious
+    const rightEdgeRounded = !isTouchingNext
+
     return (
         <>
             <div
                 ref={barRef}
                 data-timeline-bar
                 className={cn(
-                    "absolute h-9 rounded-lg cursor-pointer transition-all select-none group",
+                    "absolute h-9 cursor-pointer transition-all select-none group",
                     isDragging && hasMoved && "z-50 shadow-lg scale-[1.02]",
                     isSelected && !isDragging && "ring-2 ring-primary ring-offset-1",
                     !isDragging && "hover:brightness-110",
-                    isGreyedOut && "opacity-50"
+                    isGreyedOut && "opacity-50",
+                    leftEdgeRounded ? "rounded-l-lg" : "rounded-l-none",
+                    rightEdgeRounded ? "rounded-r-lg" : "rounded-r-none"
                 )}
                 style={{
                     left: `${visualLeft}%`,
@@ -235,7 +242,10 @@ export function TimelineBar({
                 {/* Left resize handle */}
                 {!readOnly && (
                     <div
-                        className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 rounded-l-lg transition-colors"
+                        className={cn(
+                            "absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 transition-colors",
+                            leftEdgeRounded && "rounded-l-lg"
+                        )}
                         onPointerDown={(e) => handlePointerDown(e, 'resize-start')}
                     />
                 )}
@@ -277,14 +287,17 @@ export function TimelineBar({
                 {/* Right resize handle */}
                 {!readOnly && (
                     <div
-                        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 rounded-r-lg transition-colors"
+                        className={cn(
+                            "absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-white/30 transition-colors",
+                            rightEdgeRounded && "rounded-r-lg"
+                        )}
                         onPointerDown={(e) => handlePointerDown(e, 'resize-end')}
                     />
                 )}
 
-                {/* Add chained push button - appears on hover, can be dragged */}
+                {/* Add chained push button - hide tooltip while dragging */}
                 {!readOnly && onAddChained && !isChainedWithNext && (
-                    <Tooltip>
+                    <Tooltip open={isChainDragging ? false : undefined}>
                         <TooltipTrigger asChild>
                             <div
                                 className={cn(
@@ -303,7 +316,7 @@ export function TimelineBar({
                             </div>
                         </TooltipTrigger>
                         <TooltipContent side="right" className="text-xs">
-                            Click or drag to add connected push
+                            Click or drag to add push
                         </TooltipContent>
                     </Tooltip>
                 )}
@@ -312,7 +325,7 @@ export function TimelineBar({
             {/* Chain drag preview */}
             {isChainDragging && hasMoved && chainDragEnd && (
                 <div
-                    className="absolute h-9 rounded-lg bg-primary/40 border-2 border-dashed border-primary pointer-events-none"
+                    className="absolute h-9 rounded-l-none rounded-r-lg bg-primary/40 border-2 border-dashed border-primary pointer-events-none"
                     style={{
                         left: `${chainPreviewLeft}%`,
                         width: `${Math.max(chainPreviewWidth, 2)}%`,
