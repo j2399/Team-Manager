@@ -190,7 +190,7 @@ const SortableProjectRow = React.memo(({
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="relative z-20 h-6 w-6 shrink-0 ml-auto text-muted-foreground/50 hover:text-muted-foreground"
+                        className="relative z-20 h-6 w-6 shrink-0 ml-auto text-muted-foreground/50 hover:text-muted-foreground hover:bg-transparent focus:bg-transparent"
                     >
                         {navigatingTo === `/dashboard/projects/${project.id}` ? (
                             <div className="flex items-center gap-[3px]">
@@ -402,7 +402,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
 
         const leadId = newProjectLeadId
         if (!leadId || leadId === 'none') {
-            alert('Project Lead is required')
+            alert('Division Lead is required')
             setIsSubmitting(false)
             return
         }
@@ -586,7 +586,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                 <CollapsibleTrigger className="flex-1 flex items-center gap-3 rounded-md px-3 py-2 text-muted-foreground transition-all hover:translate-x-0.5 text-sm">
                                     <ChevronDown className={cn("h-5 w-5 transition-transform", !projectsOpen && "-rotate-90")} />
                                     <FolderKanban className="h-5 w-5" />
-                                    <span>Projects</span>
+                                    <span>Divisions</span>
                                 </CollapsibleTrigger>
                                 <Button
                                     variant="ghost"
@@ -599,7 +599,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                             </div>
                             <CollapsibleContent className="pl-6 pr-1 mt-1 space-y-1 overflow-hidden">
                                 {projects.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground px-3 py-1">No projects yet</p>
+                                    <p className="text-sm text-muted-foreground px-3 py-1">No divisions yet</p>
                                 ) : (
                                     <DndContext
                                         sensors={sensors}
@@ -752,7 +752,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                 </div>
                             </div>
                             <div className="grid gap-1.5">
-                                <Label className="text-xs">Project Lead</Label>
+                                <Label className="text-xs">Division Lead</Label>
                                 <Select value={editLeadId} onValueChange={setEditLeadId}>
                                     <SelectTrigger className="h-8 text-sm">
                                         <SelectValue placeholder="Select lead" />

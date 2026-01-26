@@ -37,7 +37,7 @@ export function CreateProjectDialog({ users }: Props) {
 
     async function handleSubmit(formData: FormData) {
         if (!leadId) {
-            toast({ title: "Error", description: "Project Lead is required", variant: "destructive" })
+            toast({ title: "Error", description: "Division Lead is required", variant: "destructive" })
             return
         }
 
@@ -49,7 +49,7 @@ export function CreateProjectDialog({ users }: Props) {
             if (result?.error) {
                 toast({ title: "Error", description: result.error, variant: "destructive" })
             } else {
-                toast({ title: "Project Created" })
+                toast({ title: "Division Created" })
                 setOpen(false)
                 setLeadId("")
             }
@@ -61,7 +61,7 @@ export function CreateProjectDialog({ users }: Props) {
             <DialogTrigger asChild>
                 <Button>
                     <Plus className="mr-2 h-4 w-4" />
-                    New Project
+                    New Division
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
@@ -72,7 +72,7 @@ export function CreateProjectDialog({ users }: Props) {
                     handleSubmit(formData);
                 }}>
                     <DialogHeader>
-                        <DialogTitle>Create Project</DialogTitle>
+                        <DialogTitle>Create Division</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
@@ -85,7 +85,7 @@ export function CreateProjectDialog({ users }: Props) {
                         </div>
                         <div className="grid gap-2">
                             <Label className="flex items-center gap-1">
-                                Project Lead <span className="text-red-500">*</span>
+                                Division Lead <span className="text-red-500">*</span>
                             </Label>
                             <Select value={leadId} onValueChange={setLeadId} required>
                                 <SelectTrigger className={!leadId ? "border-red-300" : ""}>
@@ -100,13 +100,13 @@ export function CreateProjectDialog({ users }: Props) {
                                 </SelectContent>
                             </Select>
                             {!leadId && (
-                                <p className="text-xs text-red-500">Project Lead is required</p>
+                                <p className="text-xs text-red-500">Division Lead is required</p>
                             )}
                         </div>
                     </div>
                     <DialogFooter>
                         <Button type="submit" disabled={isPending}>
-                            {isPending ? 'Creating...' : 'Create Project'}
+                            {isPending ? 'Creating...' : 'Create Division'}
                         </Button>
                     </DialogFooter>
                 </form>

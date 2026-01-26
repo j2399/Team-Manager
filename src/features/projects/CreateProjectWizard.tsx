@@ -54,7 +54,7 @@ type ProjectData = {
 }
 
 const STEPS = [
-    { id: 'basic', label: 'Project Info' },
+    { id: 'basic', label: 'Division Info' },
     { id: 'timeline', label: 'Plan Timeline' },
 ]
 
@@ -176,9 +176,9 @@ export function CreateProjectWizard({
                 )}
             >
                 <DialogHeader className="pb-2">
-                    <DialogTitle className="text-xl font-semibold">Create New Project</DialogTitle>
+                    <DialogTitle className="text-xl font-semibold">Create New Division</DialogTitle>
                     <DialogDescription className="sr-only">
-                        Create a new project with optional timeline planning
+                        Create a new division with optional timeline planning
                     </DialogDescription>
                 </DialogHeader>
 
@@ -210,13 +210,13 @@ export function CreateProjectWizard({
                         <div className="grid gap-4">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="wizard-name" className="text-sm font-medium">
-                                    Project Name <span className="text-red-500">*</span>
+                                    Division Name <span className="text-red-500">*</span>
                                 </Label>
                                 <Input
                                     id="wizard-name"
                                     value={projectData.name}
                                     onChange={(e) => setProjectData(prev => ({ ...prev, name: e.target.value }))}
-                                    placeholder="Enter project name"
+                                    placeholder="Enter division name"
                                     className="h-10"
                                     autoComplete="off"
                                 />
@@ -230,14 +230,14 @@ export function CreateProjectWizard({
                                     id="wizard-description"
                                     value={projectData.description}
                                     onChange={(e) => setProjectData(prev => ({ ...prev, description: e.target.value }))}
-                                    placeholder="Brief description of the project"
+                                    placeholder="Brief description of the division"
                                     className="min-h-[80px] resize-none"
                                 />
                             </div>
 
                             <div className="grid gap-1.5">
                                 <Label className="text-sm font-medium">
-                                    Project Lead <span className="text-red-500">*</span>
+                                    Division Lead <span className="text-red-500">*</span>
                                 </Label>
                                 <Select
                                     value={projectData.leadId}
@@ -318,7 +318,7 @@ export function CreateProjectWizard({
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Sparkles className="h-4 w-4 text-primary" />
                                 <span>
-                                    Drag to create pushes. Click to edit. Hover for + to chain.
+                                    Drag to create projects. Click to edit. Hover for + to chain.
                                 </span>
                             </div>
 
@@ -330,7 +330,7 @@ export function CreateProjectWizard({
 
                             {pushes.length > 0 && (
                                 <p className="text-xs text-muted-foreground">
-                                    {pushes.length} push{pushes.length !== 1 ? 'es' : ''} planned
+                                    {pushes.length} project{pushes.length !== 1 ? 's' : ''} planned
                                 </p>
                             )}
                         </div>
@@ -388,7 +388,7 @@ export function CreateProjectWizard({
                                         </>
                                     ) : (
                                         <>
-                                            Create Project
+                                            Create Division
                                         </>
                                     )}
                                 </Button>
