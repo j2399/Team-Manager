@@ -63,11 +63,15 @@ export function PushChainStrip({
     const [isTransitioning, setIsTransitioning] = useState(false)
     // Track automatic transitions (push completed -> next push) for slower animation
     const [isAutoTransitioning, setIsAutoTransitioning] = useState(false)
+    // Flag to use slow animation during the actual motion (persists after delay)
+    const [useSlowMotion, setUseSlowMotion] = useState(false)
+    // Track which auto-transitions have already fired to prevent repeats
+    const handledTransitionsRef = useRef<Set<string>>(new Set())
     const prevActivePushIdRef = useRef<string | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
 
     const expandedPushId = useMemo(() => {
-        // During auto-transition, keep showing the old push briefly
+        // During auto-transition delay, keep showing the old push
         if (isAutoTransitioning && prevActivePushIdRef.current) {
             return prevActivePushIdRef.current
         }
@@ -91,26 +95,44 @@ export function PushChainStrip({
         }
     }, [isTransitioning])
 
+    // Clear slow motion after the animation completes
+    useEffect(() => {
+        if (useSlowMotion && !isAutoTransitioning) {
+            // Keep slow motion active during the actual width transition, then clear
+            const timer = setTimeout(() => setUseSlowMotion(false), 1200)
+            return () => clearTimeout(timer)
+        }
+    }, [useSlowMotion, isAutoTransitioning])
+
     // Detect automatic push changes (when a push is completed and we auto-advance)
     useEffect(() => {
-        if (prevActivePushIdRef.current && activePushId && prevActivePushIdRef.current !== activePushId) {
-            // Active push changed - this is an automatic transition!
-            // Only trigger if user hasn't manually selected a different push
-            if (!userSelectedPushId || userSelectedPushId === prevActivePushIdRef.current) {
-                setIsAutoTransitioning(true)
-                // Clear user selection so we follow the new active push
-                setUserSelectedPushId(null)
+        const prevId = prevActivePushIdRef.current
+        if (prevId && activePushId && prevId !== activePushId) {
+            // Create a unique key for this transition
+            const transitionKey = `${prevId}->${activePushId}`
 
-                // Preload the new push's tasks
-                ensureTasksLoaded(activePushId)
+            // Only trigger if we haven't already handled this specific transition
+            if (!handledTransitionsRef.current.has(transitionKey)) {
+                // Only trigger if user hasn't manually selected a DIFFERENT push
+                if (!userSelectedPushId || userSelectedPushId === prevId) {
+                    handledTransitionsRef.current.add(transitionKey)
+                    setIsAutoTransitioning(true)
+                    setUseSlowMotion(true) // Enable slow motion for the actual transition
+                    // Clear user selection so we follow the new active push
+                    setUserSelectedPushId(null)
 
-                // After a delay, complete the transition with animation
-                const timer = setTimeout(() => {
-                    setIsAutoTransitioning(false)
-                    setIsTransitioning(true)
-                }, 600) // 600ms delay before switching - gives time to see the completed state
+                    // Preload the new push's tasks
+                    ensureTasksLoaded(activePushId)
 
-                return () => clearTimeout(timer)
+                    // After a delay, complete the transition with animation
+                    const timer = setTimeout(() => {
+                        setIsAutoTransitioning(false)
+                        setIsTransitioning(true)
+                    }, 800) // 800ms delay before switching - gives time to see the completed state
+
+                    prevActivePushIdRef.current = activePushId
+                    return () => clearTimeout(timer)
+                }
             }
         }
         prevActivePushIdRef.current = activePushId
@@ -162,9 +184,9 @@ export function PushChainStrip({
                             key={push.id}
                             className={cn(
                                 "relative rounded-lg border shadow-sm overflow-hidden",
-                                // Slower animation for auto-transitions
-                                isAutoTransitioning
-                                    ? "transition-all duration-700 ease-out"
+                                // Slower, more dramatic animation for auto-transitions
+                                useSlowMotion
+                                    ? "transition-all duration-1000 ease-[cubic-bezier(0.4,0,0.2,1)]"
                                     : "transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.25,1.2)]",
                                 pushIsComplete
                                     ? "bg-muted/40 border-border/50"
