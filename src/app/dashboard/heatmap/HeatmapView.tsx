@@ -57,6 +57,7 @@ type UserStat = {
     stuckTasks: number
     helpRequestTasks: number
     workloadScore: number
+    status: 'struggling' | 'available' | 'on-track'
     tasks: Task[]
 }
 
@@ -195,6 +196,7 @@ export function HeatmapView({
 
     const maxWorkload = Math.max(...userStats.map(u => u.workloadScore), 1)
     const totalActiveTasks = allTasks.filter(t => t.columnName !== 'Done').length
+    const availableUsers = userStats.filter(user => user.status === 'available')
 
     // Sort users by workload
     const sortedUsers = [...userStats].sort((a, b) => b.workloadScore - a.workloadScore)
@@ -266,8 +268,7 @@ export function HeatmapView({
 
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                         {sortedUsers.map(user => {
-                            const isOverloaded = overloadedUsers.includes(user.id)
-                            const isIdle = idleUsers.includes(user.id)
+                            const status = user.status
 
                             return (
                                 <button
@@ -276,8 +277,8 @@ export function HeatmapView({
                                     className={cn(
                                         "p-3 rounded-lg border transition-all hover:shadow-md",
                                         getWorkloadColor(user.workloadScore, maxWorkload),
-                                        isOverloaded && "ring-2 ring-red-400",
-                                        isIdle && "ring-2 ring-blue-400"
+                                        status === 'struggling' && "ring-2 ring-red-400",
+                                        status === 'available' && "ring-2 ring-blue-400"
                                     )}
                                 >
                                     <div className="flex items-center gap-2 mb-2">
@@ -326,11 +327,16 @@ export function HeatmapView({
                                                 {user.helpRequestTasks} help
                                             </span>
                                         )}
-                                        {isIdle && (
-                                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 dark:bg-blue-900/50">
-                                                Available
-                                            </span>
-                                        )}
+                                        <span
+                                            className={cn(
+                                                "text-[9px] px-1.5 py-0.5 rounded",
+                                                status === 'struggling' && "bg-red-100 text-red-600 dark:bg-red-900/50",
+                                                status === 'available' && "bg-blue-100 text-blue-600 dark:bg-blue-900/50",
+                                                status === 'on-track' && "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50"
+                                            )}
+                                        >
+                                            {status === 'struggling' ? 'Struggling' : status === 'available' ? 'Available' : 'On track'}
+                                        </span>
                                     </div>
 
                                     {/* Workload bar */}
@@ -408,14 +414,14 @@ export function HeatmapView({
                     )}
 
                     {/* Available Team Members */}
-                    {idleUsers.length > 0 && (
+                    {availableUsers.length > 0 && (
                         <div className="border rounded-lg p-4">
                             <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
                                 <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                Available for Work ({idleUsers.length})
+                                Available for Work ({availableUsers.length})
                             </h3>
                             <div className="space-y-2">
-                                {userStats.filter(u => idleUsers.includes(u.id)).map(user => (
+                                {availableUsers.map(user => (
                                     <div
                                         key={user.id}
                                         className="flex items-center gap-2 p-2 rounded bg-green-50 dark:bg-green-950/30"

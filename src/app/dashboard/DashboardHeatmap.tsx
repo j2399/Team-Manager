@@ -61,6 +61,7 @@ type UserStat = {
     stuckTasks: number
     helpRequestTasks: number
     workloadScore: number
+    status: 'struggling' | 'available' | 'on-track'
     tasks: Task[]
 }
 
@@ -282,7 +283,7 @@ function UserDetailDialog({
                                     <Clock className="h-3 w-3" />
                                 </TooltipTrigger>
                                 <TooltipContent side="top" className="text-xs">
-                                    Stuck (3+ days)
+                                    Stuck (no recent activity)
                                 </TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
@@ -800,12 +801,7 @@ export function DashboardHeatmap({
             {/* User Cards Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {sortedUsers.map(user => {
-                    const isOverloaded = overloadedUsers.includes(user.id)
-                    const isIdle = idleUsers.includes(user.id)
-                    const hasIssues = user.overdueTasks > 0 || user.stuckTasks > 0 || user.helpRequestTasks > 0
-
-                    // Determine status
-                    const status = hasIssues ? 'struggling' : isIdle ? 'available' : 'on-track'
+                    const status = user.status
 
                     return (
                         <div

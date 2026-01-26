@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma"
 import { getCurrentUser } from '@/lib/auth'
+import { buildWorkloadTasks, computeWorkloadStats, getWorkloadConfig } from '@/lib/workload'
 import { AlertCircle, Users, CheckCircle2, Circle, Loader2, Clock, Layout, ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
@@ -174,9 +175,12 @@ export default async function DashboardPage() {
     }
 
     const fetchHeatmapData = async () => {
-        if (!isLeadership) return null
+        if (!isLeadership || !dbUser.workspaceId) return null
 
-        const [users, tasks] = await Promise.all([
+        const workspaceId = dbUser.workspaceId
+
+        const [config, users, tasks] = await Promise.all([
+            getWorkloadConfig(workspaceId),
             prisma.user.findMany({
                 where: { workspaceId: dbUser.workspaceId },
                 select: { id: true, name: true, avatar: true, role: true }
@@ -193,7 +197,7 @@ export default async function DashboardPage() {
                             board: { include: { project: { select: { id: true, name: true, color: true } } } }
                         }
                     },
-                    push: { select: { id: true } },
+                    push: { select: { id: true, name: true } },
                     helpRequests: {
                         where: { status: { in: ['open', 'acknowledged'] } },
                         select: { id: true }
@@ -208,80 +212,16 @@ export default async function DashboardPage() {
         ])
 
         const now = new Date()
-
-        // Transform tasks
-        const transformedTasks = tasks.map(task => {
-            const allAssigneeIds = [
-                task.assigneeId,
-                ...task.assignees.map(a => a.userId)
-            ].filter(Boolean) as string[]
-            const uniqueAssigneeIds = [...new Set(allAssigneeIds)]
-
-            const lastActivity = task.activityLogs[0]?.createdAt
-            const daysSinceActivity = lastActivity
-                ? Math.floor((now.getTime() - new Date(lastActivity).getTime()) / (1000 * 60 * 60 * 24))
-                : null
-
-            const dueDate = task.dueDate || task.endDate
-            const isOverdue = dueDate && task.column?.name !== 'Done' ? new Date(dueDate) < now : false
-            const isStuck = task.column?.name === 'In Progress' && daysSinceActivity !== null && daysSinceActivity >= 3
-            const isBlockedByHelp = task.helpRequests.length > 0
-            const isUnassigned = uniqueAssigneeIds.length === 0 && task.column?.name !== 'Done'
-
-            return {
-                id: task.id,
-                title: task.title,
-                columnName: task.column?.name || 'Unknown',
-                projectId: task.column?.board?.project?.id || '',
-                projectName: task.column?.board?.project?.name || '',
-                projectColor: task.column?.board?.project?.color || '#6b7280',
-                pushId: task.push?.id || null,
-                assigneeIds: uniqueAssigneeIds,
-                isOverdue,
-                isStuck,
-                isBlockedByHelp,
-                isUnassigned
-            }
-        })
-
-        // User stats with full details
-        const userStats = users.map(u => {
-            const userTasks = transformedTasks.filter(t => t.assigneeIds.includes(u.id))
-            const activeTasks = userTasks.filter(t => t.columnName !== 'Done').length
-            const todoTasks = userTasks.filter(t => t.columnName === 'To Do').length
-            const inProgressTasks = userTasks.filter(t => t.columnName === 'In Progress').length
-            const reviewTasks = userTasks.filter(t => t.columnName === 'Review').length
-            const doneTasks = userTasks.filter(t => t.columnName === 'Done').length
-            const overdueTasks = userTasks.filter(t => t.isOverdue).length
-            const stuckTasks = userTasks.filter(t => t.isStuck).length
-            const helpRequestTasks = userTasks.filter(t => t.isBlockedByHelp).length
-            const workloadScore = activeTasks + (overdueTasks * 2) + (stuckTasks * 1.5) + (helpRequestTasks * 1)
-
-            return {
-                id: u.id,
-                name: u.name,
-                avatar: u.avatar,
-                role: u.role,
-                activeTasks,
-                todoTasks,
-                inProgressTasks,
-                reviewTasks,
-                doneTasks,
-                overdueTasks,
-                stuckTasks,
-                helpRequestTasks,
-                workloadScore,
-                tasks: userTasks
-            }
-        })
+        const workloadTasks = buildWorkloadTasks(tasks, now, config)
+        const { userStats, overloadedUsers, idleUsers } = computeWorkloadStats(users, workloadTasks, config, now)
 
         // Critical issues
-        const criticalIssues: { type: string; severity: 'critical' | 'warning' | 'info'; message: string; count: number; tasks: typeof transformedTasks }[] = []
+        const criticalIssues: { type: string; severity: 'critical' | 'warning' | 'info'; message: string; count: number; tasks: typeof workloadTasks }[] = []
 
-        const totalOverdue = transformedTasks.filter(t => t.isOverdue).length
-        const totalStuck = transformedTasks.filter(t => t.isStuck).length
-        const totalHelpRequests = transformedTasks.filter(t => t.isBlockedByHelp).length
-        const totalUnassigned = transformedTasks.filter(t => t.isUnassigned).length
+        const totalOverdue = workloadTasks.filter(t => t.isOverdue).length
+        const totalStuck = workloadTasks.filter(t => t.isStuck).length
+        const totalHelpRequests = workloadTasks.filter(t => t.isBlockedByHelp).length
+        const totalUnassigned = workloadTasks.filter(t => t.isUnassigned).length
 
         if (totalOverdue > 0) {
             criticalIssues.push({
@@ -289,7 +229,7 @@ export default async function DashboardPage() {
                 severity: 'critical',
                 message: `${totalOverdue} tasks are overdue`,
                 count: totalOverdue,
-                tasks: transformedTasks.filter(t => t.isOverdue)
+                tasks: workloadTasks.filter(t => t.isOverdue)
             })
         }
 
@@ -297,9 +237,9 @@ export default async function DashboardPage() {
             criticalIssues.push({
                 type: 'stuck',
                 severity: 'warning',
-                message: `${totalStuck} tasks stuck (3+ days)`,
+                message: `${totalStuck} tasks stuck (${config.thresholds.stuckDays}+ days)`,
                 count: totalStuck,
-                tasks: transformedTasks.filter(t => t.isStuck)
+                tasks: workloadTasks.filter(t => t.isStuck)
             })
         }
 
@@ -309,7 +249,7 @@ export default async function DashboardPage() {
                 severity: 'warning',
                 message: `${totalHelpRequests} tasks need help`,
                 count: totalHelpRequests,
-                tasks: transformedTasks.filter(t => t.isBlockedByHelp)
+                tasks: workloadTasks.filter(t => t.isBlockedByHelp)
             })
         }
 
@@ -319,16 +259,11 @@ export default async function DashboardPage() {
                 severity: 'info',
                 message: `${totalUnassigned} tasks unassigned`,
                 count: totalUnassigned,
-                tasks: transformedTasks.filter(t => t.isUnassigned)
+                tasks: workloadTasks.filter(t => t.isUnassigned)
             })
         }
 
-        // Find overloaded and idle users
-        const avgWorkload = userStats.reduce((acc, u) => acc + u.workloadScore, 0) / userStats.length
-        const overloadedUsers = userStats.filter(u => u.workloadScore > avgWorkload * 1.5 && u.activeTasks > 3).map(u => u.id)
-        const idleUsers = userStats.filter(u => u.activeTasks === 0).map(u => u.id)
-
-        return { userStats, criticalIssues, overloadedUsers, idleUsers, allTasks: transformedTasks }
+        return { userStats, criticalIssues, overloadedUsers, idleUsers, allTasks: workloadTasks }
     }
 
     const fetchProjects = async () => {
