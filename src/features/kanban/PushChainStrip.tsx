@@ -61,14 +61,21 @@ export function PushChainStrip({
     const [hoveredId, setHoveredId] = useState<string | null>(null)
     // Add transition state for "juicy" animation feel
     const [isTransitioning, setIsTransitioning] = useState(false)
+    // Track automatic transitions (push completed -> next push) for slower animation
+    const [isAutoTransitioning, setIsAutoTransitioning] = useState(false)
+    const prevActivePushIdRef = useRef<string | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
 
     const expandedPushId = useMemo(() => {
+        // During auto-transition, keep showing the old push briefly
+        if (isAutoTransitioning && prevActivePushIdRef.current) {
+            return prevActivePushIdRef.current
+        }
         if (userSelectedPushId && chain.find(p => p.id === userSelectedPushId)) {
             return userSelectedPushId
         }
         return activePushId
-    }, [userSelectedPushId, activePushId, chain])
+    }, [userSelectedPushId, activePushId, chain, isAutoTransitioning])
 
     const ensureTasksLoaded = useCallback((pushId: string) => {
         if (!loadedPushes[pushId]) {
@@ -83,6 +90,31 @@ export function PushChainStrip({
             return () => clearTimeout(timer)
         }
     }, [isTransitioning])
+
+    // Detect automatic push changes (when a push is completed and we auto-advance)
+    useEffect(() => {
+        if (prevActivePushIdRef.current && activePushId && prevActivePushIdRef.current !== activePushId) {
+            // Active push changed - this is an automatic transition!
+            // Only trigger if user hasn't manually selected a different push
+            if (!userSelectedPushId || userSelectedPushId === prevActivePushIdRef.current) {
+                setIsAutoTransitioning(true)
+                // Clear user selection so we follow the new active push
+                setUserSelectedPushId(null)
+
+                // Preload the new push's tasks
+                ensureTasksLoaded(activePushId)
+
+                // After a delay, complete the transition with animation
+                const timer = setTimeout(() => {
+                    setIsAutoTransitioning(false)
+                    setIsTransitioning(true)
+                }, 600) // 600ms delay before switching - gives time to see the completed state
+
+                return () => clearTimeout(timer)
+            }
+        }
+        prevActivePushIdRef.current = activePushId
+    }, [activePushId, userSelectedPushId, ensureTasksLoaded])
 
     const handlePushClick = useCallback((push: PushType) => {
         // Locked pushes can't be clicked
@@ -122,16 +154,23 @@ export function PushChainStrip({
                     const pushIsLocked = isLocked(push)
                     const isHovered = hoveredId === push.id
                     const percent = push.taskCount > 0 ? (push.completedCount / push.taskCount) * 100 : 0
+                    // Check if this push just completed (we're in auto-transition and this was the previous active)
+                    const justCompleted = isAutoTransitioning && push.id === prevActivePushIdRef.current
 
                     return (
                         <div
                             key={push.id}
                             className={cn(
                                 "relative rounded-lg border shadow-sm overflow-hidden",
-                                "transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.25,1.2)]", // Reduced bounce (1.2 overshoot)
+                                // Slower animation for auto-transitions
+                                isAutoTransitioning
+                                    ? "transition-all duration-700 ease-out"
+                                    : "transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.25,1.2)]",
                                 pushIsComplete
                                     ? "bg-muted/40 border-border/50"
                                     : "bg-card border-border",
+                                // Green pulse for just-completed push
+                                justCompleted && "ring-2 ring-green-500/60 animate-pulse",
                                 isExpanded ? "min-w-0" : "shrink-0",
                                 !isExpanded && pushIsLocked
                                     ? "opacity-60 grayscale border-dashed cursor-not-allowed"
