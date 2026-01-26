@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { ChevronDown, Pencil, Plus, Lock, CheckCircle2 } from "lucide-react"
 
@@ -30,6 +30,11 @@ type PushChainStripProps = {
 }
 
 const COLLAPSED_WIDTH = 56
+const NORMAL_TRANSITION_MS = 300
+const COMPLETION_TRANSITION_MS = 600 // 2x slower for completion animation
+const WATER_FILL_MS = 800
+
+type AnimationPhase = 'filling' | 'transitioning' | null
 
 export function PushChainStrip({
     chain,
@@ -63,13 +68,58 @@ export function PushChainStrip({
     const [hoveredId, setHoveredId] = useState<string | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
 
-    // Expanded push: user selection if valid, otherwise active
+    // Animation state
+    const [completingPushId, setCompletingPushId] = useState<string | null>(null)
+    const [animationPhase, setAnimationPhase] = useState<AnimationPhase>(null)
+    const [showCountIds, setShowCountIds] = useState<Set<string>>(new Set())
+    const prevCompletionStatesRef = useRef<Record<string, boolean>>({})
+
+    // Detect when a push becomes complete
+    useEffect(() => {
+        const prevStates = prevCompletionStatesRef.current
+
+        for (const push of chain) {
+            const wasComplete = prevStates[push.id] ?? false
+            const nowComplete = isComplete(push.id)
+
+            // Detect transition from incomplete to complete
+            if (!wasComplete && nowComplete && !completingPushId) {
+                // Start completion animation for this push
+                setCompletingPushId(push.id)
+                setAnimationPhase('filling')
+
+                // Phase 1: Water fill (800ms)
+                setTimeout(() => {
+                    setAnimationPhase('transitioning')
+                    // Clear user selection so it expands to next active push
+                    setUserSelectedPushId(null)
+
+                    // Phase 2: Transition to next push (600ms)
+                    setTimeout(() => {
+                        // Animation complete - show count
+                        setShowCountIds(prev => new Set(prev).add(push.id))
+                        setCompletingPushId(null)
+                        setAnimationPhase(null)
+                    }, COMPLETION_TRANSITION_MS)
+                }, WATER_FILL_MS)
+            }
+
+            // Update prev states
+            prevStates[push.id] = nowComplete
+        }
+    }, [chain, isComplete, completingPushId])
+
+    // Expanded push: during transition, keep completing push expanded until animation switches
     const expandedPushId = useMemo(() => {
+        // During filling phase, keep the completing push expanded
+        if (animationPhase === 'filling' && completingPushId) {
+            return completingPushId
+        }
         if (userSelectedPushId && chain.find(p => p.id === userSelectedPushId)) {
             return userSelectedPushId
         }
         return activePushId
-    }, [userSelectedPushId, activePushId, chain])
+    }, [userSelectedPushId, activePushId, chain, animationPhase, completingPushId])
 
     const ensureTasksLoaded = useCallback((pushId: string) => {
         if (!loadedPushes[pushId]) {
@@ -101,6 +151,9 @@ export function PushChainStrip({
     const collapsedCount = chain.length - 1
     const totalCollapsedWidth = collapsedCount * COLLAPSED_WIDTH + (collapsedCount * 8)
 
+    // Use slower transition during completion animation
+    const transitionDuration = animationPhase === 'transitioning' ? COMPLETION_TRANSITION_MS : NORMAL_TRANSITION_MS
+
     return (
         <div className="w-full" ref={containerRef}>
             <div className="flex items-stretch gap-2">
@@ -114,13 +167,18 @@ export function PushChainStrip({
                     const collapsedWidth = isHovered ? 160 : COLLAPSED_WIDTH
                     const expandedWidth = `calc(100% - ${totalCollapsedWidth}px)`
 
+                    // Check if this push is currently in filling animation
+                    const isFillingAnimation = completingPushId === push.id && animationPhase === 'filling'
+                    // Check if this push just finished animating and should show count
+                    const shouldShowCount = showCountIds.has(push.id)
+
                     return (
                         <div
                             key={push.id}
                             className={cn(
                                 "relative rounded-lg border shadow-sm overflow-hidden",
-                                "transition-[width] duration-300 ease-out",
-                                pushIsComplete ? "bg-muted/40 border-border/50" : "bg-card border-border",
+                                "transition-[width] ease-out",
+                                pushIsComplete && !isFillingAnimation ? "bg-muted/40 border-border/50" : "bg-card border-border",
                                 isExpanded ? "min-w-0" : "shrink-0",
                                 !isExpanded && pushIsLocked
                                     ? "opacity-60 grayscale border-dashed cursor-not-allowed"
@@ -128,17 +186,42 @@ export function PushChainStrip({
                             )}
                             style={{
                                 width: isExpanded ? expandedWidth : collapsedWidth,
+                                transitionDuration: `${transitionDuration}ms`,
                             }}
                             onMouseEnter={() => setHoveredId(push.id)}
                             onMouseLeave={() => setHoveredId(null)}
                             onClick={() => {
-                                if (!isExpanded && !pushIsLocked) {
+                                if (!isExpanded && !pushIsLocked && !animationPhase) {
                                     handlePushClick(push)
                                 }
                             }}
                             role={!isExpanded ? "button" : undefined}
                             tabIndex={!isExpanded && !pushIsLocked ? 0 : -1}
                         >
+                            {/* Water fill animation overlay */}
+                            {isFillingAnimation && (
+                                <div className="absolute inset-0 z-20 overflow-hidden rounded-lg">
+                                    <div
+                                        className="absolute bottom-0 left-0 right-0 bg-green-500/90 animate-water-fill"
+                                        style={{
+                                            willChange: 'height',
+                                        }}
+                                    >
+                                        {/* Wave effect at the top edge */}
+                                        <svg
+                                            className="absolute -top-2 left-0 w-[200%] h-3 animate-wave"
+                                            viewBox="0 0 200 12"
+                                            preserveAspectRatio="none"
+                                        >
+                                            <path
+                                                d="M0 6 Q25 0, 50 6 T100 6 T150 6 T200 6 V12 H0 Z"
+                                                fill="currentColor"
+                                                className="text-green-500/90"
+                                            />
+                                        </svg>
+                                    </div>
+                                </div>
+                            )}
                             {/* COLLAPSED CONTENT */}
                             {!isExpanded && (
                                 <div className="flex items-stretch h-full w-full">
@@ -160,6 +243,11 @@ export function PushChainStrip({
                                         <div className="absolute inset-0 flex items-center justify-center z-10">
                                             {pushIsLocked ? (
                                                 <Lock className="w-4 h-4 text-muted-foreground/50" />
+                                            ) : pushIsComplete && shouldShowCount ? (
+                                                // Show count after animation completes
+                                                <span className="text-[10px] font-bold tabular-nums text-green-600 animate-count-fade-in">
+                                                    {push.completedCount}/{push.taskCount}
+                                                </span>
                                             ) : pushIsComplete ? (
                                                 <CheckCircle2 className="w-4 h-4 text-green-500" />
                                             ) : (
