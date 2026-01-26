@@ -169,16 +169,19 @@ export function PushChainStrip({
 
                     // Check if this push is currently in filling animation
                     const isFillingAnimation = completingPushId === push.id && animationPhase === 'filling'
+                    // Check if this push is in transition phase (still needs green bg)
+                    const isTransitioning = completingPushId === push.id && animationPhase === 'transitioning'
                     // Check if this push just finished animating and should show count
                     const shouldShowCount = showCountIds.has(push.id)
+                    // Keep green background during and after animation
+                    const showGreenBg = isFillingAnimation || isTransitioning || (pushIsComplete && shouldShowCount)
 
                     return (
                         <div
                             key={push.id}
                             className={cn(
                                 "relative rounded-lg border shadow-sm overflow-hidden",
-                                "transition-[width] ease-out",
-                                pushIsComplete && !isFillingAnimation ? "bg-muted/40 border-border/50" : "bg-card border-border",
+                                "transition-[width,background-color] ease-out",
                                 isExpanded ? "min-w-0" : "shrink-0",
                                 !isExpanded && pushIsLocked
                                     ? "opacity-60 grayscale border-dashed cursor-not-allowed"
@@ -187,6 +190,8 @@ export function PushChainStrip({
                             style={{
                                 width: isExpanded ? expandedWidth : collapsedWidth,
                                 transitionDuration: `${transitionDuration}ms`,
+                                backgroundColor: showGreenBg ? 'rgb(34 197 94 / 0.9)' : pushIsComplete ? 'rgb(var(--muted) / 0.4)' : undefined,
+                                borderColor: showGreenBg ? 'rgb(34 197 94 / 0.5)' : undefined,
                             }}
                             onMouseEnter={() => setHoveredId(push.id)}
                             onMouseLeave={() => setHoveredId(null)}
@@ -224,48 +229,44 @@ export function PushChainStrip({
                             )}
                             {/* COLLAPSED CONTENT */}
                             {!isExpanded && (
-                                <div className="flex items-stretch h-full w-full">
-                                    {/* Progress indicator area */}
-                                    <div className={cn(
-                                        "relative w-[56px] shrink-0 h-full flex items-center justify-center",
-                                        pushIsComplete ? "bg-green-500/20" : "bg-muted/20",
-                                        isHovered && "border-r border-border/50"
-                                    )}>
-                                        {/* Vertical fill for incomplete pushes */}
-                                        {!pushIsComplete && !pushIsLocked && (
-                                            <div
-                                                className="absolute bottom-0 left-0 right-0 bg-primary/60 transition-all duration-500"
-                                                style={{ height: `${percent}%` }}
-                                            />
-                                        )}
+                                <div className="flex items-center justify-center h-full w-full relative">
+                                    {/* Vertical fill for incomplete pushes */}
+                                    {!pushIsComplete && !pushIsLocked && !showGreenBg && (
+                                        <div
+                                            className="absolute bottom-0 left-0 right-0 bg-primary/40 transition-all duration-500"
+                                            style={{ height: `${percent}%` }}
+                                        />
+                                    )}
 
-                                        {/* Icon/text overlay */}
-                                        <div className="absolute inset-0 flex items-center justify-center z-10">
-                                            {pushIsLocked ? (
-                                                <Lock className="w-4 h-4 text-muted-foreground/50" />
-                                            ) : pushIsComplete && shouldShowCount ? (
-                                                // Show count after animation completes
-                                                <span className="text-[10px] font-bold tabular-nums text-green-600 animate-count-fade-in">
-                                                    {push.completedCount}/{push.taskCount}
-                                                </span>
-                                            ) : pushIsComplete ? (
-                                                <CheckCircle2 className="w-4 h-4 text-green-500" />
-                                            ) : (
-                                                <span className="text-[10px] font-medium tabular-nums text-foreground/70">
-                                                    {push.completedCount}/{push.taskCount}
-                                                </span>
-                                            )}
-                                        </div>
+                                    {/* Icon/text overlay */}
+                                    <div className="flex items-center justify-center z-10">
+                                        {pushIsLocked ? (
+                                            <Lock className="w-4 h-4 text-muted-foreground/50" />
+                                        ) : showGreenBg ? (
+                                            // Show count on green background
+                                            <span className={cn(
+                                                "text-[10px] font-bold tabular-nums text-white",
+                                                shouldShowCount && "animate-count-fade-in"
+                                            )}>
+                                                {push.completedCount}/{push.taskCount}
+                                            </span>
+                                        ) : pushIsComplete ? (
+                                            <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                        ) : (
+                                            <span className="text-[10px] font-medium tabular-nums text-foreground/70">
+                                                {push.completedCount}/{push.taskCount}
+                                            </span>
+                                        )}
                                     </div>
 
                                     {/* Name on hover */}
                                     <div className={cn(
-                                        "flex items-center px-3 overflow-hidden whitespace-nowrap transition-all duration-300",
-                                        isHovered ? "opacity-100 max-w-[104px]" : "opacity-0 max-w-0 px-0"
+                                        "absolute left-[56px] flex items-center px-3 overflow-hidden whitespace-nowrap transition-all duration-300",
+                                        isHovered ? "opacity-100" : "opacity-0"
                                     )}>
                                         <span className={cn(
                                             "text-sm font-semibold truncate",
-                                            pushIsComplete && "text-muted-foreground",
+                                            showGreenBg ? "text-white" : pushIsComplete ? "text-muted-foreground" : "",
                                             pushIsLocked && "text-muted-foreground/70"
                                         )}>
                                             {push.name}
