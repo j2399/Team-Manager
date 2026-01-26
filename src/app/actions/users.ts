@@ -67,23 +67,25 @@ export async function updateUserRole(userId: string, newRole: string) {
         }
     }
 
+    const workspaceId = currentUser.workspaceId
+
     try {
         await prisma.$transaction(async (tx) => {
             const membership = await tx.workspaceMember.findUnique({
-                where: { userId_workspaceId: { userId, workspaceId: currentUser.workspaceId } },
+                where: { userId_workspaceId: { userId, workspaceId } },
                 select: { id: true }
             })
 
             if (membership) {
                 await tx.workspaceMember.update({
-                    where: { userId_workspaceId: { userId, workspaceId: currentUser.workspaceId } },
+                    where: { userId_workspaceId: { userId, workspaceId } },
                     data: { role: newRole }
                 })
-            } else if (targetUser.workspaceId === currentUser.workspaceId) {
+            } else if (targetUser.workspaceId === workspaceId) {
                 await tx.workspaceMember.create({
                     data: {
                         userId,
-                        workspaceId: currentUser.workspaceId,
+                        workspaceId,
                         role: newRole,
                         name: targetUser.name || 'User'
                     }
@@ -92,7 +94,7 @@ export async function updateUserRole(userId: string, newRole: string) {
                 throw new Error('User not found')
             }
 
-            if (targetUser.workspaceId === currentUser.workspaceId) {
+            if (targetUser.workspaceId === workspaceId) {
                 await tx.user.update({
                     where: { id: userId },
                     data: { role: newRole }
