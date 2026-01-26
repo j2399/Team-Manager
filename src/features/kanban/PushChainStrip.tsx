@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback, useRef, useEffect } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect } from "react"
 import { cn } from "@/lib/utils"
 import { ChevronDown, Pencil, Plus, Lock, CheckCircle2 } from "lucide-react"
 
@@ -65,19 +65,20 @@ export function PushChainStrip({
     const [useSlowMotion, setUseSlowMotion] = useState(false)
     // Track which push is showing the green completion fill animation
     const [completionFillId, setCompletionFillId] = useState<string | null>(null)
-    const prevActivePushIdRef = useRef<string | null>(null)
+    // Track the previous activePushId to detect auto-transitions
+    const prevActivePushIdRef = useRef<string | null>(activePushId)
     const containerRef = useRef<HTMLDivElement>(null)
 
     const expandedPushId = useMemo(() => {
-        // During auto-transition delay, keep showing the old push
-        if (isAutoTransitioning && prevActivePushIdRef.current) {
-            return prevActivePushIdRef.current
+        // During auto-transition delay, keep showing the old push (the one being filled green)
+        if (completionFillId) {
+            return completionFillId
         }
         if (userSelectedPushId && chain.find(p => p.id === userSelectedPushId)) {
             return userSelectedPushId
         }
         return activePushId
-    }, [userSelectedPushId, activePushId, chain, isAutoTransitioning])
+    }, [userSelectedPushId, activePushId, chain, completionFillId])
 
     const ensureTasksLoaded = useCallback((pushId: string) => {
         if (!loadedPushes[pushId]) {
@@ -87,17 +88,20 @@ export function PushChainStrip({
 
     // Clear slow motion after the animation completes
     useEffect(() => {
-        if (useSlowMotion && !isAutoTransitioning) {
+        if (useSlowMotion && !completionFillId) {
             const timer = setTimeout(() => setUseSlowMotion(false), 1200)
             return () => clearTimeout(timer)
         }
-    }, [useSlowMotion, isAutoTransitioning])
+    }, [useSlowMotion, completionFillId])
 
     // Detect automatic push changes (when a push is completed and we auto-advance)
-    useEffect(() => {
+    // Use useLayoutEffect to set state BEFORE the browser paints
+    useLayoutEffect(() => {
         const prevId = prevActivePushIdRef.current
+
         if (prevId && activePushId && prevId !== activePushId) {
-            // Only trigger auto-transition if user hasn't manually selected a different push
+            // Active push changed - a push was just completed!
+            // Only trigger if user hasn't manually selected a DIFFERENT push
             if (!userSelectedPushId || userSelectedPushId === prevId) {
                 // Start the green fill animation on the just-completed push
                 setCompletionFillId(prevId)
@@ -110,14 +114,15 @@ export function PushChainStrip({
 
                 // After green fill completes, transition to next push
                 const timer = setTimeout(() => {
-                    setIsAutoTransitioning(false)
                     setCompletionFillId(null)
-                }, 900) // 900ms for green fill before sliding
+                    setIsAutoTransitioning(false)
+                }, 1200) // 1.2s for green fill animation
 
-                prevActivePushIdRef.current = activePushId
                 return () => clearTimeout(timer)
             }
         }
+
+        // Always update the ref AFTER the effect body runs
         prevActivePushIdRef.current = activePushId
     }, [activePushId, userSelectedPushId, ensureTasksLoaded])
 
@@ -196,9 +201,9 @@ export function PushChainStrip({
                             role={!isExpanded ? "button" : undefined}
                             tabIndex={!isExpanded && !pushIsLocked ? 0 : -1}
                         >
-                            {/* Green completion fill overlay - sweeps from left to right */}
+                            {/* Green completion fill overlay - sweeps from bottom to top */}
                             {showingCompletionFill && (
-                                <div className="absolute inset-0 bg-gradient-to-r from-green-500/30 via-green-400/40 to-green-500/30 z-20 pointer-events-none animate-completion-fill" />
+                                <div className="absolute inset-0 bg-green-500/50 z-20 pointer-events-none animate-completion-fill" />
                             )}
                             {/* COLLAPSED CONTENT */}
                             {!isExpanded && (

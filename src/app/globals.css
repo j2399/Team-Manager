@@ -570,14 +570,14 @@
   animation: chain-collapse 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-/* Push completion fill animation - sweeps green across */
+/* Push completion fill animation - sweeps green from bottom to top */
 @keyframes completionFill {
   0% {
-    clip-path: inset(0 100% 0 0);
-    opacity: 0;
+    clip-path: inset(100% 0 0 0);
+    opacity: 0.6;
   }
 
-  20% {
+  15% {
     opacity: 1;
   }
 
@@ -588,5 +588,5 @@
 }
 
 .animate-completion-fill {
-  animation: completionFill 0.8s ease-out forwards;
+  animation: completionFill 1s ease-out forwards;
 }
