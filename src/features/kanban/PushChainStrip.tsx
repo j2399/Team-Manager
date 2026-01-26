@@ -169,19 +169,19 @@ export function PushChainStrip({
 
                     // Check if this push is currently in filling animation
                     const isFillingAnimation = completingPushId === push.id && animationPhase === 'filling'
-                    // Check if this push is in transition phase (still needs green bg)
+                    // Check if this push is in transition phase (green bg should show)
                     const isTransitioning = completingPushId === push.id && animationPhase === 'transitioning'
                     // Check if this push just finished animating and should show count
                     const shouldShowCount = showCountIds.has(push.id)
-                    // Keep green background during and after animation
-                    const showGreenBg = isFillingAnimation || isTransitioning || (pushIsComplete && shouldShowCount)
+                    // Green background ONLY after fill completes (transitioning or done)
+                    const showGreenBg = isTransitioning || shouldShowCount
 
                     return (
                         <div
                             key={push.id}
                             className={cn(
                                 "relative rounded-lg border shadow-sm overflow-hidden",
-                                "transition-[width,background-color] ease-out",
+                                "transition-[width] ease-out",
                                 isExpanded ? "min-w-0" : "shrink-0",
                                 !isExpanded && pushIsLocked
                                     ? "opacity-60 grayscale border-dashed cursor-not-allowed"
@@ -190,7 +190,8 @@ export function PushChainStrip({
                             style={{
                                 width: isExpanded ? expandedWidth : collapsedWidth,
                                 transitionDuration: `${transitionDuration}ms`,
-                                backgroundColor: showGreenBg ? 'rgb(34 197 94 / 0.9)' : pushIsComplete ? 'rgb(var(--muted) / 0.4)' : undefined,
+                                // Instant background change - no transition
+                                backgroundColor: showGreenBg ? 'rgb(34 197 94 / 0.9)' : pushIsComplete && !isFillingAnimation ? 'hsl(var(--muted) / 0.4)' : undefined,
                                 borderColor: showGreenBg ? 'rgb(34 197 94 / 0.5)' : undefined,
                             }}
                             onMouseEnter={() => setHoveredId(push.id)}
