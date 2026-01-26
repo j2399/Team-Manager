@@ -415,7 +415,7 @@ export function TimelineEditor({
                         </span>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                        {pushes.length} push{pushes.length !== 1 ? 'es' : ''}
+                        {pushes.length} project{pushes.length !== 1 ? 's' : ''}
                     </span>
                 </div>
 

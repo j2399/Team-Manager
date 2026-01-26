@@ -142,7 +142,7 @@ export function TimelineManagerDialog({
                 <DialogHeader className="p-6 pb-2">
                     <div className="flex items-center justify-between">
                         <DialogTitle>Project Timeline</DialogTitle>
-                        <DialogDescription className="sr-only">Visual editor for managing project pushes and their timeline.</DialogDescription>
+                        <DialogDescription className="sr-only">Visual editor for managing project timelines.</DialogDescription>
                         <div className="flex items-center gap-2 pr-8">
                             <Button
                                 variant="outline"
@@ -173,7 +173,7 @@ export function TimelineManagerDialog({
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Sparkles className="h-4 w-4 text-primary" />
                             <span>
-                                Drag to create pushes. Click to edit. Hover for + to chain.
+                                Drag to create projects. Click to edit. Hover for + to chain.
                             </span>
                         </div>
 
@@ -185,7 +185,7 @@ export function TimelineManagerDialog({
 
                         {pushes.length > 0 && (
                             <p className="text-xs text-muted-foreground">
-                                {pushes.length} push{pushes.length !== 1 ? 'es' : ''} planned
+                                {pushes.length} project{pushes.length !== 1 ? 's' : ''} planned
                             </p>
                         )}
                     </div>
