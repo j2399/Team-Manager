@@ -265,10 +265,10 @@ export function PushChainStrip({
                                     {/* Right section - name on hover */}
                                     <div className={cn(
                                         "flex items-center overflow-hidden whitespace-nowrap transition-all duration-300",
-                                        isHovered ? "opacity-100 px-2" : "opacity-0 w-0 px-0"
+                                        isHovered ? "opacity-100 px-3" : "opacity-0 w-0 px-0"
                                     )}>
                                         <span className={cn(
-                                            "text-sm font-semibold truncate",
+                                            "font-semibold text-base md:text-lg tracking-tight truncate",
                                             showGreenBg ? "text-white" : pushIsComplete ? "text-muted-foreground" : "",
                                             pushIsLocked && "text-muted-foreground/70"
                                         )}>
