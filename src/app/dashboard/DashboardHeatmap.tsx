@@ -610,10 +610,10 @@ function QuickAddTaskDialog({
 
                 <div className="space-y-4 py-2">
                     <div className="space-y-2">
-                        <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Select Project</label>
+                        <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Select Division</label>
                         <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
                             <SelectTrigger className="w-full text-xs h-9">
-                                <SelectValue placeholder="Choose a project" />
+                                <SelectValue placeholder="Choose a division" />
                             </SelectTrigger>
                             <SelectContent>
                                 {projects.map(project => (
@@ -630,14 +630,14 @@ function QuickAddTaskDialog({
 
                     {selectedProjectId && (
                         <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Select Push</label>
+                            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Select Project</label>
                             <Select
                                 value={selectedPushId}
                                 onValueChange={setSelectedPushId}
                                 disabled={activePushes.length === 0}
                             >
                                 <SelectTrigger className="w-full text-xs h-9">
-                                    <SelectValue placeholder={activePushes.length === 0 ? "No active pushes" : "Select target push"} />
+                                    <SelectValue placeholder={activePushes.length === 0 ? "No active projects" : "Select target project"} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {activePushes.map(push => (
@@ -648,7 +648,7 @@ function QuickAddTaskDialog({
                                 </SelectContent>
                             </Select>
                             {activePushes.length === 0 && (
-                                <p className="text-[9px] text-muted-foreground italic px-1">This project has no active pushes. Tasks must be assigned to a push.</p>
+                                <p className="text-[9px] text-muted-foreground italic px-1">This division has no active projects. Tasks must be assigned to a project.</p>
                             )}
                         </div>
                     )}

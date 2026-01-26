@@ -18,11 +18,11 @@ export function PushInfo({ push }: PushInfoProps) {
         return (
             <Card className="h-full">
                 <CardHeader>
-                    <CardTitle className="text-base">Current Push</CardTitle>
-                    <CardDescription>No active push found.</CardDescription>
+                    <CardTitle className="text-base">Current Project</CardTitle>
+                    <CardDescription>No active project found.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-sm text-muted-foreground">No pushes are currently active.</p>
+                    <p className="text-sm text-muted-foreground">No projects are currently active.</p>
                 </CardContent>
             </Card>
         )

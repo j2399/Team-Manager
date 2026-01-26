@@ -117,7 +117,7 @@ export function ProjectTimeline({ tasks }: ProjectTimelineProps) {
                                                             width: `${width}%`,
                                                             backgroundColor: barColor
                                                         }}
-                                                        title={`${task.title} (${task.push?.name || 'No Push'})`}
+                                                        title={`${task.title} (${task.push?.name || 'No Project'})`}
                                                     />
                                                     {/* Label */}
                                                     <span

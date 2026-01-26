@@ -498,7 +498,7 @@ export function TimelineEditor({
                     {pushes.length === 0 && !isCreating && (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ top: `${HEADER_HEIGHT}px` }}>
                             <p className="text-sm text-muted-foreground">
-                                {readOnly ? 'No pushes' : 'Drag to create a push'}
+                                {readOnly ? 'No projects' : 'Drag to create a project'}
                             </p>
                         </div>
                     )}
