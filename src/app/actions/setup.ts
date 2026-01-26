@@ -2,8 +2,6 @@
 
 import prisma from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/auth"
-import { redirect } from "next/navigation"
-import { cookies } from "next/headers"
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
@@ -23,63 +21,7 @@ export async function createWorkspace(formData: FormData) {
     if (!name || name.trim().length === 0) return { error: "Workspace name is required" }
 
     try {
-        let userId = user.id
-
-        // Handle first-time user creation or re-linking
-        if (userId === 'pending') {
-            // @ts-ignore - discordId exists on pending user object
-            const discordId = user.discordId
-
-            if (!discordId) {
-                return { error: "Failed to create user: Missing Discord ID" }
-            }
-
-            // Check if user already exists
-            const existingUser = await prisma.user.findUnique({
-                where: { discordId: discordId }
-            })
-
-            if (existingUser) {
-                userId = existingUser.id
-            } else {
-                try {
-                    // Create the user
-                    const newUser = await prisma.user.create({
-                        data: {
-                            name: user.name,
-                            email: user.email,
-                            avatar: user.avatar,
-                            discordId: discordId,
-                            role: 'Admin'
-                        }
-                    })
-                    userId = newUser.id
-                } catch (e: any) {
-                    // Race condition: User created by another request?
-                    if (e.code === 'P2002') {
-                        const existingUserRetry = await prisma.user.findUnique({
-                            where: { discordId: discordId }
-                        })
-                        if (existingUserRetry) {
-                            userId = existingUserRetry.id
-                        } else {
-                            throw e
-                        }
-                    } else {
-                        throw e
-                    }
-                }
-            }
-
-            // Set session cookie
-            const cookieStore = await cookies()
-            cookieStore.set('user_id', userId, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-                path: '/'
-            })
-        }
+        const userId = user.id
 
         let workspace = null
         let retries = 0

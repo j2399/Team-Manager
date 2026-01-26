@@ -4,12 +4,17 @@ import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 
 import { getCurrentUser } from '@/lib/auth'
+import { getProjectContext, getWorkspaceUserIds } from '@/lib/access'
 
 export async function createProject(formData: FormData) {
     try {
         const user = await getCurrentUser()
         if (!user) {
             return { error: 'Unauthorized' }
+        }
+
+        if (!user.workspaceId) {
+            return { error: 'Unauthorized: No workspace' }
         }
 
         // RBAC Check
@@ -25,6 +30,10 @@ export async function createProject(formData: FormData) {
         if (!name || name.trim().length === 0) return { error: 'Project Name is required' }
         if (!leadId || leadId === 'none') return { error: 'Project Lead is required' }
 
+        const allowedLeadIds = await getWorkspaceUserIds([leadId], user.workspaceId)
+        if (allowedLeadIds.length !== 1) {
+            return { error: 'Project Lead must belong to this workspace' }
+        }
 
         // Use interactive transaction to ensure all parts are created or none
         const project = await prisma.$transaction(async (tx: any) => {
@@ -33,6 +42,14 @@ export async function createProject(formData: FormData) {
                     name,
                     description: description || null,
                     leadId: leadId || null,
+                    workspaceId: user.workspaceId
+                }
+            })
+
+            await tx.projectMember.create({
+                data: {
+                    projectId: p.id,
+                    userId: leadId
                 }
             })
 
@@ -69,9 +86,25 @@ export async function updateProjectLead(projectId: string, leadId: string | null
             return { error: 'Unauthorized' }
         }
 
+        if (!user.workspaceId) {
+            return { error: 'Unauthorized: No workspace' }
+        }
+
         // Only Admin can change project lead
         if (user.role !== 'Admin') {
             return { error: 'Unauthorized' }
+        }
+
+        if (leadId) {
+            const allowedLeadIds = await getWorkspaceUserIds([leadId], user.workspaceId)
+            if (allowedLeadIds.length !== 1) {
+                return { error: 'Project Lead must belong to this workspace' }
+            }
+        }
+
+        const projectContext = await getProjectContext(projectId)
+        if (!projectContext || projectContext.workspaceId !== user.workspaceId) {
+            return { error: 'Project not found' }
         }
 
         await prisma.project.update({

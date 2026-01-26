@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { put, del } from '@vercel/blob'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { getTaskContext } from '@/lib/access'
 
 export async function GET(
     request: Request,
@@ -9,6 +10,17 @@ export async function GET(
 ) {
     try {
         const { id } = await params
+        const user = await getCurrentUser()
+
+        if (!user || !user.workspaceId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const taskContext = await getTaskContext(id)
+        if (!taskContext || taskContext.workspaceId !== user.workspaceId) {
+            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+        }
+
         const task = await prisma.task.findUnique({
             where: { id },
             select: {
@@ -43,6 +55,15 @@ export async function POST(
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
         }
 
+        if (!user.workspaceId) {
+            return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+        }
+
+        const taskContext = await getTaskContext(id)
+        if (!taskContext || taskContext.workspaceId !== user.workspaceId) {
+            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+        }
+
         const formData = await request.formData()
         const file = formData.get('file') as File
 
@@ -50,9 +71,9 @@ export async function POST(
             return NextResponse.json({ error: 'File is required' }, { status: 400 })
         }
 
-        // Verify task exists
         const task = await prisma.task.findUnique({
-            where: { id }
+            where: { id },
+            select: { instructionsFileUrl: true, instructionsFileName: true, title: true }
         })
 
         if (!task) {
@@ -67,7 +88,6 @@ export async function POST(
                 console.error('Failed to delete old instructions file:', e)
             }
         }
-
         // Upload to Vercel Blob
         const filename = `instructions/${id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
         const fileBuffer = await file.arrayBuffer()
@@ -128,6 +148,15 @@ export async function DELETE(
 
         if (!user || !user.id || user.id === 'pending') {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+        }
+
+        if (!user.workspaceId) {
+            return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+        }
+
+        const taskContext = await getTaskContext(id)
+        if (!taskContext || taskContext.workspaceId !== user.workspaceId) {
+            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
         }
 
         const task = await prisma.task.findUnique({

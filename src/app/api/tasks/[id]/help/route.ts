@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { getTaskContext } from '@/lib/access'
 
 // GET - Get help request for a task
 export async function GET(
@@ -9,6 +10,17 @@ export async function GET(
 ) {
     try {
         const { id } = await params
+        const user = await getCurrentUser()
+
+        if (!user || !user.workspaceId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const taskContext = await getTaskContext(id)
+        if (!taskContext || taskContext.workspaceId !== user.workspaceId) {
+            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+        }
+
         const helpRequest = await prisma.helpRequest.findFirst({
             where: {
                 taskId: id,
@@ -36,6 +48,10 @@ export async function POST(
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
         }
 
+        if (!user.workspaceId) {
+            return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+        }
+
         const body = await request.json()
         const { message } = body
 
@@ -60,6 +76,10 @@ export async function POST(
         })
 
         if (!task) {
+            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+        }
+
+        if (task.column?.board?.project?.workspaceId !== user.workspaceId) {
             return NextResponse.json({ error: 'Task not found' }, { status: 404 })
         }
 
@@ -163,6 +183,10 @@ export async function PATCH(
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
         }
 
+        if (!user.workspaceId) {
+            return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+        }
+
         const body = await request.json()
         const { status, helpRequestId } = body
 
@@ -200,6 +224,10 @@ export async function PATCH(
                 }
             }
         })
+
+        if (task?.column?.board?.project?.workspaceId !== user.workspaceId) {
+            return NextResponse.json({ error: 'Help request not found' }, { status: 404 })
+        }
 
         const updateData: any = { status }
 
@@ -266,6 +294,10 @@ export async function DELETE(
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
         }
 
+        if (!user.workspaceId) {
+            return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+        }
+
         const url = new URL(request.url)
         const helpRequestId = url.searchParams.get('helpRequestId')
 
@@ -285,6 +317,11 @@ export async function DELETE(
         // Only the requester or admins can cancel
         if (helpRequest.requestedBy !== user.id && user.role !== 'Admin' && user.role !== 'Team Lead') {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+        }
+
+        const taskContext = await getTaskContext(id)
+        if (!taskContext || taskContext.workspaceId !== user.workspaceId) {
+            return NextResponse.json({ error: 'Help request not found' }, { status: 404 })
         }
 
         const task = await prisma.task.findUnique({

@@ -1,8 +1,21 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 
-export async function POST() {
+export async function POST(request: Request) {
     try {
+        const cronSecret = process.env.CRON_SECRET
+        if (cronSecret) {
+            const authHeader = request.headers.get('authorization')
+            const headerSecret = request.headers.get('x-cron-secret')
+            const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+
+            if (token !== cronSecret && headerSecret !== cronSecret) {
+                return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+            }
+        } else if (process.env.NODE_ENV === 'production') {
+            return NextResponse.json({ error: 'Cron secret not configured' }, { status: 500 })
+        }
+
         const now = new Date()
         
         // Find all tasks that are overdue (endDate < now) and not in Done column

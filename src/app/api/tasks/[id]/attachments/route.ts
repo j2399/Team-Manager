@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { put, del } from '@vercel/blob'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { getTaskContext } from '@/lib/access'
 
 export async function GET(
     request: Request,
@@ -9,6 +10,17 @@ export async function GET(
 ) {
     try {
         const { id } = await params
+        const user = await getCurrentUser()
+
+        if (!user || !user.workspaceId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const taskContext = await getTaskContext(id)
+        if (!taskContext || taskContext.workspaceId !== user.workspaceId) {
+            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+        }
+
         const attachments = await prisma.taskAttachment.findMany({
             where: { taskId: id },
             orderBy: [{ order: 'asc' }, { createdAt: 'desc' }]
@@ -30,6 +42,15 @@ export async function POST(
 
         if (!user || !user.id || user.id === 'pending') {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+        }
+
+        if (!user.workspaceId) {
+            return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+        }
+
+        const taskContext = await getTaskContext(id)
+        if (!taskContext || taskContext.workspaceId !== user.workspaceId) {
+            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
         }
 
         const formData = await request.formData()
@@ -73,15 +94,6 @@ export async function POST(
             return NextResponse.json({ error: 'File type not allowed' }, { status: 400 })
         }
 
-        // Verify task exists
-        const task = await prisma.task.findUnique({
-            where: { id }
-        })
-
-        if (!task) {
-            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-        }
-
         // Upload to Vercel Blob
         const filename = `${id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
         const fileBuffer = await file.arrayBuffer()
@@ -116,7 +128,7 @@ export async function POST(
         await prisma.activityLog.create({
             data: {
                 taskId: id,
-                taskTitle: task.title,
+                taskTitle: taskContext.title || 'Untitled Task',
                 action: 'updated',
                 field: 'attachment',
                 oldValue: 'None',
@@ -151,6 +163,15 @@ export async function DELETE(
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
         }
 
+        if (!user.workspaceId) {
+            return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+        }
+
+        const taskContext = await getTaskContext(id)
+        if (!taskContext || taskContext.workspaceId !== user.workspaceId) {
+            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+        }
+
         const url = new URL(request.url)
         const attachmentId = url.searchParams.get('attachmentId')
 
@@ -176,22 +197,17 @@ export async function DELETE(
         }
 
         // Get task info before deleting
-        const task = await prisma.task.findUnique({
-            where: { id },
-            select: { title: true }
-        })
-
         // Delete from database
         await prisma.taskAttachment.delete({
             where: { id: attachmentId }
         })
 
         // Log activity for attachment being deleted
-        if (task) {
+        if (taskContext.title) {
             await prisma.activityLog.create({
                 data: {
                     taskId: id,
-                    taskTitle: task.title,
+                    taskTitle: taskContext.title,
                     action: 'updated',
                     field: 'attachment',
                     oldValue: attachment.name,
@@ -222,6 +238,15 @@ export async function PATCH(
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
         }
 
+        if (!user.workspaceId) {
+            return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+        }
+
+        const taskContext = await getTaskContext(id)
+        if (!taskContext || taskContext.workspaceId !== user.workspaceId) {
+            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+        }
+
         const body = await request.json()
         const { attachmentIds } = body
 
@@ -230,11 +255,6 @@ export async function PATCH(
         }
 
         // Get task info
-        const task = await prisma.task.findUnique({
-            where: { id },
-            select: { title: true }
-        })
-
         // Get attachment names for logging
         const attachments = await prisma.taskAttachment.findMany({
             where: { id: { in: attachmentIds }, taskId: id },
@@ -258,11 +278,11 @@ export async function PATCH(
         )
 
         // Log activity for attachment reordering
-        if (task && attachments.length > 0) {
+        if (taskContext.title && attachments.length > 0) {
             await prisma.activityLog.create({
                 data: {
                     taskId: id,
-                    taskTitle: task.title,
+                    taskTitle: taskContext.title,
                     action: 'updated',
                     field: 'attachment',
                     oldValue: 'Previous order',

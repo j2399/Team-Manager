@@ -48,20 +48,49 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
         }
 
-        // Verify target user is in the same workspace
         const targetUser = await prisma.user.findUnique({
             where: { id: userId },
-            select: { workspaceId: true }
+            select: { workspaceId: true, name: true }
         })
 
-        if (!targetUser || targetUser.workspaceId !== currentUser.workspaceId) {
+        if (!targetUser || !currentUser.workspaceId) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 })
         }
 
-        // Update user role in database
-        await prisma.user.update({
-            where: { id: userId },
-            data: { role }
+        const membership = await prisma.workspaceMember.findUnique({
+            where: { userId_workspaceId: { userId, workspaceId: currentUser.workspaceId } },
+            select: { id: true }
+        })
+
+        if (!membership && targetUser.workspaceId !== currentUser.workspaceId) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 })
+        }
+
+        await prisma.$transaction(async (tx) => {
+            if (membership) {
+                await tx.workspaceMember.update({
+                    where: { userId_workspaceId: { userId, workspaceId: currentUser.workspaceId } },
+                    data: { role }
+                })
+            } else if (targetUser.workspaceId === currentUser.workspaceId) {
+                await tx.workspaceMember.create({
+                    data: {
+                        userId,
+                        workspaceId: currentUser.workspaceId,
+                        role,
+                        name: targetUser.name || 'User'
+                    }
+                })
+            } else {
+                throw new Error('User not found')
+            }
+
+            if (targetUser.workspaceId === currentUser.workspaceId) {
+                await tx.user.update({
+                    where: { id: userId },
+                    data: { role }
+                })
+            }
         })
 
         return NextResponse.json({ success: true })

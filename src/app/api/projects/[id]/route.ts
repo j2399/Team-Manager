@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { getWorkspaceUserIds } from '@/lib/access'
 
 export async function GET(
     request: Request,
@@ -77,6 +78,34 @@ export async function PATCH(
         const body = await request.json()
         const { name, description, leadId, memberIds, color } = body
 
+        const memberIdsInput = Array.isArray(memberIds)
+            ? memberIds.filter((id: unknown) => typeof id === 'string' && id.trim().length > 0)
+            : undefined
+        const uniqueMemberIds = memberIdsInput ? Array.from(new Set(memberIdsInput)) : undefined
+
+        const leadIdValue = leadId === null
+            ? null
+            : (typeof leadId === 'string' && leadId.trim().length > 0 ? leadId : undefined)
+
+        if (leadId !== undefined && leadIdValue === undefined) {
+            return NextResponse.json({ error: 'Invalid project lead' }, { status: 400 })
+        }
+
+        if (leadIdValue) {
+            const allowedLeadIds = await getWorkspaceUserIds([leadIdValue], user.workspaceId)
+            if (allowedLeadIds.length !== 1) {
+                return NextResponse.json({ error: 'Project Lead must belong to this workspace' }, { status: 400 })
+            }
+        }
+
+        const validMemberIds = uniqueMemberIds
+            ? await getWorkspaceUserIds(uniqueMemberIds, user.workspaceId)
+            : undefined
+
+        if (uniqueMemberIds && validMemberIds && validMemberIds.length !== uniqueMemberIds.length) {
+            return NextResponse.json({ error: 'One or more members are not in this workspace' }, { status: 400 })
+        }
+
         const normalizedColor = typeof color === "string"
             ? (color.trim().startsWith("#") ? color.trim().toLowerCase() : `#${color.trim().toLowerCase()}`)
             : null
@@ -89,20 +118,20 @@ export async function PATCH(
                 data: {
                     ...(name !== undefined && { name }),
                     ...(description !== undefined && { description }),
-                    ...(leadId !== undefined && { leadId }),
+                    ...(leadId !== undefined && { leadId: leadIdValue }),
                     ...colorUpdate
                 }
             })
 
-            if (memberIds && Array.isArray(memberIds)) {
+            if (validMemberIds) {
                 // Replace members
                 await tx.projectMember.deleteMany({
                     where: { projectId: id }
                 })
 
-                if (memberIds.length > 0) {
+                if (validMemberIds.length > 0) {
                     await tx.projectMember.createMany({
-                        data: memberIds.map((userId: string) => ({
+                        data: validMemberIds.map((userId: string) => ({
                             projectId: id,
                             userId
                         }))
@@ -221,4 +250,3 @@ export async function DELETE(
         return NextResponse.json({ error: 'Failed' }, { status: 500 })
     }
 }
-

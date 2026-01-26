@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { sendDiscordNotification } from '@/lib/discord'
 import { getCurrentUser } from '@/lib/auth'
+import { getProjectContext, getWorkspaceUserIds } from '@/lib/access'
 import { differenceInCalendarDays } from 'date-fns'
 
 function parseDateOnlyStart(dateStr: string) {
@@ -64,6 +65,16 @@ export async function createTask(input: CreateTaskInput) {
     }
 
     try {
+        const user = await getCurrentUser()
+        if (!user || !user.workspaceId) {
+            return { error: 'Unauthorized' }
+        }
+
+        const projectContext = await getProjectContext(projectId)
+        if (!projectContext || projectContext.workspaceId !== user.workspaceId) {
+            return { error: 'Project not found' }
+        }
+
         let targetColumnId = columnId
 
         // If no columnId provided, find the first column
@@ -83,24 +94,36 @@ export async function createTask(input: CreateTaskInput) {
         }
 
 
-        // Verify column exists
+        // Verify column exists and belongs to the project
         const column = await prisma.column.findUnique({
-            where: { id: targetColumnId }
+            where: { id: targetColumnId },
+            include: { board: true }
         })
 
-        if (!column) {
+        if (!column || column.board.projectId !== projectId) {
             return { error: 'Column not found' }
         }
 
-        // Verify assignee exists if provided
-        if (assigneeId && assigneeId !== "") {
-            const assigneePromise = prisma.user.findUnique({
-                where: { id: assigneeId },
-                select: { id: true }
+        const userIdsToCheck = [
+            ...(assigneeId ? [assigneeId] : []),
+            ...(input.assigneeIds || [])
+        ]
+
+        if (userIdsToCheck.length > 0) {
+            const validUserIds = await getWorkspaceUserIds(userIdsToCheck, user.workspaceId)
+            if (validUserIds.length !== Array.from(new Set(userIdsToCheck)).length) {
+                return { error: 'One or more assignees are not in this workspace' }
+            }
+        }
+
+        if (pushId) {
+            const push = await prisma.push.findUnique({
+                where: { id: pushId },
+                select: { projectId: true, project: { select: { workspaceId: true } } }
             })
-            const [assignee] = await Promise.all([assigneePromise])
-            if (!assignee) {
-                return { error: 'Assignee not found' }
+
+            if (!push || push.project.workspaceId !== user.workspaceId || push.projectId !== projectId) {
+                return { error: 'Push not found' }
             }
         }
 
@@ -157,9 +180,6 @@ export async function createTask(input: CreateTaskInput) {
             if (updatedTask) Object.assign(task, updatedTask)
         }
 
-
-        // Get current user for activity log
-        const user = await getCurrentUser()
 
         // Create activity log for task creation
         if (user && user.id && user.id !== 'pending') {
@@ -239,8 +259,15 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
             return { error: 'Unauthorized' }
         }
 
+        if (!user.workspaceId) {
+            return { error: 'Unauthorized: No workspace' }
+        }
+
         const [targetColumn, task] = await Promise.all([
-            prisma.column.findUnique({ where: { id: columnId } }),
+            prisma.column.findUnique({
+                where: { id: columnId },
+                include: { board: true }
+            }),
             prisma.task.findUnique({
                 where: { id: taskId },
                 select: {
@@ -248,18 +275,37 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
                     title: true,
                     requireAttachment: true,
                     submittedAt: true,
-                    column: true,
+                    column: {
+                        select: {
+                            id: true,
+                            name: true,
+                            board: {
+                                select: {
+                                    projectId: true,
+                                    project: { select: { workspaceId: true } }
+                                }
+                            }
+                        }
+                    },
                     attachments: { select: { id: true } }
                 }
             })
         ])
 
-        if (!targetColumn) {
+        if (!task || !task.column?.board?.projectId) {
+            return { error: 'Task not found' }
+        }
+
+        if (task.column.board.project.workspaceId !== user.workspaceId) {
+            return { error: 'Task not found' }
+        }
+
+        if (!targetColumn || targetColumn.board.projectId !== task.column.board.projectId) {
             return { error: 'Target column not found' }
         }
 
-        if (!task) {
-            return { error: 'Task not found' }
+        if (task.column.board.projectId !== projectId) {
+            return { error: 'Invalid project' }
         }
 
         const sourceColumnName = task.column?.name || ''
@@ -343,12 +389,12 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
         })
 
         // Revalidate the project path to update the UI
-        revalidatePath(`/dashboard/projects/${projectId}`)
+        revalidatePath(`/dashboard/projects/${task.column.board.projectId}`)
 
         // Discord: only ping when task is moved into Review (ping the project lead)
         if (targetColumnName === 'Review') {
             const project = await prisma.project.findUnique({
-                where: { id: projectId },
+                where: { id: task.column.board.projectId },
                 select: {
                     name: true,
                     workspaceId: true,
@@ -386,6 +432,10 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
             return { error: 'Unauthorized' }
         }
 
+        if (!user.workspaceId) {
+            return { error: 'Unauthorized: No workspace' }
+        }
+
         const [task, newAssignee] = await Promise.all([
             prisma.task.findUnique({
                 where: { id: taskId },
@@ -420,6 +470,10 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
             return { error: 'Task not found' }
         }
 
+        if (task.column?.board?.project?.workspaceId !== user.workspaceId) {
+            return { error: 'Task not found' }
+        }
+
         const project = task.column?.board?.project
         const workspaceId = project?.workspaceId
         const webhookUrl = project?.workspace?.discordChannelId
@@ -449,6 +503,19 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
         // Get old assignee name for comparison
         const oldAssigneeName = task.assignee?.name || 'Unassigned'
         let newAssigneeName = oldAssigneeName
+
+        const assigneeIdsToCheck = [
+            ...(input.assigneeId !== undefined && input.assigneeId !== "" ? [input.assigneeId] : []),
+            ...(input.assigneeIds || [])
+        ]
+
+        if (assigneeIdsToCheck.length > 0) {
+            const validAssigneeIds = await getWorkspaceUserIds(assigneeIdsToCheck, user.workspaceId)
+            const uniqueAssigneeIds = Array.from(new Set(assigneeIdsToCheck))
+            if (validAssigneeIds.length !== uniqueAssigneeIds.length) {
+                return { error: 'One or more assignees are not in this workspace' }
+            }
+        }
 
         if (input.assigneeId !== undefined && input.assigneeId !== task.assigneeId) {
             newAssigneeName = newAssignee?.name || 'Unassigned'
@@ -651,13 +718,32 @@ export async function deleteTask(taskId: string, projectId: string) {
             return { error: 'Unauthorized' }
         }
 
+        if (!user.workspaceId) {
+            return { error: 'Unauthorized: No workspace' }
+        }
+
         const task = await prisma.task.findUnique({
             where: { id: taskId },
-            include: { column: true }
+            include: {
+                column: {
+                    include: {
+                        board: { include: { project: { select: { workspaceId: true } } } }
+                    }
+                }
+            }
         })
 
         if (!task) {
             return { error: 'Task not found' }
+        }
+
+        if (task.column?.board?.project?.workspaceId !== user.workspaceId) {
+            return { error: 'Task not found' }
+        }
+
+        const taskProjectId = task.column?.board?.projectId
+        if (taskProjectId && taskProjectId !== projectId) {
+            return { error: 'Invalid project' }
         }
 
         // Members cannot delete tasks in Review or Done
@@ -684,7 +770,9 @@ export async function deleteTask(taskId: string, projectId: string) {
         })
 
         await prisma.task.delete({ where: { id: taskId } })
-        revalidatePath(`/dashboard/projects/${projectId}`)
+        if (taskProjectId) {
+            revalidatePath(`/dashboard/projects/${taskProjectId}`)
+        }
         return { success: true }
     } catch (e) {
         console.error("Delete task error:", e)
@@ -718,12 +806,23 @@ export async function updateTaskProgress(taskId: string, progress: number, proje
             return { error: 'Unauthorized' }
         }
 
+        if (!user.workspaceId) {
+            return { error: 'Unauthorized: No workspace' }
+        }
+
         const task = await prisma.task.findUnique({
             where: { id: taskId },
-            include: { assignees: true }
+            include: {
+                assignees: true,
+                column: { include: { board: { include: { project: { select: { workspaceId: true } } } } } }
+            }
         })
 
         if (!task) {
+            return { error: 'Task not found' }
+        }
+
+        if (task.column?.board?.project?.workspaceId !== user.workspaceId) {
             return { error: 'Task not found' }
         }
 

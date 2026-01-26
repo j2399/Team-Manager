@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 // Force rebuild
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { getWorkspaceUserIds } from '@/lib/access'
 
 const PROJECT_COLORS = [
     "#ef4444", // red
@@ -40,24 +41,12 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url)
         const includeLead = searchParams.get('includeLead') === 'true'
         const user = await getCurrentUser()
-        if (!user) {
+        if (!user || !user.workspaceId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
 
-        // Show projects if:
-        // 1. In user's workspace
-        // 2. User is a member
-        // 3. User is the lead
-        let whereClause: any = {
-            OR: [
-                { workspaceId: user.workspaceId },
-                { members: { some: { userId: user.id } } },
-                { leadId: user.id }
-            ]
-        }
-
         const projects = await prisma.project.findMany({
-            where: whereClause,
+            where: { workspaceId: user.workspaceId },
             orderBy: { createdAt: 'desc' },
             select: {
                 id: true,
@@ -103,6 +92,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Unauthorized or No Workspace' }, { status: 403 })
         }
 
+        if (user.role !== 'Admin') {
+            return NextResponse.json({ error: 'Forbidden: Only Admins can create projects' }, { status: 403 })
+        }
+
         const body = await request.json()
         const { name, description, leadId, memberIds, color, pushes } = body
 
@@ -112,6 +105,23 @@ export async function POST(request: Request) {
 
         if (!leadId || leadId === 'none') {
             return NextResponse.json({ error: 'Project Lead is required' }, { status: 400 })
+        }
+
+        const memberIdsInput = Array.isArray(memberIds)
+            ? memberIds.filter((id: unknown) => typeof id === 'string' && id.trim().length > 0)
+            : []
+        const uniqueMemberIds = Array.from(new Set(memberIdsInput))
+
+        const userIdsToCheck = [leadId, ...uniqueMemberIds].filter((id) => typeof id === 'string') as string[]
+        const allowedUserIds = await getWorkspaceUserIds(userIdsToCheck, user.workspaceId)
+
+        if (!allowedUserIds.includes(leadId)) {
+            return NextResponse.json({ error: 'Project Lead must belong to this workspace' }, { status: 400 })
+        }
+
+        const validMemberIds = await getWorkspaceUserIds(uniqueMemberIds, user.workspaceId)
+        if (validMemberIds.length !== uniqueMemberIds.length) {
+            return NextResponse.json({ error: 'One or more members are not in this workspace' }, { status: 400 })
         }
 
         // Create project with default board and columns
@@ -134,7 +144,7 @@ export async function POST(request: Request) {
             })
 
             // Ensure lead is added as a member
-            let uniqueMemberIds = new Set(memberIds || [])
+            let uniqueMemberIds = new Set(validMemberIds)
             if (leadId) {
                 uniqueMemberIds.add(leadId)
             }

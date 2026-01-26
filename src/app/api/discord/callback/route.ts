@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import prisma from '@/lib/prisma'
+import { createSession, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS } from '@/lib/session'
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
@@ -145,14 +146,17 @@ export async function GET(request: Request) {
 
             console.log(`[Auth] Logged in user ${user.id}. Session active.`)
 
+            const session = await createSession(user.id)
+
             // Redirect to Workspaces
             const response = NextResponse.redirect(new URL('/workspaces', request.url))
 
             // Set session cookie on the response
-            response.cookies.set('user_id', user.id, {
+            response.cookies.set(SESSION_COOKIE_NAME, session.token, {
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                maxAge: THIRTY_DAYS,
+                sameSite: 'lax',
+                maxAge: SESSION_TTL_SECONDS,
                 path: '/',
             })
 
@@ -161,26 +165,34 @@ export async function GET(request: Request) {
 
         // NEW USER: Create & Go to Onboarding
         console.log(`[Auth] User not found. Creating NEW user.`)
-        user = await prisma.user.create({
-            data: {
-                email: discordUser.email || `discord_${discordUser.id}@discord.user`,
-                name: discordUser.global_name || discordUser.username,
-                avatar: discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png` : null,
-                discordId: discordUser.id,
-                role: 'Member',
-                hasOnboarded: false,
-            },
-            include: { workspace: true }
+        user = await prisma.$transaction(async (tx) => {
+            const userCount = await tx.user.count()
+            const role = userCount === 0 ? 'Admin' : 'Member'
+
+            return tx.user.create({
+                data: {
+                    email: discordUser.email || `discord_${discordUser.id}@discord.user`,
+                    name: discordUser.global_name || discordUser.username,
+                    avatar: discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png` : null,
+                    discordId: discordUser.id,
+                    role,
+                    hasOnboarded: false,
+                },
+                include: { workspace: true }
+            })
         })
 
         console.log(`[Auth] Created new user ${user.id} with role Member.`)
 
         const response = NextResponse.redirect(new URL('/onboarding', request.url))
 
-        response.cookies.set('user_id', user.id, {
+        const session = await createSession(user.id)
+
+        response.cookies.set(SESSION_COOKIE_NAME, session.token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            maxAge: THIRTY_DAYS,
+            sameSite: 'lax',
+            maxAge: SESSION_TTL_SECONDS,
             path: '/',
         })
 

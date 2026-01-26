@@ -3,6 +3,7 @@
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/auth'
+import { getProjectContext, getTaskContext } from '@/lib/access'
 
 const PUSH_COLORS = [
     "#3b82f6", // blue
@@ -22,6 +23,10 @@ export async function createPush(formData: FormData) {
             return { error: 'Unauthorized: Only Admins and Team Leads can create pushes' }
         }
 
+        if (!user.workspaceId) {
+            return { error: 'Unauthorized: No workspace' }
+        }
+
         // RBAC Check - Only Admin and Team Lead can create pushes
         if (user.role !== 'Admin' && user.role !== 'Team Lead') {
             return { error: 'Unauthorized: Only Admins and Team Leads can create pushes' }
@@ -37,6 +42,22 @@ export async function createPush(formData: FormData) {
         if (!projectId) return { error: 'Project ID is required' }
         if (!startDate) return { error: 'Start date is required' }
         // End date is optional now
+
+        const projectContext = await getProjectContext(projectId)
+        if (!projectContext || projectContext.workspaceId !== user.workspaceId) {
+            return { error: 'Project not found' }
+        }
+
+        if (dependsOnId) {
+            const dependency = await prisma.push.findUnique({
+                where: { id: dependsOnId },
+                select: { projectId: true, project: { select: { workspaceId: true } } }
+            })
+
+            if (!dependency || dependency.project.workspaceId !== user.workspaceId || dependency.projectId !== projectId) {
+                return { error: 'Invalid dependency push' }
+            }
+        }
 
         const start = new Date(startDate)
         let end: Date | null = null
@@ -91,6 +112,10 @@ export async function updatePush(input: {
         return { error: 'Unauthorized' }
     }
 
+    if (!user.workspaceId) {
+        return { error: 'Unauthorized: No workspace' }
+    }
+
     if (user.role !== 'Admin' && user.role !== 'Team Lead') {
         return { error: 'Unauthorized: Only Admins and Team Leads can update pushes' }
     }
@@ -98,10 +123,10 @@ export async function updatePush(input: {
     try {
         const push = await prisma.push.findUnique({
             where: { id: input.id },
-            select: { projectId: true }
+            select: { projectId: true, project: { select: { workspaceId: true } } }
         })
 
-        if (!push) {
+        if (!push || push.project.workspaceId !== user.workspaceId) {
             return { error: 'Push not found' }
         }
 
@@ -119,6 +144,17 @@ export async function updatePush(input: {
 
         // Handle dependsOnId explicitly if passed (can be null)
         if (input.dependsOnId !== undefined) {
+            if (input.dependsOnId) {
+                const dependency = await prisma.push.findUnique({
+                    where: { id: input.dependsOnId },
+                    select: { projectId: true, project: { select: { workspaceId: true } } }
+                })
+
+                if (!dependency || dependency.project.workspaceId !== user.workspaceId || dependency.projectId !== push.projectId) {
+                    return { error: 'Invalid dependency push' }
+                }
+            }
+
             updateData.dependsOnId = input.dependsOnId || null
         }
 
@@ -143,8 +179,21 @@ export async function deletePush(pushId: string, projectId: string) {
             return { error: 'Unauthorized: Only Admins can delete pushes' }
         }
 
+        if (!user.workspaceId) {
+            return { error: 'Unauthorized: No workspace' }
+        }
+
         if (user.role !== 'Admin' && user.role !== 'Team Lead') {
             return { error: 'Unauthorized: Only Admins and Team Leads can delete pushes' }
+        }
+
+        const push = await prisma.push.findUnique({
+            where: { id: pushId },
+            select: { projectId: true, project: { select: { workspaceId: true } } }
+        })
+
+        if (!push || push.projectId !== projectId || push.project.workspaceId !== user.workspaceId) {
+            return { error: 'Push not found' }
         }
 
         // Use transaction to ensure atomic operation
@@ -176,6 +225,10 @@ export async function assignTaskToPush(taskId: string, pushId: string | null) {
         return { error: 'Unauthorized' }
     }
 
+    if (!user.workspaceId) {
+        return { error: 'Unauthorized: No workspace' }
+    }
+
     try {
         const task = await prisma.task.findUnique({
             where: { id: taskId },
@@ -184,6 +237,26 @@ export async function assignTaskToPush(taskId: string, pushId: string | null) {
 
         if (!task) {
             return { error: 'Task not found' }
+        }
+
+        const taskContext = await getTaskContext(taskId)
+        if (!taskContext || taskContext.workspaceId !== user.workspaceId) {
+            return { error: 'Task not found' }
+        }
+
+        if (pushId) {
+            const push = await prisma.push.findUnique({
+                where: { id: pushId },
+                select: { projectId: true, project: { select: { workspaceId: true } } }
+            })
+
+            if (!push || push.project.workspaceId !== user.workspaceId) {
+                return { error: 'Push not found' }
+            }
+
+            if (taskContext.projectId && push.projectId !== taskContext.projectId) {
+                return { error: 'Push does not belong to this task project' }
+            }
         }
 
         await prisma.task.update({
@@ -245,6 +318,16 @@ export async function checkAndUpdatePushStatus(pushId: string) {
 
 export async function getPushes(projectId: string) {
     try {
+        const user = await getCurrentUser()
+        if (!user || !user.workspaceId) {
+            return []
+        }
+
+        const projectContext = await getProjectContext(projectId)
+        if (!projectContext || projectContext.workspaceId !== user.workspaceId) {
+            return []
+        }
+
         const pushes = await prisma.push.findMany({
             where: { projectId },
             include: {

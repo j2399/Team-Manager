@@ -77,10 +77,21 @@ export async function PATCH(request: Request) {
             })
         } else if (notificationId) {
             // Mark single notification as read
-            await prisma.notification.update({
-                where: { id: notificationId },
+            const updated = await prisma.notification.updateMany({
+                where: {
+                    id: notificationId,
+                    workspaceId: user.workspaceId,
+                    OR: [
+                        { userId: user.id },
+                        { userId: null }
+                    ]
+                },
                 data: { read: true }
             })
+
+            if (updated.count === 0) {
+                return NextResponse.json({ error: 'Notification not found' }, { status: 404 })
+            }
         }
 
         return NextResponse.json({ success: true })

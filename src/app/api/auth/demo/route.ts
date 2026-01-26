@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import prisma from '@/lib/prisma'
+import { createSession, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS } from '@/lib/session'
 
 export async function GET(request: Request) {
     // Disable demo mode in production
@@ -35,11 +36,14 @@ export async function GET(request: Request) {
             })
         }
 
+        const session = await createSession(demoUser.id)
+
         // Set cookies
-        cookieStore.set('user_id', demoUser.id, {
+        cookieStore.set(SESSION_COOKIE_NAME, session.token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            maxAge: 60 * 60 * 24 * 7,
+            sameSite: 'lax',
+            maxAge: SESSION_TTL_SECONDS,
             path: '/',
         })
 

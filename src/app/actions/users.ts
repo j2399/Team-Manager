@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { getCurrentUser } from '@/lib/auth'
+import { isUserInWorkspace } from '@/lib/access'
 
 export async function updateUserRole(userId: string, newRole: string) {
     const currentUser = await getCurrentUser()
@@ -10,16 +11,30 @@ export async function updateUserRole(userId: string, newRole: string) {
         return { error: 'Unauthorized: Not authenticated' }
     }
 
+    if (!currentUser.workspaceId) {
+        return { error: 'Unauthorized: No workspace' }
+    }
+
     if (currentUser.role !== 'Admin' && currentUser.role !== 'Team Lead') {
         return { error: 'Unauthorized: Only Admins and Team Leads can change roles' }
     }
 
+    const validRoles = ['Admin', 'Team Lead', 'Member']
+    if (!validRoles.includes(newRole)) {
+        return { error: 'Invalid role' }
+    }
+
     const targetUser = await prisma.user.findUnique({
         where: { id: userId },
-        select: { role: true, workspaceId: true }
+        select: { role: true, workspaceId: true, name: true }
     })
 
     if (!targetUser) {
+        return { error: 'User not found' }
+    }
+
+    const isMember = await isUserInWorkspace(userId, currentUser.workspaceId)
+    if (!isMember) {
         return { error: 'User not found' }
     }
 
@@ -53,9 +68,36 @@ export async function updateUserRole(userId: string, newRole: string) {
     }
 
     try {
-        await prisma.user.update({
-            where: { id: userId },
-            data: { role: newRole }
+        await prisma.$transaction(async (tx) => {
+            const membership = await tx.workspaceMember.findUnique({
+                where: { userId_workspaceId: { userId, workspaceId: currentUser.workspaceId } },
+                select: { id: true }
+            })
+
+            if (membership) {
+                await tx.workspaceMember.update({
+                    where: { userId_workspaceId: { userId, workspaceId: currentUser.workspaceId } },
+                    data: { role: newRole }
+                })
+            } else if (targetUser.workspaceId === currentUser.workspaceId) {
+                await tx.workspaceMember.create({
+                    data: {
+                        userId,
+                        workspaceId: currentUser.workspaceId,
+                        role: newRole,
+                        name: targetUser.name || 'User'
+                    }
+                })
+            } else {
+                throw new Error('User not found')
+            }
+
+            if (targetUser.workspaceId === currentUser.workspaceId) {
+                await tx.user.update({
+                    where: { id: userId },
+                    data: { role: newRole }
+                })
+            }
         })
         revalidatePath('/dashboard/members')
         revalidatePath('/dashboard/projects')
@@ -72,9 +114,28 @@ export async function updateUserProjects(userId: string, projectIds: string[]) {
         return { error: 'Unauthorized: Not authenticated' }
     }
 
+    if (!currentUser.workspaceId) {
+        return { error: 'Unauthorized: No workspace' }
+    }
+
     // Allow Team Leads to assign projects too
     if (currentUser.role !== 'Admin' && currentUser.role !== 'Team Lead') {
         return { error: 'Unauthorized: Only Admins and Team Leads can change project assignments' }
+    }
+
+    const isMember = await isUserInWorkspace(userId, currentUser.workspaceId)
+    if (!isMember) {
+        return { error: 'User not found' }
+    }
+
+    const uniqueProjectIds = Array.from(new Set(projectIds))
+    const workspaceProjects = await prisma.project.findMany({
+        where: { workspaceId: currentUser.workspaceId, id: { in: uniqueProjectIds } },
+        select: { id: true }
+    })
+
+    if (workspaceProjects.length !== uniqueProjectIds.length) {
+        return { error: 'One or more projects are not in this workspace' }
     }
 
     try {
@@ -86,9 +147,9 @@ export async function updateUserProjects(userId: string, projectIds: string[]) {
             })
 
             // Create new project memberships
-            if (projectIds.length > 0) {
+            if (uniqueProjectIds.length > 0) {
                 await tx.projectMember.createMany({
-                    data: projectIds.map(projectId => ({
+                    data: uniqueProjectIds.map(projectId => ({
                         userId,
                         projectId
                     }))
@@ -111,6 +172,10 @@ export async function removeUserFromWorkspace(userId: string) {
         return { error: 'Unauthorized: Not authenticated' }
     }
 
+    if (!currentUser.workspaceId) {
+        return { error: 'Unauthorized: No workspace' }
+    }
+
     if (currentUser.role !== 'Admin' && currentUser.role !== 'Team Lead') {
         return { error: 'Unauthorized: Only Admins and Team Leads can remove members' }
     }
@@ -121,6 +186,15 @@ export async function removeUserFromWorkspace(userId: string) {
     })
 
     if (!targetUser) {
+        return { error: 'User not found' }
+    }
+
+    const membership = await prisma.workspaceMember.findUnique({
+        where: { userId_workspaceId: { userId, workspaceId: currentUser.workspaceId } },
+        select: { id: true }
+    })
+
+    if (!membership) {
         return { error: 'User not found' }
     }
 

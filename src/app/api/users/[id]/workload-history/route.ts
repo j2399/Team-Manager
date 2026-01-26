@@ -30,6 +30,14 @@ export async function GET(
                 OR: [
                     { assigneeId: targetUserId },
                     { assignees: { some: { userId: targetUserId } } }
+                ],
+                AND: [
+                    {
+                        OR: [
+                            { column: { board: { project: { workspaceId: user.workspaceId } } } },
+                            { push: { project: { workspaceId: user.workspaceId } } }
+                        ]
+                    }
                 ]
             },
             select: {

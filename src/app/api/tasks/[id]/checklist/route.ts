@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { getTaskContext } from '@/lib/access'
 
 // GET - Fetch all checklist items for a task
 export async function GET(
@@ -9,6 +10,17 @@ export async function GET(
 ) {
     try {
         const { id } = await params
+        const user = await getCurrentUser()
+
+        if (!user || !user.workspaceId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+        }
+
+        const taskContext = await getTaskContext(id)
+        if (!taskContext || taskContext.workspaceId !== user.workspaceId) {
+            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+        }
+
         const items = await prisma.taskChecklistItem.findMany({
             where: { taskId: id },
             orderBy: { order: 'asc' }
@@ -33,21 +45,20 @@ export async function POST(
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
         }
 
+        if (!user.workspaceId) {
+            return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+        }
+
+        const taskContext = await getTaskContext(id)
+        if (!taskContext || taskContext.workspaceId !== user.workspaceId) {
+            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+        }
+
         const body = await request.json()
         const { content } = body
 
         if (!content || typeof content !== 'string' || content.trim().length === 0) {
             return NextResponse.json({ error: 'Content is required' }, { status: 400 })
-        }
-
-        // Verify task exists
-        const task = await prisma.task.findUnique({
-            where: { id },
-            select: { title: true }
-        })
-
-        if (!task) {
-            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
         }
 
         // Get max order
@@ -69,7 +80,7 @@ export async function POST(
         await prisma.activityLog.create({
             data: {
                 taskId: id,
-                taskTitle: task.title,
+                taskTitle: taskContext.title || 'Untitled Task',
                 action: 'updated',
                 field: 'checklist',
                 oldValue: null,
@@ -98,6 +109,15 @@ export async function PATCH(
 
         if (!user || !user.id || user.id === 'pending') {
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+        }
+
+        if (!user.workspaceId) {
+            return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+        }
+
+        const taskContext = await getTaskContext(id)
+        if (!taskContext || taskContext.workspaceId !== user.workspaceId) {
+            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
         }
 
         const body = await request.json()
@@ -129,11 +149,6 @@ export async function PATCH(
             return NextResponse.json({ error: 'Checklist item not found' }, { status: 404 })
         }
 
-        const task = await prisma.task.findUnique({
-            where: { id },
-            select: { title: true }
-        })
-
         const updateData: any = {}
 
         if (typeof completed === 'boolean') {
@@ -152,11 +167,11 @@ export async function PATCH(
         })
 
         // Log activity for completion toggle
-        if (typeof completed === 'boolean' && task) {
+        if (typeof completed === 'boolean' && taskContext.title) {
             await prisma.activityLog.create({
                 data: {
                     taskId: id,
-                    taskTitle: task.title,
+                    taskTitle: taskContext.title || 'Untitled Task',
                     action: 'updated',
                     field: 'checklist',
                     oldValue: completed ? 'incomplete' : 'complete',
@@ -188,6 +203,15 @@ export async function DELETE(
             return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
         }
 
+        if (!user.workspaceId) {
+            return NextResponse.json({ error: 'No workspace' }, { status: 403 })
+        }
+
+        const taskContext = await getTaskContext(id)
+        if (!taskContext || taskContext.workspaceId !== user.workspaceId) {
+            return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+        }
+
         const url = new URL(request.url)
         const itemId = url.searchParams.get('itemId')
 
@@ -204,21 +228,16 @@ export async function DELETE(
             return NextResponse.json({ error: 'Checklist item not found' }, { status: 404 })
         }
 
-        const task = await prisma.task.findUnique({
-            where: { id },
-            select: { title: true }
-        })
-
         await prisma.taskChecklistItem.delete({
             where: { id: itemId }
         })
 
         // Log activity
-        if (task) {
+        if (taskContext.title) {
             await prisma.activityLog.create({
                 data: {
                     taskId: id,
-                    taskTitle: task.title,
+                    taskTitle: taskContext.title,
                     action: 'updated',
                     field: 'checklist',
                     oldValue: item.content,

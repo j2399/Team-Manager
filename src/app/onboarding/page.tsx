@@ -10,6 +10,10 @@ export default async function OnboardingPage() {
     const discordUserCookie = cookieStore.get('discord_user')
     const user = await getCurrentUser()
 
+    if (!user) {
+        redirect('/')
+    }
+
     if (user && user.hasOnboarded) {
         redirect('/workspaces')
     }
@@ -66,5 +70,4 @@ export default async function OnboardingPage() {
         </div >
     )
 }
-
 
