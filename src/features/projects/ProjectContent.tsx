@@ -205,15 +205,19 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                             <TooltipProvider delayDuration={1000}>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className={`h-7 px-2 shrink-0 transition-opacity ${canManagePushes ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                                        <button
+                                            className="h-7 px-2.5 shrink-0 flex items-center gap-1.5 rounded-md text-xs font-medium transition-all tag-shimmer"
+                                            style={{
+                                                background: `linear-gradient(to right, ${projectColor}20, transparent)`,
+                                                border: `1px solid ${projectColor}40`,
+                                                color: projectColor,
+                                                '--tag-color': `${projectColor}20`
+                                            } as React.CSSProperties}
                                             onClick={() => setShowTimelineDialog(true)}
                                         >
-                                            <Plus className="w-3.5 h-3.5 mr-1" />
-                                            <span className="text-xs">Edit Projects</span>
-                                        </Button>
+                                            <Plus className="w-3.5 h-3.5" />
+                                            Edit Projects
+                                        </button>
                                     </TooltipTrigger>
                                     <TooltipContent side="bottom" className="max-w-[200px] text-center">
                                         <p className="text-xs">A project is a time-boxed sprint to group related tasks together</p>
@@ -224,26 +228,22 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                         <div className="relative flex items-center p-0.5 bg-muted rounded-lg overflow-hidden">
-                            {/* Sliding indicator with solid border and subtle gradient */}
+                            {/* Sliding indicator */}
                             <div
-                                className={`absolute inset-y-0.5 w-[calc(50%-2px)] rounded-md transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${view === 'kanban' ? 'left-0.5' : 'left-[calc(50%+1px)]'}`}
+                                className={`absolute inset-y-0.5 w-[calc(50%-2px)] bg-primary rounded-md transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${view === 'kanban' ? 'left-0.5' : 'left-[calc(50%+1px)]'}`}
                                 style={{
-                                    background: `linear-gradient(135deg, ${projectColor}15, ${projectColor}08)`,
-                                    border: `1.5px solid ${projectColor}`,
-                                    boxShadow: `0 1px 3px ${projectColor}20`
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.15)'
                                 }}
                             />
                             <button
-                                className={`relative z-10 flex items-center gap-1.5 h-7 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors duration-200`}
-                                style={{ color: view === 'kanban' ? projectColor : undefined }}
+                                className={`relative z-10 flex items-center gap-1.5 h-7 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors duration-200 ${view === 'kanban' ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                                 onClick={() => handleViewChange('kanban')}
                             >
                                 <LayoutGrid className="w-3.5 h-3.5" />
                                 <span className="hidden sm:inline text-xs">Kanban</span>
                             </button>
                             <button
-                                className={`relative z-10 flex items-center gap-1.5 h-7 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors duration-200`}
-                                style={{ color: view === 'gantt' ? projectColor : undefined }}
+                                className={`relative z-10 flex items-center gap-1.5 h-7 px-2 sm:px-3 rounded-md text-sm font-medium transition-colors duration-200 ${view === 'gantt' ? 'text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}
                                 onClick={() => handleViewChange('gantt')}
                             >
                                 <Calendar className="w-3.5 h-3.5" />
