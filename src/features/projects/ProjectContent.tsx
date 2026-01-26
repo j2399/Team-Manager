@@ -210,7 +210,6 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                                             style={{
                                                 background: `linear-gradient(to right, ${projectColor}20, transparent)`,
                                                 border: `1px solid ${projectColor}40`,
-                                                color: projectColor,
                                                 '--tag-color': `${projectColor}20`
                                             } as React.CSSProperties}
                                             onClick={() => setShowTimelineDialog(true)}
