@@ -742,7 +742,9 @@ export function DashboardHeatmap({
         <section className="border border-border rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                    <h2 className="text-sm font-medium">Work Distribution</h2>
+                    <Link href="/dashboard/heatmap" className="text-sm font-medium hover:text-primary transition-colors">
+                        Work Distribution
+                    </Link>
 
                     {/* Issue counts */}
                     <div className="flex items-center gap-1.5">
