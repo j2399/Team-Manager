@@ -57,26 +57,28 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 })
         }
 
+        const workspaceId = currentUser.workspaceId
+
         const membership = await prisma.workspaceMember.findUnique({
-            where: { userId_workspaceId: { userId, workspaceId: currentUser.workspaceId } },
+            where: { userId_workspaceId: { userId, workspaceId } },
             select: { id: true }
         })
 
-        if (!membership && targetUser.workspaceId !== currentUser.workspaceId) {
+        if (!membership && targetUser.workspaceId !== workspaceId) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 })
         }
 
         await prisma.$transaction(async (tx) => {
             if (membership) {
                 await tx.workspaceMember.update({
-                    where: { userId_workspaceId: { userId, workspaceId: currentUser.workspaceId } },
+                    where: { userId_workspaceId: { userId, workspaceId } },
                     data: { role }
                 })
-            } else if (targetUser.workspaceId === currentUser.workspaceId) {
+            } else if (targetUser.workspaceId === workspaceId) {
                 await tx.workspaceMember.create({
                     data: {
                         userId,
-                        workspaceId: currentUser.workspaceId,
+                        workspaceId,
                         role,
                         name: targetUser.name || 'User'
                     }
@@ -85,7 +87,7 @@ export async function POST(request: Request) {
                 throw new Error('User not found')
             }
 
-            if (targetUser.workspaceId === currentUser.workspaceId) {
+            if (targetUser.workspaceId === workspaceId) {
                 await tx.user.update({
                     where: { id: userId },
                     data: { role }
