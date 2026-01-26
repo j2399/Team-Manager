@@ -71,12 +71,21 @@ export function PushChainStrip({
     // Animation state
     const [completingPushId, setCompletingPushId] = useState<string | null>(null)
     const [animationPhase, setAnimationPhase] = useState<AnimationPhase>(null)
-    const [showCountIds, setShowCountIds] = useState<Set<string>>(new Set())
     const prevCompletionStatesRef = useRef<Record<string, boolean>>({})
+    const initializedRef = useRef(false)
 
-    // Detect when a push becomes complete
+    // Detect when a push becomes complete (only after initial render)
     useEffect(() => {
         const prevStates = prevCompletionStatesRef.current
+
+        // Skip animation on initial load - just record current states
+        if (!initializedRef.current) {
+            for (const push of chain) {
+                prevStates[push.id] = isComplete(push.id)
+            }
+            initializedRef.current = true
+            return
+        }
 
         for (const push of chain) {
             const wasComplete = prevStates[push.id] ?? false
@@ -96,8 +105,7 @@ export function PushChainStrip({
 
                     // Phase 2: Transition to next push (600ms)
                     setTimeout(() => {
-                        // Animation complete - show count
-                        setShowCountIds(prev => new Set(prev).add(push.id))
+                        // Animation complete - back to normal
                         setCompletingPushId(null)
                         setAnimationPhase(null)
                     }, COMPLETION_TRANSITION_MS)
@@ -171,10 +179,8 @@ export function PushChainStrip({
                     const isFillingAnimation = completingPushId === push.id && animationPhase === 'filling'
                     // Check if this push is in transition phase (green bg should show)
                     const isTransitioning = completingPushId === push.id && animationPhase === 'transitioning'
-                    // Check if this push just finished animating and should show count
-                    const shouldShowCount = showCountIds.has(push.id)
-                    // Green background ONLY after fill completes (transitioning or done)
-                    const showGreenBg = isTransitioning || shouldShowCount
+                    // Green background ONLY during transition (not persisted)
+                    const showGreenBg = isTransitioning
 
                     return (
                         <div
@@ -244,11 +250,8 @@ export function PushChainStrip({
                                         {pushIsLocked ? (
                                             <Lock className="w-4 h-4 text-muted-foreground/50" />
                                         ) : showGreenBg ? (
-                                            // Show count on green background
-                                            <span className={cn(
-                                                "text-[10px] font-bold tabular-nums text-white",
-                                                shouldShowCount && "animate-count-fade-in"
-                                            )}>
+                                            // Show count on green background during transition
+                                            <span className="text-[10px] font-bold tabular-nums text-white">
                                                 {push.completedCount}/{push.taskCount}
                                             </span>
                                         ) : pushIsComplete ? (
