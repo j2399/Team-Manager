@@ -412,27 +412,6 @@ export function TimelineEditor({
         setEditingPush({ ...editingPush, dependsOn: null })
     }, [editingPush, pushes, onPushesChange])
 
-    // Handle breaking a push out of its chain by dragging down
-    // Any downstream pushes will now depend on this push's former dependency
-    const handleBreakChain = useCallback((pushId: string) => {
-        const push = pushes.find(p => p.tempId === pushId)
-        if (!push || !push.dependsOn) return
-
-        const formerDependency = push.dependsOn
-
-        onPushesChange(pushes.map(p => {
-            // Remove dependency from the dragged push
-            if (p.tempId === pushId) {
-                return { ...p, dependsOn: null }
-            }
-            // Update any push that depends on the dragged push to depend on the former dependency
-            if (p.dependsOn === pushId) {
-                return { ...p, dependsOn: formerDependency }
-            }
-            return p
-        }))
-    }, [pushes, onPushesChange])
-
     const gridHeight = Math.max((numRows + 1) * ROW_HEIGHT, MIN_ROWS * ROW_HEIGHT)
     const totalHeight = HEADER_HEIGHT + gridHeight
 
@@ -560,7 +539,6 @@ export function TimelineEditor({
                                 isTouchingNext={pushInfo[push.tempId]?.isTouchingNext || false}
                                 getDateFromX={getDateFromClientX}
                                 onDragChange={setBarDragInfo}
-                                onBreakChain={handleBreakChain}
                                 otherPushesOnSameRow={pushes.filter(p =>
                                     p.tempId !== push.tempId &&
                                     rowAssignments[p.tempId] === rowAssignments[push.tempId]
