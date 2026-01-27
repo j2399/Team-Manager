@@ -486,10 +486,10 @@ export function TimelineEditor({
                             style={{
                                 left: `${hoverInfo.x}px`,
                                 top: `${HEADER_HEIGHT}px`,
-                                height: `${gridHeight}px`
+                                bottom: 0
                             }}
                         >
-                            {/* Vertical line - starts below header */}
+                            {/* Vertical line - extends to bottom of container */}
                             <div
                                 className="absolute w-px bg-primary/50"
                                 style={{
