@@ -182,14 +182,19 @@ export function PushChainStrip({
                     // Green background for completed collapsed cards (always) and during transition
                     const showGreenBg = (!isExpanded && pushIsComplete && !isFillingAnimation) || isTransitioning
 
+                    // When content is open and this is the expanded push, connect visually to content panel
+                    const isConnectedToContent = isExpanded && isContentOpen
+
                     return (
                         <div
                             key={push.id}
                             className={cn(
-                                "relative rounded-lg border shadow-sm overflow-hidden",
+                                "relative border shadow-sm overflow-hidden",
                                 // Only transition width - background changes instantly
                                 "transition-[width] ease-out",
                                 isExpanded ? "min-w-0" : "shrink-0",
+                                // Rounded corners - remove bottom when connected to content
+                                isConnectedToContent ? "rounded-t-lg rounded-b-none border-b-0" : "rounded-lg",
                                 !isExpanded && pushIsLocked
                                     ? "opacity-60 grayscale border-dashed cursor-not-allowed"
                                     : !isExpanded && "hover:shadow-md cursor-pointer"
@@ -376,7 +381,7 @@ export function PushChainStrip({
                 })}
             </div>
 
-            {/* Content Panel */}
+            {/* Content Panel - visually connected to expanded push header */}
             {expandedPush && (
                 <div
                     className="grid transition-[grid-template-rows] duration-300 ease-out"
@@ -386,11 +391,19 @@ export function PushChainStrip({
                         "min-h-0",
                         isContentOpen ? "overflow-visible" : "overflow-hidden"
                     )}>
-                        <div className={cn(
-                            "mt-2 rounded-lg border shadow-sm transition-all duration-300",
-                            isContentOpen ? "opacity-100" : "opacity-0 pointer-events-none",
-                            isComplete(expandedPush.id) ? "bg-muted/30 border-border/50" : "bg-card border-border"
-                        )}>
+                        <div
+                            className={cn(
+                                "border shadow-sm transition-all duration-300",
+                                // Connected to header: no top-left radius, no top margin
+                                "rounded-b-lg rounded-tr-lg border-t",
+                                isContentOpen ? "opacity-100" : "opacity-0 pointer-events-none",
+                                isComplete(expandedPush.id) ? "bg-muted/30 border-border/50" : "bg-card border-border"
+                            )}
+                            style={{
+                                // Match the width of the expanded push for the connected top edge
+                                borderTopLeftRadius: 0,
+                            }}
+                        >
                             <div className="p-4">
                                 {loadingPushes[expandedPush.id] ? (
                                     <div className="h-[180px] rounded-lg border bg-background/60 animate-pulse" />
