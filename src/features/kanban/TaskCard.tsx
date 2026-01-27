@@ -62,6 +62,8 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
         transform: CSS.Translate.toString(transform),
         transition,
         opacity: isDragging ? 0 : 1,
+        position: 'relative' as const,
+        zIndex: 10, // Ensure card renders above confetti (z-index: 1)
     }
 
     // Calculate due date status
@@ -90,7 +92,10 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
     // Render Overlay Card (Action of dragging)
     if (overlay) {
         return (
-            <div className="bg-card border rounded-lg shadow-xl cursor-grabbing p-3 w-[260px] rotate-2 scale-105 border-primary/20 ring-1 ring-primary/20">
+            <div
+                className="bg-card border rounded-lg shadow-xl cursor-grabbing p-3 w-[260px] rotate-2 scale-105 border-primary/20 ring-1 ring-primary/20"
+                style={{ position: 'relative', zIndex: 100 }}
+            >
                 <h4 className="text-sm font-medium leading-normal">{task.title}</h4>
                 <div className="mt-3 flex justify-between items-center opacity-50">
                     <div className="h-1.5 w-16 bg-muted rounded-full" />

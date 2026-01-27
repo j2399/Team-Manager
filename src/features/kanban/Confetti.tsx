@@ -57,7 +57,7 @@ export function useConfetti() {
             width: 100vw;
             height: 100vh;
             pointer-events: none;
-            z-index: 50;
+            z-index: 1;
         `
         canvas.width = window.innerWidth
         canvas.height = window.innerHeight
@@ -121,7 +121,8 @@ export function useConfetti() {
     }, [])
 
     const triggerConfetti = useCallback((type: ConfettiType, position?: { x: number, y: number }, projectColor?: string) => {
-        const colors = type === 'review' ? REVIEW_COLORS : generateColors(projectColor)
+        // Always use project colors for both review and done
+        const colors = generateColors(projectColor)
         const particleCount = type === 'done' ? 60 : 40
         const canvas = canvasRef.current
         if (!canvas) return
@@ -146,7 +147,7 @@ export function useConfetti() {
                 vx: Math.cos(angle) * velocity,
                 vy: Math.sin(angle) * velocity - 1, // slight upward bias
                 color: colors[Math.floor(Math.random() * colors.length)],
-                size: 10 + Math.random() * 8, // bigger particles
+                size: 14 + Math.random() * 10, // larger particles for visibility
                 rotation: Math.random() * Math.PI * 2,
                 rotationSpeed: (Math.random() - 0.5) * 0.3,
                 life: 0.9 + Math.random() * 0.5

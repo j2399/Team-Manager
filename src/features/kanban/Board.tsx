@@ -753,7 +753,7 @@ export function Board({
             // Revert on error
             router.refresh()
         } else {
-            triggerConfetti('review', reviewDialog.dropPosition)
+            triggerConfetti('review', reviewDialog.dropPosition, projectColor)
             // router.refresh() // Removed to prevent flicker
         }
         setReviewDialog(null)
