@@ -74,6 +74,10 @@ export function PushChainStrip({
     const prevCompletionStatesRef = useRef<Record<string, boolean>>({})
     const initializedRef = useRef(false)
 
+    // Track pushes that are currently collapsing (to delay green bg)
+    const [collapsingPushId, setCollapsingPushId] = useState<string | null>(null)
+    const prevExpandedPushIdRef = useRef<string | null>(null)
+
     // Detect when a push becomes complete (only after initial render)
     useEffect(() => {
         const prevStates = prevCompletionStatesRef.current
@@ -129,6 +133,26 @@ export function PushChainStrip({
         return activePushId
     }, [userSelectedPushId, activePushId, chain, animationPhase, completingPushId])
 
+    // Detect when a push goes from expanded to collapsed and delay green bg
+    useEffect(() => {
+        const prevExpanded = prevExpandedPushIdRef.current
+
+        // If a different push was expanded before, it's now collapsing
+        if (prevExpanded && prevExpanded !== expandedPushId) {
+            const collapsedPush = chain.find(p => p.id === prevExpanded)
+            // Only track if it's a completed push (needs green delay)
+            if (collapsedPush && isComplete(collapsedPush.id)) {
+                setCollapsingPushId(prevExpanded)
+                // Clear after collapse animation completes
+                setTimeout(() => {
+                    setCollapsingPushId(null)
+                }, NORMAL_TRANSITION_MS)
+            }
+        }
+
+        prevExpandedPushIdRef.current = expandedPushId
+    }, [expandedPushId, chain, isComplete])
+
     const ensureTasksLoaded = useCallback((pushId: string) => {
         if (!loadedPushes[pushId]) {
             loadPushTasks(pushId)
@@ -177,24 +201,26 @@ export function PushChainStrip({
 
                     // Check if this push is currently in filling animation
                     const isFillingAnimation = completingPushId === push.id && animationPhase === 'filling'
-                    // Check if this push is in transition phase
+                    // Check if this push is in transition phase (completion animation)
                     const isTransitioning = completingPushId === push.id && animationPhase === 'transitioning'
-                    // Green background for completed collapsed cards (always) and during transition
-                    const showGreenBg = (!isExpanded && pushIsComplete && !isFillingAnimation) || isTransitioning
-
-                    // When content is open and this is the expanded push, connect visually to content panel
-                    const isConnectedToContent = isExpanded && isContentOpen
+                    // Check if this push is currently collapsing (delay green)
+                    const isCollapsing = collapsingPushId === push.id
+                    // Green background:
+                    // - When collapsed AND complete AND not filling AND not currently collapsing
+                    // - OR during completion transition phase
+                    const showGreenBg = (
+                        (!isExpanded && pushIsComplete && !isFillingAnimation && !isCollapsing) ||
+                        isTransitioning
+                    )
 
                     return (
                         <div
                             key={push.id}
                             className={cn(
-                                "relative border shadow-sm overflow-hidden",
-                                // Only transition width - background changes instantly
-                                "transition-[width] ease-out",
+                                "relative rounded-lg border shadow-sm overflow-hidden",
+                                // Transition width and background color smoothly
+                                "transition-[width,background-color,border-color] ease-out",
                                 isExpanded ? "min-w-0" : "shrink-0",
-                                // Rounded corners - remove bottom when connected to content
-                                isConnectedToContent ? "rounded-t-lg rounded-b-none border-b-0" : "rounded-lg",
                                 !isExpanded && pushIsLocked
                                     ? "opacity-60 grayscale border-dashed cursor-not-allowed"
                                     : !isExpanded && "hover:shadow-md cursor-pointer"
@@ -202,8 +228,9 @@ export function PushChainStrip({
                             style={{
                                 width: isExpanded ? expandedWidth : collapsedWidth,
                                 transitionDuration: `${transitionDuration}ms`,
-                                backgroundColor: showGreenBg ? 'rgb(34 197 94)' : undefined,
-                                borderColor: showGreenBg ? 'rgb(34 197 94 / 0.5)' : undefined,
+                                // Green background only when collapsed and complete (not during expansion)
+                                backgroundColor: (!isExpanded && pushIsComplete && !isFillingAnimation) ? 'rgb(34 197 94)' : undefined,
+                                borderColor: (!isExpanded && pushIsComplete && !isFillingAnimation) ? 'rgb(34 197 94 / 0.5)' : undefined,
                             }}
                             onMouseEnter={() => setHoveredId(push.id)}
                             onMouseLeave={() => setHoveredId(null)}
@@ -381,7 +408,7 @@ export function PushChainStrip({
                 })}
             </div>
 
-            {/* Content Panel - visually connected to expanded push header */}
+            {/* Content Panel */}
             {expandedPush && (
                 <div
                     className="grid transition-[grid-template-rows] duration-300 ease-out"
@@ -391,19 +418,11 @@ export function PushChainStrip({
                         "min-h-0",
                         isContentOpen ? "overflow-visible" : "overflow-hidden"
                     )}>
-                        <div
-                            className={cn(
-                                "border shadow-sm transition-all duration-300",
-                                // Connected to header: no top-left radius, no top margin
-                                "rounded-b-lg rounded-tr-lg border-t",
-                                isContentOpen ? "opacity-100" : "opacity-0 pointer-events-none",
-                                isComplete(expandedPush.id) ? "bg-muted/30 border-border/50" : "bg-card border-border"
-                            )}
-                            style={{
-                                // Match the width of the expanded push for the connected top edge
-                                borderTopLeftRadius: 0,
-                            }}
-                        >
+                        <div className={cn(
+                            "mt-2 rounded-lg border shadow-sm transition-all duration-300",
+                            isContentOpen ? "opacity-100" : "opacity-0 pointer-events-none",
+                            isComplete(expandedPush.id) ? "bg-muted/30 border-border/50" : "bg-card border-border"
+                        )}>
                             <div className="p-4">
                                 {loadingPushes[expandedPush.id] ? (
                                     <div className="h-[180px] rounded-lg border bg-background/60 animate-pulse" />
