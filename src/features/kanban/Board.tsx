@@ -570,6 +570,15 @@ export function Board({
         const startColName = sourceColumn.name
         const endColName = targetColumn.name
 
+        // Check if task meets attachment requirements for Done column
+        const meetsAttachmentRequirement = !activeTask.requireAttachment ||
+            (activeTask.attachments && activeTask.attachments.length > 0)
+
+        // Trigger confetti immediately on drop into Done (if requirements met)
+        if (endColName === 'Done' && startColName !== 'Done' && meetsAttachmentRequirement && dropCenter) {
+            triggerConfetti('done', dropCenter)
+        }
+
         // Handle special dialogs
         if (endColName === 'Review' && startColName !== 'Review') {
             setReviewDialog({
@@ -665,9 +674,8 @@ export function Board({
                 const columnResult = await saveToServer(activeId, targetColumnId, originalColumnId!)
                 if (!columnResult) {
                     success = false
-                } else if (endColName === 'Done') {
-                    triggerConfetti('done', dropCenter)
                 }
+                // Confetti already triggered immediately on drop
             }
 
             // Only refresh if both operations succeeded

@@ -25,7 +25,7 @@ export function useConfetti() {
     const animationFrame = useRef<number | null>(null)
 
     useEffect(() => {
-        // Create canvas on mount
+        // Create canvas on mount - z-index 40 puts it behind drag overlay but above content
         const canvas = document.createElement('canvas')
         canvas.style.cssText = `
             position: fixed;
@@ -34,7 +34,7 @@ export function useConfetti() {
             width: 100vw;
             height: 100vh;
             pointer-events: none;
-            z-index: 9999;
+            z-index: 40;
         `
         canvas.width = window.innerWidth
         canvas.height = window.innerHeight
@@ -99,30 +99,34 @@ export function useConfetti() {
 
     const triggerConfetti = useCallback((type: ConfettiType, position?: { x: number, y: number }) => {
         const colors = type === 'review' ? REVIEW_COLORS : DONE_COLORS
-        const particleCount = type === 'done' ? 80 : 50
+        const particleCount = type === 'done' ? 100 : 50
         const canvas = canvasRef.current
         if (!canvas) return
 
-        // Spawn from center of viewport, slightly up, or use provided position
-        // Since canvas IS the viewport (fixed), we use window dimensions
+        // Spawn from the card center position
         const originX = position?.x ?? window.innerWidth / 2
         const originY = position?.y ?? window.innerHeight * 0.4
 
         for (let i = 0; i < particleCount; i++) {
-            // Random angle in a cone upwards
-            const angle = -Math.PI / 2 + (Math.random() - 0.5) * 2 // spread
-            const velocity = 10 + Math.random() * 10
+            // Burst in all directions from center (like exploding from behind)
+            const angle = Math.random() * Math.PI * 2 // full 360 degrees
+            const velocity = 8 + Math.random() * 12 // faster initial burst
+
+            // Add slight offset so particles start slightly outside center
+            const offsetDistance = 5 + Math.random() * 10
+            const startX = originX + Math.cos(angle) * offsetDistance
+            const startY = originY + Math.sin(angle) * offsetDistance
 
             particles.current.push({
-                x: originX,
-                y: originY,
-                vx: Math.cos(angle) * velocity + (Math.random() - 0.5) * 5,
-                vy: Math.sin(angle) * velocity,
+                x: startX,
+                y: startY,
+                vx: Math.cos(angle) * velocity,
+                vy: Math.sin(angle) * velocity - 3, // slight upward bias
                 color: colors[Math.floor(Math.random() * colors.length)],
-                size: 8 + Math.random() * 6,
+                size: 6 + Math.random() * 5,
                 rotation: Math.random() * Math.PI * 2,
-                rotationSpeed: (Math.random() - 0.5) * 0.3,
-                life: 1.0 + Math.random() * 0.5
+                rotationSpeed: (Math.random() - 0.5) * 0.4,
+                life: 0.8 + Math.random() * 0.6
             })
         }
 
