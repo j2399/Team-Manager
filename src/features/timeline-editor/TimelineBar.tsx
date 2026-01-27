@@ -422,8 +422,8 @@ export function TimelineBar({
                                 className={cn(
                                     "absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full",
                                     "bg-background border border-border shadow-sm flex items-center justify-center",
-                                    "opacity-0 group-hover:opacity-100 transition-all duration-200 group/plus",
-                                    "hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer z-30",
+                                    "opacity-0 group-hover:opacity-100 transition-all duration-200",
+                                    "text-muted-foreground hover:bg-primary hover:text-primary-foreground hover:scale-110 cursor-pointer z-30",
                                     isChainDragging && "opacity-100 bg-primary text-primary-foreground scale-110"
                                 )}
                                 onPointerDown={handleChainPointerDown}
@@ -436,12 +436,7 @@ export function TimelineBar({
                                     setHasMoved(false)
                                 }}
                             >
-                                <Plus
-                                    className={cn(
-                                        "h-3.5 w-3.5 transition-colors",
-                                        !isChainDragging && "text-muted-foreground group-hover:text-primary-foreground"
-                                    )}
-                                />
+                                <Plus className="h-3.5 w-3.5 text-current" />
                             </div>
                         </TooltipTrigger>
                         <TooltipContent side="right" className="text-xs">
