@@ -2,15 +2,12 @@ import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth"
 import Link from "next/link"
 
+export const dynamic = "force-dynamic"
+
 export default async function LandingPage() {
     const user = await getCurrentUser()
 
-    // If user has a workspace, go to dashboard
-    if (user && user.workspaceId) {
-        redirect('/dashboard')
-    }
-
-    // If user is logged in but no workspace, go to workspaces
+    // If user is logged in, send them to workspace hub
     if (user && user.id && user.id !== 'pending') {
         redirect('/workspaces')
     }

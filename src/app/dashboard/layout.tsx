@@ -9,6 +9,8 @@ import { ThemeClient } from "@/components/ThemeClient"
 
 import { Metadata } from 'next'
 
+export const dynamic = "force-dynamic"
+
 export async function generateMetadata(): Promise<Metadata> {
     const user = await getCurrentUser()
     return {

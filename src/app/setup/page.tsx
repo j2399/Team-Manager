@@ -2,15 +2,17 @@ import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth"
 import { SetupContent } from "./SetupContent"
 
+export const dynamic = "force-dynamic"
+
 export default async function SetupPage() {
     const user = await getCurrentUser()
     if (!user) {
         redirect('/')
     }
 
-    // If user already has a workspace, go to dashboard
+    // If user already has a workspace, go to workspace hub
     if (user.workspaceId) {
-        redirect('/dashboard')
+        redirect('/workspaces')
     }
 
     return (

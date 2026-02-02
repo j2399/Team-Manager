@@ -16,6 +16,8 @@ import { RoleSelect } from "../members/RoleSelect"
 import { ProjectSelect } from "../members/ProjectSelect"
 import { MemberActions } from "../members/MemberActions"
 
+export const dynamic = "force-dynamic"
+
 export default async function SettingsPage() {
     const user = await getCurrentUser()
     if (!user) {

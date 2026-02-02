@@ -3,6 +3,8 @@ import { redirect } from "next/navigation"
 import { WorkspaceSelector } from "./WorkspaceSelector"
 import { ThemeClient } from "@/components/ThemeClient"
 
+export const dynamic = "force-dynamic"
+
 export default async function WorkspacesPage() {
     const user = await getCurrentUser()
     if (!user) {
