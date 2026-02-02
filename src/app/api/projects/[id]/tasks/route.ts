@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/auth"
+import type { Prisma } from "@prisma/client"
 
 export async function GET(
     request: Request,
@@ -14,7 +15,7 @@ export async function GET(
     try {
         const { id: projectId } = await params
         const { searchParams } = new URL(request.url)
-        const pushId = searchParams.get("pushId")
+        const pushIdParam = searchParams.get("pushId")
 
         const project = await prisma.project.findUnique({
             where: { id: projectId },
@@ -25,11 +26,18 @@ export async function GET(
             return NextResponse.json({ error: "Project not found" }, { status: 404 })
         }
 
+        const where: Prisma.TaskWhereInput = {
+            column: { board: { projectId } },
+        }
+
+        // Only filter by pushId when the caller supplies the param.
+        // When omitted, return tasks from all pushes + backlog.
+        if (pushIdParam && pushIdParam.trim().length > 0) {
+            where.pushId = (pushIdParam === "null" || pushIdParam === "backlog") ? null : pushIdParam
+        }
+
         const tasks = await prisma.task.findMany({
-            where: {
-                column: { board: { projectId } },
-                pushId: pushId || null,
-            },
+            where,
             include: {
                 assignee: { select: { id: true, name: true } },
                 assignees: {

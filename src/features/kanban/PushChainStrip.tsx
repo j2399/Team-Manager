@@ -34,7 +34,7 @@ const NORMAL_TRANSITION_MS = 300
 const COMPLETION_TRANSITION_MS = 600 // 2x slower for completion animation
 const WATER_FILL_MS = 800
 
-type AnimationPhase = 'filling' | 'transitioning' | null
+type AnimationPhase = 'filling' | 'transitioning' | 'fading' | null
 
 export function PushChainStrip({
     chain,
@@ -77,10 +77,56 @@ export function PushChainStrip({
     // Track pushes that are currently collapsing (to delay green bg)
     const [collapsingPushId, setCollapsingPushId] = useState<string | null>(null)
     const prevExpandedPushIdRef = useRef<string | null>(null)
+    const completionTimeoutsRef = useRef<{
+        fill: ReturnType<typeof setTimeout> | null
+        transition: ReturnType<typeof setTimeout> | null
+    }>({ fill: null, transition: null })
+    const completionKickoffTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const collapseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+    // Ensure timers can't fire after unmount.
+    useEffect(() => {
+        const completionTimeouts = completionTimeoutsRef.current
+        return () => {
+            if (completionKickoffTimeoutRef.current) clearTimeout(completionKickoffTimeoutRef.current)
+            if (completionTimeouts.fill) clearTimeout(completionTimeouts.fill)
+            if (completionTimeouts.transition) clearTimeout(completionTimeouts.transition)
+            if (collapseTimeoutRef.current) clearTimeout(collapseTimeoutRef.current)
+        }
+    }, [])
+
+    const startCompletionAnimation = useCallback((pushId: string) => {
+        setCompletingPushId(pushId)
+        setAnimationPhase('filling')
+
+        if (completionTimeoutsRef.current.fill) {
+            clearTimeout(completionTimeoutsRef.current.fill)
+            completionTimeoutsRef.current.fill = null
+        }
+        if (completionTimeoutsRef.current.transition) {
+            clearTimeout(completionTimeoutsRef.current.transition)
+            completionTimeoutsRef.current.transition = null
+        }
+
+        completionTimeoutsRef.current.fill = setTimeout(() => {
+            setAnimationPhase('transitioning')
+            // Clear user selection so it expands to next active push
+            setUserSelectedPushId(null)
+
+            completionTimeoutsRef.current.transition = setTimeout(() => {
+                // Animation complete - back to normal
+                setCompletingPushId(null)
+                setAnimationPhase(null)
+                completionTimeoutsRef.current.fill = null
+                completionTimeoutsRef.current.transition = null
+            }, COMPLETION_TRANSITION_MS)
+        }, WATER_FILL_MS)
+    }, [])
 
     // Detect when a push becomes complete (only after initial render)
     useEffect(() => {
         const prevStates = prevCompletionStatesRef.current
+        let startedCompletionAnimation = false
 
         // Skip animation on initial load - just record current states
         if (!initializedRef.current) {
@@ -96,30 +142,23 @@ export function PushChainStrip({
             const nowComplete = isComplete(push.id)
 
             // Detect transition from incomplete to complete
-            if (!wasComplete && nowComplete && !completingPushId) {
-                // Start completion animation for this push
-                setCompletingPushId(push.id)
-                setAnimationPhase('filling')
-
-                // Phase 1: Water fill (800ms)
-                setTimeout(() => {
-                    setAnimationPhase('transitioning')
-                    // Clear user selection so it expands to next active push
-                    setUserSelectedPushId(null)
-
-                    // Phase 2: Transition to next push (600ms)
-                    setTimeout(() => {
-                        // Animation complete - back to normal
-                        setCompletingPushId(null)
-                        setAnimationPhase(null)
-                    }, COMPLETION_TRANSITION_MS)
-                }, WATER_FILL_MS)
+            if (!startedCompletionAnimation && !wasComplete && nowComplete && !completingPushId) {
+                startedCompletionAnimation = true
+                // Schedule state changes async to avoid cascading renders in the effect body.
+                if (completionKickoffTimeoutRef.current) {
+                    clearTimeout(completionKickoffTimeoutRef.current)
+                    completionKickoffTimeoutRef.current = null
+                }
+                completionKickoffTimeoutRef.current = setTimeout(() => {
+                    completionKickoffTimeoutRef.current = null
+                    startCompletionAnimation(push.id)
+                }, 0)
             }
 
             // Update prev states
             prevStates[push.id] = nowComplete
         }
-    }, [chain, isComplete, completingPushId])
+    }, [chain, isComplete, completingPushId, startCompletionAnimation])
 
     // Expanded push: during transition, keep completing push expanded until animation switches
     const expandedPushId = useMemo(() => {
@@ -144,8 +183,13 @@ export function PushChainStrip({
             if (collapsedPush && isComplete(collapsedPush.id)) {
                 setCollapsingPushId(prevExpanded)
                 // Clear after collapse animation completes
-                setTimeout(() => {
+                if (collapseTimeoutRef.current) {
+                    clearTimeout(collapseTimeoutRef.current)
+                    collapseTimeoutRef.current = null
+                }
+                collapseTimeoutRef.current = setTimeout(() => {
                     setCollapsingPushId(null)
+                    collapseTimeoutRef.current = null
                 }, NORMAL_TRANSITION_MS)
             }
         }
@@ -189,7 +233,7 @@ export function PushChainStrip({
     return (
         <div className="w-full" ref={containerRef}>
             <div className="flex items-stretch gap-2">
-                {chain.map((push, index) => {
+                {chain.map((push) => {
                     const isExpanded = push.id === expandedPushId
                     const pushIsComplete = isComplete(push.id)
                     const pushIsLocked = isLocked(push)

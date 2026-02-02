@@ -36,6 +36,16 @@ type TaskType = {
     endDate?: Date | string | null
 }
 
+type TaskDialogResultTask = TaskType & {
+    columnId: string | null
+    updatedAt?: Date | string | null
+    push?: { id: string; name: string; color: string; status: string } | null
+    assignee?: { id?: string; name: string } | null
+    activityLogs?: { changedByName: string; createdAt: Date | string }[]
+    comments?: { createdAt: Date | string }[]
+    attachments?: { id: string; createdAt: Date | string }[]
+}
+
 import {
     AlertDialog,
     AlertDialogAction,
@@ -61,8 +71,8 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     task?: TaskType | null
     open?: boolean
     onOpenChange?: (open: boolean) => void
-    onTaskCreated?: (task: any) => void
-    onTaskUpdated?: (task: any) => void
+    onTaskCreated?: (task: TaskDialogResultTask) => void
+    onTaskUpdated?: (task: TaskDialogResultTask) => void
     onTaskDeleted?: (taskId: string) => void
     initialAssigneeIds?: string[]
 }) {
@@ -211,6 +221,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         try {
             if (task) {
                 const result = await updateTaskDetails(task.id, {
+                    title: title.trim(),
                     description: description.trim(),
                     assigneeId: assigneeIds.length > 0 ? assigneeIds[0] : "",
                     assigneeIds: assigneeIds,

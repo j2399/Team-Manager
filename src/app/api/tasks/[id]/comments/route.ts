@@ -99,6 +99,11 @@ export async function POST(
             return NextResponse.json({ error: 'Please complete your profile setup.' }, { status: 401 })
         }
 
+        if (!user.workspaceId) {
+            return NextResponse.json({ error: 'No workspace selected.' }, { status: 403 })
+        }
+        const workspaceId = user.workspaceId
+
         const dbUser = await prisma.user.findUnique({
             where: { id: user.id }
         })
@@ -176,7 +181,7 @@ export async function POST(
             // Find users in the same workspace whose name contains any of the mentioned names
             const mentionedMembers = await prisma.workspaceMember.findMany({
                 where: {
-                    workspaceId: user.workspaceId,
+                    workspaceId,
                     userId: { not: dbUser.id }, // Don't notify the commenter
                     OR: mentionNames.map((name: string) => ({
                         name: { contains: name, mode: 'insensitive' as const }
@@ -190,7 +195,7 @@ export async function POST(
                 const projectId = task.column?.board?.projectId
                 await prisma.notification.createMany({
                     data: mentionedMembers.map(mentionedUser => ({
-                        workspaceId: user.workspaceId!,
+                        workspaceId,
                         userId: mentionedUser.userId,
                         type: 'mention',
                         title: 'You were mentioned',

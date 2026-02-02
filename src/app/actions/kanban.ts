@@ -6,6 +6,7 @@ import { sendDiscordNotification } from '@/lib/discord'
 import { getCurrentUser } from '@/lib/auth'
 import { getProjectContext, getWorkspaceUserIds } from '@/lib/access'
 import { differenceInCalendarDays } from 'date-fns'
+import type { Prisma } from '@prisma/client'
 
 function parseDateOnlyStart(dateStr: string) {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim())
@@ -127,7 +128,7 @@ export async function createTask(input: CreateTaskInput) {
             }
         }
 
-        const taskData: any = {
+        const taskData: Prisma.TaskCreateInput = {
             title: title.trim(),
             description: description?.trim() || null,
             column: { connect: { id: targetColumnId } },
@@ -158,12 +159,15 @@ export async function createTask(input: CreateTaskInput) {
 
         // Create TaskAssignee entries if assigneeIds provided
         if (input.assigneeIds && input.assigneeIds.length > 0) {
-            await prisma.taskAssignee.createMany({
-                data: input.assigneeIds.map(userId => ({
-                    taskId: task.id,
-                    userId: userId
-                }))
-            })
+            const uniqueAssigneeIds = Array.from(new Set(input.assigneeIds)).filter((id) => id.trim().length > 0)
+            if (uniqueAssigneeIds.length > 0) {
+                await prisma.taskAssignee.createMany({
+                    data: uniqueAssigneeIds.map(userId => ({
+                        taskId: task.id,
+                        userId: userId
+                    }))
+                })
+            }
 
             // Re-fetch to get the assignees relation populated correctly
             const updatedTask = await prisma.task.findUnique({
@@ -334,7 +338,7 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
         }
 
         // Build update data with timestamps for Review/Done
-        const updateData: any = { columnId }
+        const updateData: Prisma.TaskUncheckedUpdateInput = { columnId }
 
         // Set submittedAt when moving to Review (only if not already set)
         if (targetColumnName === 'Review' && !task.submittedAt) {
@@ -486,14 +490,31 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
             }
         }
 
-        // Don't allow title changes
-        if (input.title && input.title !== task.title) {
-            return { error: 'Task title cannot be changed' }
-        }
-
         // Track all changes
         const changes: Array<{ field: string; oldValue: string; newValue: string }> = []
         const activityLogs: Array<{ action: string; field: string; oldValue: string; newValue: string; changedBy: string; changedByName: string }> = []
+
+        // Title changes (rename)
+        const nextTitle = input.title !== undefined ? input.title.trim() : undefined
+        if (nextTitle !== undefined && nextTitle.length === 0) {
+            return { error: 'Title is required' }
+        }
+        const titleChanged = nextTitle !== undefined && nextTitle !== task.title
+        if (titleChanged) {
+            changes.push({
+                field: 'Title',
+                oldValue: task.title,
+                newValue: nextTitle!
+            })
+            activityLogs.push({
+                action: 'updated',
+                field: 'title',
+                oldValue: task.title,
+                newValue: nextTitle!,
+                changedBy: user.id,
+                changedByName: user.name || 'Unknown'
+            })
+        }
 
         const oldAssignedIds = new Set<string>([
             ...(task.assigneeId ? [task.assigneeId] : []),
@@ -607,6 +628,7 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
         await prisma.task.update({
             where: { id: taskId },
             data: {
+                title: titleChanged ? nextTitle : undefined,
                 description: input.description !== undefined ? (input.description || null) : undefined,
                 assigneeId: input.assigneeId !== undefined ? (input.assigneeId && input.assigneeId !== "" ? input.assigneeId : null) : undefined,
                 startDate: input.startDate !== undefined ? (input.startDate ? parseDateInput(input.startDate, "startOfDay") : null) : undefined,
@@ -619,14 +641,15 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
 
         // Update TaskAssignee entries if assigneeIds provided
         if (input.assigneeIds !== undefined) {
+            const uniqueAssigneeIds = Array.from(new Set(input.assigneeIds)).filter((id) => id.trim().length > 0)
             // Delete existing assignees
             await prisma.taskAssignee.deleteMany({
                 where: { taskId: taskId }
             })
             // Create new assignees
-            if (input.assigneeIds.length > 0) {
+            if (uniqueAssigneeIds.length > 0) {
                 await prisma.taskAssignee.createMany({
-                    data: input.assigneeIds.map(userId => ({
+                    data: uniqueAssigneeIds.map(userId => ({
                         taskId: taskId,
                         userId: userId
                     }))
@@ -667,8 +690,8 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
 
         // Create activity logs
         if (activityLogs.length > 0) {
-            // Get task title for activity logs
-            const taskTitle = task.title
+            // Use the updated title if it changed during this update.
+            const taskTitle = titleChanged ? nextTitle! : task.title
 
             await prisma.activityLog.createMany({
                 data: activityLogs.map(log => ({

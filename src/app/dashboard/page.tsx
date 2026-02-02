@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/auth'
 import { buildWorkloadTasks, computeWorkloadStats, getWorkloadConfig } from '@/lib/workload'
 import { AlertCircle, Users, CheckCircle2, Circle, Loader2, Clock, Layout, ChevronRight } from "lucide-react"
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { DashboardClient } from "./DashboardClient"
 import { TeamPopup } from "./TeamPopup"
@@ -24,6 +25,10 @@ export default async function DashboardPage() {
     })
 
     if (!dbUser) return <div className="p-6 text-muted-foreground">User not found. Please log in again.</div>
+    const workspaceId = dbUser.workspaceId
+    if (!workspaceId) {
+        redirect('/workspaces')
+    }
 
     const isAdmin = user.role === 'Admin'
     const isTeamLead = user.role === 'Team Lead'
@@ -73,7 +78,7 @@ export default async function DashboardPage() {
         if (!isLeadership) return []
 
         const where = isAdmin
-            ? { column: { name: 'Review', board: { project: { workspaceId: dbUser.workspaceId } } } }
+            ? { column: { name: 'Review', board: { project: { workspaceId } } } }
             : { column: { name: 'Review', board: { project: { leadId: dbUser.id } } } }
 
         return prisma.task.findMany({
@@ -104,7 +109,7 @@ export default async function DashboardPage() {
 
         const [memberships, tasks] = await Promise.all([
             prisma.workspaceMember.findMany({
-                where: { workspaceId: dbUser.workspaceId },
+                where: { workspaceId },
                 select: {
                     userId: true,
                     name: true,
@@ -112,7 +117,7 @@ export default async function DashboardPage() {
                 }
             }),
             prisma.task.findMany({
-                where: { column: { board: { project: { workspaceId: dbUser.workspaceId } } } },
+                where: { column: { board: { project: { workspaceId } } } },
                 select: {
                     id: true,
                     title: true,
@@ -167,7 +172,7 @@ export default async function DashboardPage() {
         if (!isLeadership) return []
 
         return prisma.activityLog.findMany({
-            where: { task: { column: { board: { project: { workspaceId: dbUser.workspaceId } } } } },
+            where: { task: { column: { board: { project: { workspaceId } } } } },
             orderBy: { createdAt: 'desc' },
             take: 10,
             select: {
@@ -185,14 +190,12 @@ export default async function DashboardPage() {
     }
 
     const fetchHeatmapData = async () => {
-        if (!isLeadership || !dbUser.workspaceId) return null
-
-        const workspaceId = dbUser.workspaceId
+        if (!isLeadership) return null
 
         const [config, memberships, tasks] = await Promise.all([
             getWorkloadConfig(workspaceId),
             prisma.workspaceMember.findMany({
-                where: { workspaceId: dbUser.workspaceId },
+                where: { workspaceId },
                 select: {
                     userId: true,
                     name: true,
@@ -202,7 +205,7 @@ export default async function DashboardPage() {
             }),
             prisma.task.findMany({
                 where: {
-                    column: { board: { project: { workspaceId: dbUser.workspaceId } } }
+                    column: { board: { project: { workspaceId } } }
                 },
                 include: {
                     assignee: { select: { id: true } },
@@ -290,7 +293,7 @@ export default async function DashboardPage() {
 
     const fetchProjects = async () => {
         return prisma.project.findMany({
-            where: { workspaceId: dbUser.workspaceId },
+            where: { workspaceId },
             select: {
                 id: true,
                 name: true,
