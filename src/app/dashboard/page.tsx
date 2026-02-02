@@ -10,6 +10,7 @@ import { TeamPopup } from "./TeamPopup"
 import { TaskRow, ApprovalRow } from "./TaskRow"
 import { DashboardHeatmap } from "./DashboardHeatmap"
 import { ProjectActivityTracker } from "./ProjectActivityTracker"
+import { DriveUploadWidget } from "./DriveUploadWidget"
 
 export const dynamic = 'force-dynamic'
 
@@ -322,13 +323,31 @@ export default async function DashboardPage() {
         })
     }
 
-    const [myTasks, pendingApproval, teamStats, recentActivity, heatmapData, projects] = await Promise.all([
+    const fetchDriveConfig = async () => {
+        if (!isLeadership) return null
+
+        const driveDelegate = (prisma as { workspaceDriveConfig?: { findUnique?: Function } }).workspaceDriveConfig
+        if (!driveDelegate?.findUnique) return null
+
+        return driveDelegate.findUnique({
+            where: { workspaceId },
+            select: {
+                refreshToken: true,
+                folderId: true,
+                folderName: true,
+                connectedByName: true
+            }
+        })
+    }
+
+    const [myTasks, pendingApproval, teamStats, recentActivity, heatmapData, projects, driveConfig] = await Promise.all([
         fetchMyTasks(),
         fetchPendingApproval(),
         fetchTeamStats(),
         fetchRecentActivity(),
         fetchHeatmapData(),
-        fetchProjects()
+        fetchProjects(),
+        fetchDriveConfig()
     ])
 
     // Process tasks
@@ -501,30 +520,43 @@ export default async function DashboardPage() {
                             {/* Project Activity Tracker */}
                             <ProjectActivityTracker />
 
-                            {/* Recent Activity */}
-                            {recentActivity.length > 0 && (
-                                <section className="border border-border rounded-lg p-4">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h2 className="text-sm font-medium">Recent Activity</h2>
-                                        {teamStats && (
-                                            <TeamPopup members={teamStats.users} totalTasks={teamStats.totalTasks}>
-                                                <button className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
-                                                    <Users className="h-3 w-3" />
-                                                    Team
-                                                </button>
-                                            </TeamPopup>
-                                        )}
-                                    </div>
-                                    <div className="space-y-1">
-                                        {recentActivity.map(log => (
-                                            <DashboardClient
-                                                key={log.id}
-                                                activity={log}
-                                            />
-                                        ))}
-                                    </div>
-                                </section>
-                            )}
+                            {/* Drive Uploads */}
+                            <DriveUploadWidget
+                                initialConfig={{
+                                    connected: !!driveConfig?.refreshToken,
+                                    folderId: driveConfig?.folderId || null,
+                                    folderName: driveConfig?.folderName || null,
+                                    connectedByName: driveConfig?.connectedByName || null
+                                }}
+                                canManage={isAdmin}
+                            />
+                        </div>
+                    )}
+
+                    {/* Recent Activity - Bottom Left */}
+                    {isLeadership && recentActivity.length > 0 && (
+                        <div className="lg:col-span-2">
+                            <section className="border border-border rounded-lg p-4">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-sm font-medium">Recent Activity</h2>
+                                    {teamStats && (
+                                        <TeamPopup members={teamStats.users} totalTasks={teamStats.totalTasks}>
+                                            <button className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+                                                <Users className="h-3 w-3" />
+                                                Team
+                                            </button>
+                                        </TeamPopup>
+                                    )}
+                                </div>
+                                <div className="space-y-1">
+                                    {recentActivity.map(log => (
+                                        <DashboardClient
+                                            key={log.id}
+                                            activity={log}
+                                        />
+                                    ))}
+                                </div>
+                            </section>
                         </div>
                     )}
 
