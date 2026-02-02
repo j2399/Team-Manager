@@ -329,15 +329,22 @@ export default async function DashboardPage() {
         const driveDelegate = (prisma as { workspaceDriveConfig?: { findUnique?: Function } }).workspaceDriveConfig
         if (!driveDelegate?.findUnique) return null
 
-        return driveDelegate.findUnique({
-            where: { workspaceId },
-            select: {
-                refreshToken: true,
-                folderId: true,
-                folderName: true,
-                connectedByName: true
+        try {
+            return await driveDelegate.findUnique({
+                where: { workspaceId },
+                select: {
+                    refreshToken: true,
+                    folderId: true,
+                    folderName: true,
+                    connectedByName: true
+                }
+            })
+        } catch (error: any) {
+            if (error?.code === "P2021") {
+                return null
             }
-        })
+            throw error
+        }
     }
 
     const [myTasks, pendingApproval, teamStats, recentActivity, heatmapData, projects, driveConfig] = await Promise.all([
