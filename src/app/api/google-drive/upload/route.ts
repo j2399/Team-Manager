@@ -74,7 +74,7 @@ export async function POST(request: Request) {
 
         void (async () => {
             try {
-                const drive = await getDriveClientForWorkspace(user.workspaceId)
+                const drive = await getDriveClientForWorkspace(user.workspaceId!)
                 for (const file of payloads) {
                     await drive.files.create({
                         requestBody: {
