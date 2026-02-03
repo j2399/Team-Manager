@@ -11,6 +11,7 @@ export async function POST(request: Request) {
     if (!user || !user.workspaceId) {
         return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
+    const workspaceId = user.workspaceId
 
     const canUpload = user.role === "Admin" || user.role === "Team Lead"
     if (!canUpload) {
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
     }
 
     const config = await prisma.workspaceDriveConfig.findUnique({
-        where: { workspaceId: user.workspaceId },
+        where: { workspaceId },
         select: { folderId: true, refreshToken: true },
     })
 
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
 
     if (requestedFolderId && config.folderId && requestedFolderId !== config.folderId) {
         try {
-            const cached = await getDriveFolderCache(user.workspaceId)
+            const cached = await getDriveFolderCache(workspaceId)
             if (!isFolderWithinRoot(cached, config.folderId, requestedFolderId)) {
                 return NextResponse.json({ error: "Folder is outside the configured root" }, { status: 400 })
             }
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
 
         void (async () => {
             try {
-                const drive = await getDriveClientForWorkspace(user.workspaceId!)
+                const drive = await getDriveClientForWorkspace(workspaceId)
                 for (const file of payloads) {
                     await drive.files.create({
                         requestBody: {
@@ -89,7 +90,7 @@ export async function POST(request: Request) {
                         supportsAllDrives: true,
                     })
                 }
-                void refreshDriveFolderCache(user.workspaceId)
+                void refreshDriveFolderCache(workspaceId)
             } catch (error) {
                 console.error("Google Drive background upload error:", error)
             }
