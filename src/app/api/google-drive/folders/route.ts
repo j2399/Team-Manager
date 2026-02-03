@@ -36,7 +36,13 @@ export async function GET() {
                 corpora: "allDrives",
             })
 
-            const batch = response.data.files || []
+            const batch = (response.data.files || [])
+                .map((file) => ({
+                    id: file.id ?? "",
+                    name: file.name ?? "",
+                    modifiedTime: file.modifiedTime ?? null,
+                }))
+                .filter((file) => file.id && file.name)
             folders.push(...batch)
             totalFetched += batch.length
             pageToken = response.data.nextPageToken || undefined
