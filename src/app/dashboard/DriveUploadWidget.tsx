@@ -81,6 +81,7 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
         : rootFolderName
 
     const currentChildren = currentFolderId ? childrenMap.get(currentFolderId) || [] : []
+    const isRootLevel = currentFolderId === rootFolderId
 
     const setMessage = (type: "success" | "error", message: string) => {
         setStatus({ type, message })
@@ -132,7 +133,7 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
         setCurrentFolderId(parent)
     }
 
-    const uploadFiles = async (files: File[], folderId: string) => {
+    const uploadFiles = async (files: File[], folderId: string, folderName?: string) => {
         if (!rootFolderId) {
             setMessage("error", "Select a destination folder in Settings first.")
             return
@@ -140,6 +141,10 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
         if (files.length === 0) return
 
         setUploading(true)
+        setMessage(
+            "success",
+            `Sending ${files.length} file${files.length === 1 ? "" : "s"} to ${folderName || "folder"}…`
+        )
 
         try {
             const formData = new FormData()
@@ -182,7 +187,8 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
             return
         }
 
-        void uploadFiles(files, folderId)
+        const targetName = folderMap.get(folderId)?.name
+        void uploadFiles(files, folderId, targetName)
     }
 
     if (!initialConfig.connected) {
@@ -280,7 +286,7 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
                         <div className="flex-1 flex items-center justify-center">
                             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                         </div>
-                    ) : (
+                    ) : isRootLevel ? (
                         <div className="grid grid-cols-2 gap-3 auto-rows-fr flex-1">
                             {currentChildren.length === 0 && (
                                 <div className="col-span-2 text-xs text-muted-foreground text-center py-6">
@@ -308,8 +314,9 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
                                             if (pendingFiles) {
                                                 if (hasChildren(folder.id)) {
                                                     navigateToFolder(folder.id)
+                                                    setMessage("success", `Selected ${folder.name}. Choose a subfolder.`)
                                                 } else {
-                                                    uploadFiles(pendingFiles, folder.id)
+                                                    uploadFiles(pendingFiles, folder.id, folder.name)
                                                 }
                                                 return
                                             }
@@ -324,6 +331,41 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
                                         {pendingFiles ? "Click to select" : "Drop to start"}
                                     </span>
                                 </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-2 flex-1 overflow-auto">
+                            {currentChildren.length === 0 && (
+                                <div className="text-xs text-muted-foreground text-center py-6">
+                                    No subfolders found.
+                                </div>
+                            )}
+
+                            {currentChildren.map((folder) => (
+                                <button
+                                    key={folder.id}
+                                    onClick={() => {
+                                        if (pendingFiles) {
+                                            if (hasChildren(folder.id)) {
+                                                navigateToFolder(folder.id)
+                                                setMessage("success", `Selected ${folder.name}. Choose a subfolder.`)
+                                            } else {
+                                                uploadFiles(pendingFiles, folder.id, folder.name)
+                                            }
+                                            return
+                                        }
+                                        navigateToFolder(folder.id)
+                                    }}
+                                    className="w-full flex items-center justify-between gap-2 border rounded-md px-3 py-2 text-xs text-left hover:bg-muted/40 transition-colors"
+                                >
+                                    <span className="flex items-center gap-2 min-w-0">
+                                        <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+                                        <span className="font-medium text-foreground truncate">{folder.name}</span>
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground shrink-0">
+                                        {pendingFiles ? "Click to send" : "Open"}
+                                    </span>
+                                </button>
                             ))}
                         </div>
                     )}
