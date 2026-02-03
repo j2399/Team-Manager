@@ -527,9 +527,12 @@ export default async function DashboardPage() {
 
                     {/* Right Column - Leadership Only */}
                     {isLeadership && (
-                        <div className="space-y-5">
+                        <div className="flex flex-col gap-5">
                             {/* Project Activity Tracker */}
                             <ProjectActivityTracker />
+
+                            {/* Spacer to push Drive widget down */}
+                            <div className="flex-1" />
 
                             {/* Drive Uploads */}
                             <DriveUploadWidget

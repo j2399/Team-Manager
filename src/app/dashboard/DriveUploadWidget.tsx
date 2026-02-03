@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { ArrowLeft, Check, ChevronRight, FolderOpen, Loader2, MoreVertical, UploadCloud, X, XCircle } from "lucide-react"
+import { ArrowLeft, Check, ChevronRight, FolderOpen, Loader2, MoreVertical, Settings2, UploadCloud, X, XCircle } from "lucide-react"
 
 type DriveConfig = {
     connected: boolean
@@ -48,6 +48,18 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
     const [connecting, setConnecting] = useState(false)
     const [menuOpen, setMenuOpen] = useState(false)
 
+    // Root folder setting (starting point for browse)
+    const [rootFolder, setRootFolder] = useState<BreadcrumbEntry | null>(
+        initialConfig.folderId && initialConfig.folderName
+            ? { id: initialConfig.folderId, name: initialConfig.folderName }
+            : null
+    )
+    const [pickingRoot, setPickingRoot] = useState(false)
+    const [rootPickerFolder, setRootPickerFolder] = useState<BreadcrumbEntry | null>(null)
+    const [rootPickerStack, setRootPickerStack] = useState<BreadcrumbEntry[]>([])
+    const [rootPickerFolders, setRootPickerFolders] = useState<FolderOption[]>([])
+    const [loadingRootPicker, setLoadingRootPicker] = useState(false)
+
     // Folder browser state
     const [browsing, setBrowsing] = useState(false)
     const [pendingFiles, setPendingFiles] = useState<File[]>([])
@@ -84,6 +96,80 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
         }
     }
 
+    // ---------- Root folder picker helpers ----------
+
+    const loadRootPickerFolders = async (parentId: string | null) => {
+        setLoadingRootPicker(true)
+        try {
+            const param = parentId || "root"
+            const res = await fetch(`/api/google-drive/folders?parentId=${param}`)
+            if (!res.ok) throw new Error("Failed to load folders")
+            const data = await res.json()
+            setRootPickerFolders(cleanFolders(Array.isArray(data.folders) ? data.folders : []))
+        } catch (error) {
+            console.error(error)
+            setMessage("error", "Failed to load folders.")
+        } finally {
+            setLoadingRootPicker(false)
+        }
+    }
+
+    const openRootPicker = () => {
+        setPickingRoot(true)
+        setRootPickerFolder(null)
+        setRootPickerStack([])
+        void loadRootPickerFolders(null)
+    }
+
+    const rootPickerNavigate = (folder: BreadcrumbEntry) => {
+        if (rootPickerFolder) {
+            setRootPickerStack((prev) => [...prev, rootPickerFolder])
+        }
+        setRootPickerFolder(folder)
+        void loadRootPickerFolders(folder.id)
+    }
+
+    const rootPickerBack = () => {
+        if (rootPickerStack.length > 0) {
+            const newStack = [...rootPickerStack]
+            const parent = newStack.pop()!
+            setRootPickerStack(newStack)
+            setRootPickerFolder(parent)
+            void loadRootPickerFolders(parent.id)
+        } else {
+            setRootPickerFolder(null)
+            void loadRootPickerFolders(null)
+        }
+    }
+
+    const confirmRootFolder = async () => {
+        if (!rootPickerFolder) return
+        try {
+            const res = await fetch("/api/google-drive/folder", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ folderId: rootPickerFolder.id }),
+            })
+            if (!res.ok) throw new Error("Failed to set folder")
+            const data = await res.json()
+            const saved = { id: data.folder?.id || rootPickerFolder.id, name: data.folder?.name || rootPickerFolder.name }
+            setRootFolder(saved)
+            setConfig((prev) => ({ ...prev, folderId: saved.id, folderName: saved.name }))
+            setPickingRoot(false)
+            setMessage("success", `Root set to ${saved.name}`)
+        } catch (error) {
+            console.error(error)
+            setMessage("error", "Could not set root folder.")
+        }
+    }
+
+    const clearRootFolder = async () => {
+        setRootFolder(null)
+        setConfig((prev) => ({ ...prev, folderId: null, folderName: null }))
+        setPickingRoot(false)
+        setMessage("success", "Root folder cleared.")
+    }
+
     // ---------- Folder browser helpers ----------
 
     const cleanFolders = (folders: FolderOption[]) =>
@@ -111,9 +197,15 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
     const enterBrowseMode = (files: File[]) => {
         setPendingFiles(files)
         setBrowsing(true)
-        setCurrentFolder(null)
-        setFolderStack([])
-        void loadSubfolders(null)
+        if (rootFolder) {
+            setCurrentFolder(rootFolder)
+            setFolderStack([])
+            void loadSubfolders(rootFolder.id)
+        } else {
+            setCurrentFolder(null)
+            setFolderStack([])
+            void loadSubfolders(null)
+        }
     }
 
     const navigateToFolder = (folder: BreadcrumbEntry) => {
@@ -131,7 +223,11 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
             setFolderStack(newStack)
             setCurrentFolder(parent)
             void loadSubfolders(parent.id)
-        } else {
+        } else if (rootFolder && currentFolder?.id !== rootFolder.id) {
+            // Already at a level above root somehow, go to root
+            setCurrentFolder(rootFolder)
+            void loadSubfolders(rootFolder.id)
+        } else if (!rootFolder) {
             setCurrentFolder(null)
             void loadSubfolders(null)
         }
@@ -139,9 +235,15 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
 
     const navigateToBreadcrumb = (index: number) => {
         if (index === -1) {
-            setCurrentFolder(null)
-            setFolderStack([])
-            void loadSubfolders(null)
+            if (rootFolder) {
+                setCurrentFolder(rootFolder)
+                setFolderStack([])
+                void loadSubfolders(rootFolder.id)
+            } else {
+                setCurrentFolder(null)
+                setFolderStack([])
+                void loadSubfolders(null)
+            }
         } else {
             const target = folderStack[index]
             setCurrentFolder(target)
@@ -278,21 +380,94 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
                                 <MoreVertical className="h-4 w-4" />
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent align="end" className="w-48 p-1">
-                            <button
-                                onClick={handleConnect}
-                                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors"
-                            >
-                                <GoogleDriveLogo className="h-3 w-3" />
-                                Switch Google Account
-                            </button>
-                            <button
-                                onClick={handleDisconnect}
-                                className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-red-600"
-                            >
-                                <XCircle className="h-3 w-3" />
-                                Disconnect
-                            </button>
+                        <PopoverContent align="end" className="w-64 p-0">
+                            {pickingRoot ? (
+                                <div>
+                                    {/* Root picker header */}
+                                    <div className="flex items-center gap-1 px-3 py-2 border-b text-xs">
+                                        <button
+                                            onClick={rootPickerBack}
+                                            disabled={!rootPickerFolder}
+                                            className="p-0.5 rounded hover:bg-muted disabled:opacity-30 shrink-0"
+                                        >
+                                            <ArrowLeft className="h-3 w-3" />
+                                        </button>
+                                        <span className="font-medium truncate flex-1">
+                                            {rootPickerFolder?.name || "My Drive"}
+                                        </span>
+                                        <button onClick={() => setPickingRoot(false)} className="p-0.5 rounded hover:bg-muted shrink-0">
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    </div>
+
+                                    {/* Root picker folder list */}
+                                    <div className="max-h-40 overflow-y-auto">
+                                        {loadingRootPicker ? (
+                                            <div className="flex items-center justify-center py-4">
+                                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                            </div>
+                                        ) : rootPickerFolders.length === 0 ? (
+                                            <div className="py-3 text-xs text-muted-foreground text-center">No folders</div>
+                                        ) : (
+                                            rootPickerFolders.map((folder) => (
+                                                <button
+                                                    key={folder.id}
+                                                    onClick={() => rootPickerNavigate(folder)}
+                                                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-muted transition-colors"
+                                                >
+                                                    <FolderOpen className="h-3 w-3 text-muted-foreground shrink-0" />
+                                                    <span className="truncate flex-1">{folder.name}</span>
+                                                    <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                                                </button>
+                                            ))
+                                        )}
+                                    </div>
+
+                                    {/* Root picker actions */}
+                                    <div className="border-t p-2 flex items-center gap-1.5">
+                                        <Button
+                                            onClick={confirmRootFolder}
+                                            disabled={!rootPickerFolder}
+                                            className="bg-[#1a73e8] hover:bg-[#1557b0] text-white flex-1"
+                                            size="sm"
+                                        >
+                                            Set as root
+                                        </Button>
+                                        {rootFolder && (
+                                            <Button variant="ghost" size="sm" onClick={clearRootFolder} className="text-xs">
+                                                Clear
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-1">
+                                    <button
+                                        onClick={openRootPicker}
+                                        className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors"
+                                    >
+                                        <Settings2 className="h-3 w-3 text-muted-foreground" />
+                                        <span className="flex-1 text-left">Root Folder</span>
+                                        <span className="text-[10px] text-muted-foreground truncate max-w-[80px]">
+                                            {rootFolder?.name || "My Drive"}
+                                        </span>
+                                    </button>
+                                    <button
+                                        onClick={handleConnect}
+                                        className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors"
+                                    >
+                                        <GoogleDriveLogo className="h-3 w-3" />
+                                        Switch Google Account
+                                    </button>
+                                    <button
+                                        onClick={handleDisconnect}
+                                        className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-red-600"
+                                    >
+                                        <XCircle className="h-3 w-3" />
+                                        Disconnect
+                                    </button>
+                                </div>
+                            )}
                         </PopoverContent>
                     </Popover>
                 )}
@@ -305,7 +480,7 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
                     <div className="flex items-center gap-1 px-3 py-2 bg-muted/50 border-b text-xs">
                         <button
                             onClick={navigateBack}
-                            disabled={!currentFolder}
+                            disabled={rootFolder ? currentFolder?.id === rootFolder.id : !currentFolder}
                             className="p-0.5 rounded hover:bg-muted disabled:opacity-30 shrink-0"
                         >
                             <ArrowLeft className="h-3.5 w-3.5" />
@@ -316,7 +491,7 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
                                 onClick={() => navigateToBreadcrumb(-1)}
                                 className="text-muted-foreground hover:text-foreground whitespace-nowrap shrink-0"
                             >
-                                My Drive
+                                {rootFolder?.name || "My Drive"}
                             </button>
                             {folderStack.map((entry, i) => (
                                 <span key={entry.id} className="flex items-center gap-1 shrink-0">
@@ -329,7 +504,7 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
                                     </button>
                                 </span>
                             ))}
-                            {currentFolder && (
+                            {currentFolder && currentFolder.id !== rootFolder?.id && (
                                 <span className="flex items-center gap-1 shrink-0">
                                     <ChevronRight className="h-3 w-3 text-muted-foreground" />
                                     <span className="font-medium whitespace-nowrap">{currentFolder.name}</span>
