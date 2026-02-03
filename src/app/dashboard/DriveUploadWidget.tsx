@@ -3,16 +3,9 @@
 import { useEffect, useRef, useState, type DragEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { Check, ChevronDown, FolderOpen, Loader2, MoreVertical, RefreshCw, Search, UploadCloud, XCircle } from "lucide-react"
+import { Check, FolderOpen, Loader2, MoreVertical, RefreshCw, Search, UploadCloud, XCircle } from "lucide-react"
 
 type DriveConfig = {
     connected: boolean
@@ -55,6 +48,7 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
     const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null)
     const [dragging, setDragging] = useState(false)
     const [connecting, setConnecting] = useState(false)
+    const [menuOpen, setMenuOpen] = useState(false)
     const fileInputRef = useRef<HTMLInputElement | null>(null)
 
     const canUpload = config.connected && !!config.folderId
@@ -101,6 +95,7 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
                 connectedByName: null,
             })
             setFolders([])
+            setMenuOpen(false)
             setMessage("success", "Disconnected from Google Drive.")
         } catch (error) {
             console.error(error)
@@ -119,7 +114,7 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
             const data: { folders?: FolderOption[] } = await res.json()
             const nextFolders: FolderOption[] = Array.isArray(data.folders) ? data.folders : []
             if (config.folderId && config.folderName && !nextFolders.some((folder: FolderOption) => folder.id === config.folderId)) {
-                nextFolders.unshift({ id: config.folderId, name: `${config.folderName} (Current)` })
+                nextFolders.unshift({ id: config.folderId, name: config.folderName })
             }
             setFolders(nextFolders)
         } catch (error) {
@@ -147,6 +142,7 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
                 folderId: data.folder?.id || folderId,
                 folderName: data.folder?.name || prev.folderName,
             }))
+            setMenuOpen(false)
             setMessage("success", "Folder updated.")
         } catch (error) {
             console.error(error)
@@ -157,7 +153,7 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
     const uploadFiles = async (files: FileList | File[]) => {
         if (!files || files.length === 0) return
         if (!canUpload) {
-            setMessage("error", "Connect Google Drive and select a folder first.")
+            setMessage("error", "Select a folder first.")
             return
         }
 
@@ -262,102 +258,111 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
         )
     }
 
-    // Connected state - streamlined folder dropdown + upload
+    // Connected state - minimal: icon + menu + big dropbox
     return (
-        <section className="border border-border rounded-lg">
-            {/* Compact header with folder dropdown */}
-            <div className="p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 rounded flex items-center justify-center bg-blue-100 dark:bg-blue-900/30">
-                            <GoogleDriveLogo className="w-3 h-3" />
-                        </div>
-                        <span className="text-xs font-medium text-muted-foreground">Drive Upload</span>
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" title="Connected" />
+        <section className="border border-border rounded-lg p-3">
+            {/* Header: Drive icon + green dot + menu */}
+            <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-md flex items-center justify-center bg-white dark:bg-zinc-800 border">
+                        <GoogleDriveLogo className="w-4 h-4" />
                     </div>
-
-                    {canManage && (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-6 w-6">
-                                    <MoreVertical className="h-3.5 w-3.5" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                                <DropdownMenuItem onClick={loadFolders} disabled={loadingFolders}>
-                                    <RefreshCw className={cn("h-3.5 w-3.5 mr-2", loadingFolders && "animate-spin")} />
-                                    Refresh folders
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={handleConnect}>
-                                    <GoogleDriveLogo className="h-3.5 w-3.5 mr-2" />
-                                    Reconnect
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                    onClick={handleDisconnect}
-                                    className="text-red-600 focus:text-red-600"
-                                >
-                                    <XCircle className="h-3.5 w-3.5 mr-2" />
-                                    Disconnect
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    )}
+                    <span className="w-2 h-2 rounded-full bg-green-500" title="Connected" />
                 </div>
 
-                {/* Folder selector - main focus */}
-                {canManage ? (
-                    <div className="space-y-1.5">
-                        {folders.length > 10 && (
-                            <div className="relative">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                                <Input
-                                    value={folderQuery}
-                                    onChange={(event) => setFolderQuery(event.target.value)}
-                                    placeholder="Search folders..."
-                                    className="h-8 text-xs pl-8"
-                                />
-                            </div>
-                        )}
-                        <Select
-                            value={config.folderId || undefined}
-                            onValueChange={handleFolderSelect}
-                            disabled={loadingFolders}
-                        >
-                            <SelectTrigger className="h-9 text-xs">
-                                <div className="flex items-center gap-2">
-                                    <FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                    <SelectValue placeholder={loadingFolders ? "Loading folders..." : "Select destination folder"} />
+                {canManage && (
+                    <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+                        <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-64 p-0">
+                            {/* Folder selection */}
+                            <div className="p-3 border-b">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-medium text-muted-foreground">Destination Folder</span>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={loadFolders}
+                                        disabled={loadingFolders}
+                                    >
+                                        <RefreshCw className={cn("h-3 w-3", loadingFolders && "animate-spin")} />
+                                    </Button>
                                 </div>
-                            </SelectTrigger>
-                            <SelectContent>
-                                {filteredFolders.length === 0 && (
-                                    <SelectItem value="__none" disabled>
-                                        {loadingFolders ? "Loading..." : normalizedQuery ? "No matches" : "No folders found"}
-                                    </SelectItem>
-                                )}
-                                {filteredFolders.map((folder) => (
-                                    <SelectItem key={folder.id} value={folder.id}>
-                                        {folder.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                ) : (
-                    <div className="flex items-center gap-2 py-1">
-                        <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-xs">{config.folderName || "No folder selected"}</span>
-                    </div>
+
+                                {/* Search */}
+                                <div className="relative mb-2">
+                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                                    <Input
+                                        value={folderQuery}
+                                        onChange={(e) => setFolderQuery(e.target.value)}
+                                        placeholder="Search folders..."
+                                        className="h-7 text-xs pl-7"
+                                    />
+                                </div>
+
+                                {/* Folder list */}
+                                <div className="max-h-40 overflow-y-auto border rounded-md">
+                                    {loadingFolders ? (
+                                        <div className="flex items-center justify-center py-4">
+                                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                        </div>
+                                    ) : filteredFolders.length === 0 ? (
+                                        <div className="py-3 px-2 text-xs text-muted-foreground text-center">
+                                            {normalizedQuery ? "No matches" : "No folders found"}
+                                        </div>
+                                    ) : (
+                                        filteredFolders.map((folder) => (
+                                            <button
+                                                key={folder.id}
+                                                onClick={() => handleFolderSelect(folder.id)}
+                                                className={cn(
+                                                    "w-full flex items-center gap-2 px-2 py-1.5 text-xs text-left hover:bg-muted transition-colors",
+                                                    config.folderId === folder.id && "bg-muted"
+                                                )}
+                                            >
+                                                <FolderOpen className="h-3 w-3 text-muted-foreground shrink-0" />
+                                                <span className="truncate">{folder.name}</span>
+                                                {config.folderId === folder.id && (
+                                                    <Check className="h-3 w-3 text-green-600 ml-auto shrink-0" />
+                                                )}
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="p-1">
+                                <button
+                                    onClick={handleConnect}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors"
+                                >
+                                    <GoogleDriveLogo className="h-3 w-3" />
+                                    Reconnect account
+                                </button>
+                                <button
+                                    onClick={handleDisconnect}
+                                    className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded hover:bg-muted transition-colors text-red-600"
+                                >
+                                    <XCircle className="h-3 w-3" />
+                                    Disconnect
+                                </button>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
                 )}
             </div>
 
-            {/* Compact drop zone */}
+            {/* Big drop zone */}
             <div
                 className={cn(
-                    "border-t border-dashed mx-3 mb-3 rounded-md transition-all",
+                    "border-2 border-dashed rounded-lg transition-all",
                     canUpload
-                        ? "border-border hover:border-muted-foreground/50 cursor-pointer"
+                        ? "border-border hover:border-muted-foreground/60 cursor-pointer"
                         : "border-muted-foreground/20 opacity-50",
                     dragging && "border-blue-500 bg-blue-50/50 dark:bg-blue-950/20"
                 )}
@@ -370,20 +375,25 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
                 onDrop={handleDrop}
                 onClick={() => canUpload && fileInputRef.current?.click()}
             >
-                <div className="flex items-center justify-center gap-2 py-3 px-4">
+                <div className="flex flex-col items-center justify-center py-10 px-4">
                     {uploading ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-2" />
                     ) : (
-                        <UploadCloud className="h-4 w-4 text-muted-foreground" />
+                        <UploadCloud className="h-8 w-8 text-muted-foreground mb-2" />
                     )}
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-sm text-muted-foreground">
                         {uploading
                             ? "Uploading..."
                             : canUpload
                                 ? "Drop files or click to upload"
-                                : "Select a folder first"
+                                : "Select a folder from menu"
                         }
                     </span>
+                    {config.folderName && canUpload && (
+                        <span className="text-xs text-muted-foreground/70 mt-1">
+                            to {config.folderName}
+                        </span>
+                    )}
                 </div>
             </div>
 
@@ -402,7 +412,7 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
 
             {/* Status messages */}
             {status && (
-                <div className="px-3 pb-3">
+                <div className="mt-3">
                     <p className={cn(
                         "text-xs flex items-center gap-2 p-2 rounded-md",
                         status.type === "error"
