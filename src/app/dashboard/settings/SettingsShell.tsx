@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { User, Users, Plug, AlertTriangle } from "lucide-react"
 
@@ -24,11 +25,31 @@ type SettingsShellProps = {
 }
 
 export function SettingsShell({ children, visibleTabs }: SettingsShellProps) {
-    const [activeTab, setActiveTab] = useState("general")
-
     const tabs = visibleTabs
         ? TABS.filter((t) => visibleTabs.includes(t.id))
         : TABS
+
+    const tabIds = useMemo(() => tabs.map((t) => t.id), [tabs])
+    const searchParams = useSearchParams()
+    const tabFromQuery = searchParams.get("tab")
+
+    const initialTab = tabFromQuery && tabIds.includes(tabFromQuery)
+        ? tabFromQuery
+        : tabIds[0] || "general"
+
+    const [activeTab, setActiveTab] = useState(initialTab)
+
+    const tabKey = tabIds.join("|")
+
+    useEffect(() => {
+        if (tabFromQuery && tabIds.includes(tabFromQuery)) {
+            setActiveTab(tabFromQuery)
+            return
+        }
+        if (!tabIds.includes(activeTab)) {
+            setActiveTab(tabIds[0] || "general")
+        }
+    }, [tabFromQuery, tabKey, activeTab])
 
     return (
         <div className="flex flex-col md:flex-row gap-6 w-full max-w-5xl mx-auto p-6 pb-20 animate-fade-in-up">
