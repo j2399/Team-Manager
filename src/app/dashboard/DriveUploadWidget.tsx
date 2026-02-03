@@ -190,6 +190,11 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
         if (!currentFolderId) return
         const files = Array.from(event.dataTransfer.files || [])
         if (files.length === 0) return
+        if (hasChildren(currentFolderId)) {
+            setPendingFiles(files)
+            setMessage("success", `Choose a subfolder for ${files.length} file${files.length === 1 ? "" : "s"}.`)
+            return
+        }
         void uploadFiles(files, currentFolderId)
     }
 
@@ -278,9 +283,11 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
                     {pendingFiles && currentFolderId && (
                         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-[11px]">
                             <span className="text-muted-foreground">Choose a destination folder.</span>
-                            <Button size="sm" className="h-7 px-2" onClick={() => uploadFiles(pendingFiles, currentFolderId)}>
-                                Upload here
-                            </Button>
+                            {!hasChildren(currentFolderId) && (
+                                <Button size="sm" className="h-7 px-2" onClick={() => uploadFiles(pendingFiles, currentFolderId)}>
+                                    Upload here
+                                </Button>
+                            )}
                             <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setPendingFiles(null)}>
                                 Clear
                             </Button>
@@ -307,7 +314,9 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
                                 onClick={() => fileInputRef.current?.click()}
                             >
                                 <UploadCloud className="h-5 w-5 mb-1" />
-                                Drop to upload here
+                                {currentFolderId && hasChildren(currentFolderId)
+                                    ? "Drop to choose subfolder"
+                                    : "Drop to upload here"}
                             </div>
 
                             {currentChildren.map((folder) => (

@@ -184,7 +184,13 @@ export async function getDriveFolderCache(workspaceId: string) {
         })
     } catch (error: any) {
         if (error?.code === "P2022") {
-            return []
+            try {
+                const drive = await getDriveClientForWorkspace(workspaceId)
+                return await listAllFolders(drive)
+            } catch (innerError) {
+                console.error("Drive folder cache fallback failed:", innerError)
+                return []
+            }
         }
         throw error
     }
@@ -197,7 +203,15 @@ export async function getDriveFolderCache(workspaceId: string) {
         try {
             return await refreshDriveFolderCache(workspaceId)
         } catch (error: any) {
-            if (error?.code === "P2022") return []
+            if (error?.code === "P2022") {
+                try {
+                    const drive = await getDriveClientForWorkspace(workspaceId)
+                    return await listAllFolders(drive)
+                } catch (innerError) {
+                    console.error("Drive folder cache fallback failed:", innerError)
+                    return []
+                }
+            }
             console.error("Drive folder cache refresh failed:", error)
             if (Array.isArray(config?.folderTree)) {
                 return config.folderTree as DriveFolderNode[]
