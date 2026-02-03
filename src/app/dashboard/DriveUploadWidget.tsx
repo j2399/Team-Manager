@@ -140,7 +140,6 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
         if (files.length === 0) return
 
         setUploading(true)
-        setMessage("success", `Upload received. Processing ${files.length} file${files.length === 1 ? "" : "s"}.`)
 
         try {
             const formData = new FormData()
@@ -158,6 +157,9 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
             }
 
             setPendingFiles(null)
+            setCurrentFolderId(rootFolderId)
+            setFolderStack([])
+            setMessage("success", "Complete.")
         } catch (error) {
             console.error(error)
             setMessage("error", "Upload failed. Try again.")
