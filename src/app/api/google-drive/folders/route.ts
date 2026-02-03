@@ -16,17 +16,30 @@ export async function GET() {
 
     try {
         const drive = await getDriveClientForWorkspace(user.workspaceId)
-        const response = await drive.files.list({
-            q: "mimeType = 'application/vnd.google-apps.folder' and trashed = false",
-            fields: "files(id, name)",
-            orderBy: "name",
-            pageSize: 100,
-            supportsAllDrives: true,
-            includeItemsFromAllDrives: true,
-        })
+        const folders: { id: string; name: string; modifiedTime?: string | null }[] = []
+        let pageToken: string | undefined
+        let totalFetched = 0
+
+        do {
+            const response = await drive.files.list({
+                q: "mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+                fields: "nextPageToken, files(id, name, modifiedTime)",
+                orderBy: "modifiedTime desc",
+                pageSize: 200,
+                pageToken,
+                supportsAllDrives: true,
+                includeItemsFromAllDrives: true,
+                corpora: "allDrives",
+            })
+
+            const batch = response.data.files || []
+            folders.push(...batch)
+            totalFetched += batch.length
+            pageToken = response.data.nextPageToken || undefined
+        } while (pageToken && totalFetched < 2000)
 
         return NextResponse.json({
-            folders: response.data.files || [],
+            folders,
         })
     } catch (error) {
         console.error("Google Drive folder list error:", error)

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type DragEvent } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { FolderOpen, Loader2, Plug, RefreshCw, UploadCloud, XCircle } from "lucide-react"
@@ -21,6 +22,7 @@ type DriveUploadWidgetProps = {
 type FolderOption = {
     id: string
     name: string
+    modifiedTime?: string | null
 }
 
 export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidgetProps) {
@@ -28,11 +30,24 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
     const [folders, setFolders] = useState<FolderOption[]>([])
     const [loadingFolders, setLoadingFolders] = useState(false)
     const [uploading, setUploading] = useState(false)
+    const [folderQuery, setFolderQuery] = useState("")
     const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null)
     const [dragging, setDragging] = useState(false)
     const fileInputRef = useRef<HTMLInputElement | null>(null)
 
     const canUpload = config.connected && !!config.folderId
+
+    const cleanedFolders = folders.filter((folder) => {
+        const trimmed = folder.name.trim()
+        if (!trimmed) return false
+        if (trimmed.startsWith(".")) return false
+        if (/^\d+$/.test(trimmed)) return false
+        return true
+    })
+    const normalizedQuery = folderQuery.trim().toLowerCase()
+    const filteredFolders = normalizedQuery
+        ? cleanedFolders.filter((folder) => folder.name.toLowerCase().includes(normalizedQuery))
+        : cleanedFolders
 
     useEffect(() => {
         if (config.connected && canManage) {
@@ -217,6 +232,14 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
                     <div className="flex items-center justify-between gap-2">
                         <div className="space-y-1">
                             <p className="text-[11px] text-muted-foreground">Destination folder</p>
+                            {canManage && (
+                                <Input
+                                    value={folderQuery}
+                                    onChange={(event) => setFolderQuery(event.target.value)}
+                                    placeholder="Search folders"
+                                    className="h-8 text-xs"
+                                />
+                            )}
                             {canManage ? (
                                 <Select
                                     value={config.folderId || undefined}
@@ -227,12 +250,12 @@ export function DriveUploadWidget({ initialConfig, canManage }: DriveUploadWidge
                                         <SelectValue placeholder="Select a folder" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {folders.length === 0 && (
+                                        {filteredFolders.length === 0 && (
                                             <SelectItem value="__none" disabled>
-                                                {loadingFolders ? "Loading..." : "No folders found"}
+                                                {loadingFolders ? "Loading..." : normalizedQuery ? "No matches" : "No folders found"}
                                             </SelectItem>
                                         )}
-                                        {folders.map((folder) => (
+                                        {filteredFolders.map((folder) => (
                                             <SelectItem key={folder.id} value={folder.id}>
                                                 {folder.name}
                                             </SelectItem>
