@@ -153,25 +153,41 @@ export async function refreshDriveFolderCache(workspaceId: string) {
     const drive = await getDriveClientForWorkspace(workspaceId)
     const folders = await listAllFolders(drive)
 
-    await prisma.workspaceDriveConfig.update({
-        where: { workspaceId },
-        data: {
-            folderTree: folders,
-            folderTreeUpdatedAt: new Date(),
-        },
-    })
+    try {
+        await prisma.workspaceDriveConfig.update({
+            where: { workspaceId },
+            data: {
+                folderTree: folders,
+                folderTreeUpdatedAt: new Date(),
+            },
+        })
+    } catch (error: any) {
+        if (error?.code === "P2022") {
+            return folders
+        }
+        throw error
+    }
 
     return folders
 }
 
 export async function getDriveFolderCache(workspaceId: string) {
-    const config = await prisma.workspaceDriveConfig.findUnique({
-        where: { workspaceId },
-        select: {
-            folderTree: true,
-            folderTreeUpdatedAt: true,
-        },
-    })
+    let config: { folderTree: unknown; folderTreeUpdatedAt: Date | null } | null = null
+
+    try {
+        config = await prisma.workspaceDriveConfig.findUnique({
+            where: { workspaceId },
+            select: {
+                folderTree: true,
+                folderTreeUpdatedAt: true,
+            },
+        })
+    } catch (error: any) {
+        if (error?.code === "P2022") {
+            return []
+        }
+        throw error
+    }
 
     const now = Date.now()
     const updatedAt = config?.folderTreeUpdatedAt?.getTime() || 0
@@ -180,7 +196,8 @@ export async function getDriveFolderCache(workspaceId: string) {
     if (!config?.folderTree || isStale) {
         try {
             return await refreshDriveFolderCache(workspaceId)
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.code === "P2022") return []
             console.error("Drive folder cache refresh failed:", error)
             if (Array.isArray(config?.folderTree)) {
                 return config.folderTree as DriveFolderNode[]

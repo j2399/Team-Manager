@@ -44,6 +44,7 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
     const [loadingTree, setLoadingTree] = useState(false)
     const [currentFolderId, setCurrentFolderId] = useState<string | null>(initialConfig.folderId)
     const [folderStack, setFolderStack] = useState<string[]>([])
+    const [pendingFiles, setPendingFiles] = useState<File[] | null>(null)
     const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null)
     const [dragTarget, setDragTarget] = useState<string | null>(null)
     const [uploading, setUploading] = useState(false)
@@ -112,6 +113,8 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
         }
     }, [initialConfig.connected, rootFolderId])
 
+    const hasChildren = (folderId: string) => (childrenMap.get(folderId) || []).length > 0
+
     const navigateToFolder = (folderId: string) => {
         if (!folderId) return
         if (currentFolderId) {
@@ -155,6 +158,8 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
                 const data = await res.json().catch(() => null)
                 throw new Error(data?.error || "Upload failed")
             }
+
+            setPendingFiles(null)
         } catch (error) {
             console.error(error)
             setMessage("error", "Upload failed. Try again.")
@@ -163,17 +168,34 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
         }
     }
 
-    const handleDrop = (event: DragEvent<HTMLDivElement>, folderId: string) => {
+    const handleDropToFolder = (event: DragEvent<HTMLDivElement>, folderId: string) => {
         event.preventDefault()
         setDragTarget(null)
-        if (event.dataTransfer.files?.length) {
-            uploadFiles(Array.from(event.dataTransfer.files), folderId)
+        const files = Array.from(event.dataTransfer.files || [])
+        if (files.length === 0) return
+
+        if (hasChildren(folderId)) {
+            setPendingFiles(files)
+            navigateToFolder(folderId)
+            setMessage("success", `Choose a subfolder for ${files.length} file${files.length === 1 ? "" : "s"}.`)
+            return
         }
+
+        void uploadFiles(files, folderId)
+    }
+
+    const handleDropToCurrent = (event: DragEvent<HTMLDivElement>) => {
+        event.preventDefault()
+        setDragTarget(null)
+        if (!currentFolderId) return
+        const files = Array.from(event.dataTransfer.files || [])
+        if (files.length === 0) return
+        void uploadFiles(files, currentFolderId)
     }
 
     const handleFileInput = (files: FileList | null) => {
         if (!files || files.length === 0 || !currentFolderId) return
-        uploadFiles(Array.from(files), currentFolderId)
+        void uploadFiles(Array.from(files), currentFolderId)
     }
 
     if (!initialConfig.connected) {
@@ -248,7 +270,22 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
                             <ArrowLeft className="h-3.5 w-3.5" />
                         </button>
                         <span className="font-medium text-foreground truncate">{currentFolderName}</span>
+                        {pendingFiles && (
+                            <span className="text-[11px] text-muted-foreground">Selecting for {pendingFiles.length} file(s)</span>
+                        )}
                     </div>
+
+                    {pendingFiles && currentFolderId && (
+                        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-[11px]">
+                            <span className="text-muted-foreground">Choose a destination folder.</span>
+                            <Button size="sm" className="h-7 px-2" onClick={() => uploadFiles(pendingFiles, currentFolderId)}>
+                                Upload here
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setPendingFiles(null)}>
+                                Clear
+                            </Button>
+                        </div>
+                    )}
 
                     {loadingTree ? (
                         <div className="flex-1 flex items-center justify-center">
@@ -266,11 +303,7 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
                                     setDragTarget(currentFolderId)
                                 }}
                                 onDragLeave={() => setDragTarget(null)}
-                                onDrop={(event) => {
-                                    if (currentFolderId) {
-                                        handleDrop(event, currentFolderId)
-                                    }
-                                }}
+                                onDrop={handleDropToCurrent}
                                 onClick={() => fileInputRef.current?.click()}
                             >
                                 <UploadCloud className="h-5 w-5 mb-1" />
@@ -289,7 +322,7 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
                                         setDragTarget(folder.id)
                                     }}
                                     onDragLeave={() => setDragTarget(null)}
-                                    onDrop={(event) => handleDrop(event, folder.id)}
+                                    onDrop={(event) => handleDropToFolder(event, folder.id)}
                                 >
                                     <button
                                         onClick={() => navigateToFolder(folder.id)}
@@ -298,7 +331,9 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Drive
                                         <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
                                         <span className="font-medium text-foreground truncate">{folder.name}</span>
                                     </button>
-                                    <span className="text-[10px] text-muted-foreground">Drop files here</span>
+                                    <span className="text-[10px] text-muted-foreground">
+                                        {hasChildren(folder.id) ? "Drop to drill down" : "Drop to upload"}
+                                    </span>
                                 </div>
                             ))}
                         </div>
