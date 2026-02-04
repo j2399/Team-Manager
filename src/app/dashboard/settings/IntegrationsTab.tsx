@@ -2,16 +2,10 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
-import {
-    ArrowLeft,
-    Check,
-    ChevronRight,
-    FolderOpen,
-    Loader2,
-    XCircle,
-} from "lucide-react"
+import { ArrowLeft, Check, ChevronRight, Folder, Loader2, XCircle } from "lucide-react"
 import { DiscordChannelSettings } from "./DiscordChannelSettings"
 
 type DriveConfig = {
@@ -22,9 +16,9 @@ type DriveConfig = {
 }
 
 type FolderOption = { id: string; name: string; modifiedTime?: string | null }
-type BreadcrumbEntry = { id: string; name: string }
+type Crumb = { id: string; name: string }
 
-function GoogleDriveLogo({ className }: { className?: string }) {
+function DriveLogo({ className }: { className?: string }) {
     return (
         <svg className={className} viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
             <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
@@ -40,119 +34,97 @@ function GoogleDriveLogo({ className }: { className?: string }) {
 function DriveCard({ config, canManage }: { config: DriveConfig; canManage: boolean }) {
     const [connecting, setConnecting] = useState(false)
     const [disconnecting, setDisconnecting] = useState(false)
-    const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null)
-
-    // Root folder picker state
-    const [pickingFolder, setPickingFolder] = useState(false)
-    const [currentFolder, setCurrentFolder] = useState<BreadcrumbEntry | null>(null)
-    const [folderStack, setFolderStack] = useState<BreadcrumbEntry[]>([])
+    const [status, setStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null)
+    const [pickerOpen, setPickerOpen] = useState(false)
+    const [current, setCurrent] = useState<Crumb | null>(null)
+    const [crumbStack, setCrumbStack] = useState<Crumb[]>([])
     const [folders, setFolders] = useState<FolderOption[]>([])
     const [loadingFolders, setLoadingFolders] = useState(false)
-    const [savedFolder, setSavedFolder] = useState<BreadcrumbEntry | null>(
+    const [saving, setSaving] = useState(false)
+    const [saved, setSaved] = useState<Crumb | null>(
         config.folderId && config.folderName ? { id: config.folderId, name: config.folderName } : null
     )
 
-    const setMessage = (type: "success" | "error", message: string) => {
-        setStatus({ type, message })
+    const flash = (type: "success" | "error", msg: string) => {
+        setStatus({ type, msg })
         setTimeout(() => setStatus(null), 4000)
     }
 
-    const handleConnect = () => {
-        setConnecting(true)
-        window.location.href = "/api/google-drive/login"
-    }
+    const connect = () => { setConnecting(true); window.location.href = "/api/google-drive/login" }
 
-    const handleDisconnect = async () => {
+    const disconnect = async () => {
         setDisconnecting(true)
         try {
-            const res = await fetch("/api/google-drive/disconnect", { method: "POST" })
-            if (!res.ok) throw new Error("Failed to disconnect")
+            const r = await fetch("/api/google-drive/disconnect", { method: "POST" })
+            if (!r.ok) throw 0
             window.location.reload()
-        } catch {
-            setMessage("error", "Could not disconnect. Try again.")
-            setDisconnecting(false)
-        }
+        } catch { flash("error", "Could not disconnect"); setDisconnecting(false) }
     }
 
-    const cleanFolders = (list: FolderOption[]) =>
-        list.filter((f) => {
-            const t = f.name.trim()
-            return t && !t.startsWith(".") && !/^\d+$/.test(t)
-        })
+    const clean = (list: FolderOption[]) =>
+        list.filter((f) => { const t = f.name.trim(); return t && !t.startsWith(".") && !/^\d+$/.test(t) })
 
-    const loadFolders = async (parentId: string | null) => {
+    const load = async (parentId: string | null) => {
         setLoadingFolders(true)
         try {
-            const param = parentId || "root"
-            const res = await fetch(`/api/google-drive/folders?parentId=${param}`)
-            if (!res.ok) throw new Error("Failed to load folders")
-            const data = await res.json()
-            setFolders(cleanFolders(Array.isArray(data.folders) ? data.folders : []))
-        } catch {
-            setMessage("error", "Failed to load folders.")
-        } finally {
-            setLoadingFolders(false)
-        }
+            const r = await fetch(`/api/google-drive/folders?parentId=${parentId || "root"}`)
+            if (!r.ok) throw 0
+            const d = await r.json()
+            setFolders(clean(Array.isArray(d.folders) ? d.folders : []))
+        } catch { flash("error", "Failed to load folders") }
+        finally { setLoadingFolders(false) }
     }
 
-    const openFolderPicker = () => {
-        setPickingFolder(true)
-        setCurrentFolder(null)
-        setFolderStack([])
-        void loadFolders(null)
+    const openPicker = () => {
+        setPickerOpen(true)
+        setCurrent(null)
+        setCrumbStack([])
+        void load(null)
     }
 
-    const navigateToFolder = (folder: BreadcrumbEntry) => {
-        if (currentFolder) {
-            setFolderStack((prev) => [...prev, currentFolder])
-        }
-        setCurrentFolder(folder)
-        void loadFolders(folder.id)
+    const navTo = (f: Crumb) => {
+        if (current) setCrumbStack((s) => [...s, current])
+        setCurrent(f)
+        void load(f.id)
     }
 
-    const navigateBack = () => {
-        if (folderStack.length > 0) {
-            const newStack = [...folderStack]
-            const parent = newStack.pop()!
-            setFolderStack(newStack)
-            setCurrentFolder(parent)
-            void loadFolders(parent.id)
+    const navBack = () => {
+        if (crumbStack.length > 0) {
+            const s = [...crumbStack]
+            const p = s.pop()!
+            setCrumbStack(s)
+            setCurrent(p)
+            void load(p.id)
         } else {
-            setCurrentFolder(null)
-            void loadFolders(null)
+            setCurrent(null)
+            void load(null)
         }
     }
 
-    const confirmFolder = async () => {
-        if (!currentFolder) return
+    const confirm = async () => {
+        if (!current) return
+        setSaving(true)
         try {
-            const res = await fetch("/api/google-drive/folder", {
+            const r = await fetch("/api/google-drive/folder", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ folderId: currentFolder.id }),
+                body: JSON.stringify({ folderId: current.id }),
             })
-            if (!res.ok) throw new Error("Failed to set folder")
-            const data = await res.json()
-            const saved = { id: data.folder?.id || currentFolder.id, name: data.folder?.name || currentFolder.name }
-            setSavedFolder(saved)
-            setPickingFolder(false)
-            setMessage("success", `Root folder set to ${saved.name}`)
-        } catch {
-            setMessage("error", "Could not set root folder.")
-        }
-    }
-
-    const clearFolder = async () => {
-        setSavedFolder(null)
-        setPickingFolder(false)
-        setMessage("success", "Root folder cleared.")
+            if (!r.ok) throw 0
+            const d = await r.json()
+            const s = { id: d.folder?.id || current.id, name: d.folder?.name || current.name }
+            setSaved(s)
+            setPickerOpen(false)
+            flash("success", `Root set to ${s.name}`)
+        } catch { flash("error", "Could not set folder") }
+        finally { setSaving(false) }
     }
 
     return (
         <div className="border rounded-lg p-4 space-y-4">
             <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-white dark:bg-zinc-900 border flex items-center justify-center shrink-0">
-                    <GoogleDriveLogo className="w-5 h-5" />
+                    <DriveLogo className="w-5 h-5" />
                 </div>
                 <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">Google Drive</p>
@@ -171,124 +143,100 @@ function DriveCard({ config, canManage }: { config: DriveConfig; canManage: bool
 
             {config.connected ? (
                 <div className="space-y-3">
-                    {/* Root folder setting */}
                     <div className="flex items-center justify-between text-xs">
                         <span className="text-muted-foreground">Root folder</span>
-                        <span className="font-medium">{savedFolder?.name || "My Drive"}</span>
+                        <span className="font-medium">{saved?.name || "Not set"}</span>
                     </div>
 
-                    {pickingFolder ? (
-                        <div className="border rounded-lg overflow-hidden">
-                            {/* Picker header */}
-                            <div className="flex items-center gap-1 px-3 py-2 border-b bg-muted/50 text-xs">
-                                <button
-                                    onClick={navigateBack}
-                                    disabled={!currentFolder}
-                                    className="p-0.5 rounded hover:bg-muted disabled:opacity-30 shrink-0"
-                                >
-                                    <ArrowLeft className="h-3 w-3" />
-                                </button>
-                                <span className="font-medium truncate flex-1">
-                                    {currentFolder?.name || "My Drive"}
-                                </span>
-                            </div>
-
-                            {/* Folder list */}
-                            <ScrollArea className="max-h-40">
-                                {loadingFolders ? (
-                                    <div className="flex items-center justify-center py-4">
-                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                    </div>
-                                ) : folders.length === 0 ? (
-                                    <div className="py-3 text-xs text-muted-foreground text-center">No folders</div>
-                                ) : (
-                                    folders.map((folder) => (
-                                        <button
-                                            key={folder.id}
-                                            onClick={() => navigateToFolder(folder)}
-                                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-muted transition-colors"
-                                        >
-                                            <FolderOpen className="h-3 w-3 text-muted-foreground shrink-0" />
-                                            <span className="truncate flex-1">{folder.name}</span>
-                                            <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
-                                        </button>
-                                    ))
-                                )}
-                            </ScrollArea>
-
-                            {/* Picker actions */}
-                            <div className="border-t p-2 flex items-center gap-1.5">
-                                <Button
-                                    onClick={confirmFolder}
-                                    disabled={!currentFolder}
-                                    size="sm"
-                                    className="flex-1"
-                                >
-                                    Set as root
-                                </Button>
-                                {savedFolder && (
-                                    <Button variant="ghost" size="sm" onClick={clearFolder} className="text-xs">
-                                        Clear
-                                    </Button>
-                                )}
-                                <Button variant="ghost" size="sm" onClick={() => setPickingFolder(false)} className="text-xs">
-                                    Cancel
-                                </Button>
-                            </div>
-                        </div>
-                    ) : (
-                        canManage && (
-                            <Button variant="outline" size="sm" onClick={openFolderPicker} className="w-full">
-                                Change Root Folder
-                            </Button>
-                        )
+                    {canManage && (
+                        <Button variant="outline" size="sm" onClick={openPicker} className="w-full">
+                            {saved ? "Change Root Folder" : "Select Root Folder"}
+                        </Button>
                     )}
 
-                    {/* Actions */}
                     {canManage && (
                         <div className="flex items-center gap-2 pt-1">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleConnect}
-                                disabled={connecting}
-                                className="flex-1"
-                            >
-                                {connecting ? (
-                                    <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Connecting...</>
-                                ) : (
-                                    "Switch Account"
-                                )}
+                            <Button variant="outline" size="sm" onClick={connect} disabled={connecting} className="flex-1">
+                                {connecting ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Connecting...</> : "Switch Account"}
                             </Button>
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={handleDisconnect}
+                                onClick={disconnect}
                                 disabled={disconnecting}
                                 className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30"
                             >
-                                {disconnecting ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                    "Disconnect"
-                                )}
+                                {disconnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Disconnect"}
                             </Button>
                         </div>
                     )}
+
+                    {/* Folder picker dialog */}
+                    <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+                        <DialogContent className="sm:max-w-md p-0 gap-0">
+                            <DialogHeader className="px-4 py-3 border-b">
+                                <DialogTitle className="text-sm">Choose root folder</DialogTitle>
+                            </DialogHeader>
+
+                            {/* nav bar */}
+                            <div className="flex items-center gap-1 px-3 py-2 border-b bg-muted/30">
+                                <button
+                                    onClick={navBack}
+                                    disabled={!current}
+                                    className="p-1 rounded hover:bg-muted disabled:opacity-30 shrink-0 transition-colors"
+                                >
+                                    <ArrowLeft className="h-3.5 w-3.5" />
+                                </button>
+                                <span className="text-xs font-medium truncate flex-1">
+                                    {current?.name || "My Drive"}
+                                </span>
+                            </div>
+
+                            {/* folder list */}
+                            <ScrollArea className="h-64">
+                                {loadingFolders ? (
+                                    <div className="flex items-center justify-center py-8">
+                                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                    </div>
+                                ) : folders.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-8 gap-1">
+                                        <Folder className="h-5 w-5 text-muted-foreground/30" />
+                                        <span className="text-xs text-muted-foreground">No folders here</span>
+                                    </div>
+                                ) : (
+                                    <div className="py-1">
+                                        {folders.map((f) => (
+                                            <button
+                                                key={f.id}
+                                                onClick={() => navTo(f)}
+                                                className="w-full flex items-center gap-2.5 px-4 py-2 text-left hover:bg-muted/50 transition-colors group"
+                                            >
+                                                <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                <span className="flex-1 text-sm truncate">{f.name}</span>
+                                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 transition-colors" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </ScrollArea>
+
+                            {/* actions */}
+                            <div className="border-t px-4 py-3 flex items-center gap-2">
+                                <Button onClick={confirm} disabled={!current || saving} size="sm" className="flex-1">
+                                    {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+                                    {current ? `Select "${current.name}"` : "Navigate into a folder"}
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => setPickerOpen(false)}>
+                                    Cancel
+                                </Button>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
                 </div>
             ) : (
                 canManage && (
-                    <Button
-                        onClick={handleConnect}
-                        disabled={connecting}
-                        size="sm"
-                        className="w-full"
-                    >
-                        {connecting ? (
-                            <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Connecting...</>
-                        ) : (
-                            "Connect Google Drive"
-                        )}
+                    <Button onClick={connect} disabled={connecting} size="sm" className="w-full">
+                        {connecting ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Connecting...</> : "Connect Google Drive"}
                     </Button>
                 )
             )}
@@ -296,7 +244,7 @@ function DriveCard({ config, canManage }: { config: DriveConfig; canManage: bool
             {status && (
                 <p className={cn("text-xs flex items-center gap-2", status.type === "error" ? "text-red-500" : "text-green-600")}>
                     {status.type === "error" ? <XCircle className="h-3 w-3" /> : <Check className="h-3 w-3" />}
-                    {status.message}
+                    {status.msg}
                 </p>
             )}
         </div>

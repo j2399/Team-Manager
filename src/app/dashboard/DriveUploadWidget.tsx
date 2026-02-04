@@ -5,9 +5,9 @@ import Link from "next/link"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import {
-    ArrowLeft, ChevronRight, ExternalLink, File, FileAudio, FileImage,
-    FileSpreadsheet, FileText, FileVideo, Folder, Loader2, Plus,
-    RotateCw, Settings, Upload, X
+    ArrowLeft, ChevronDown, ChevronRight, ExternalLink, File, FileAudio,
+    FileImage, FileSpreadsheet, FileText, FileVideo, Folder, Loader2,
+    Plus, RotateCw, Settings, Upload, X
 } from "lucide-react"
 
 type DriveConfig = {
@@ -83,6 +83,7 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Props
     const [loadingFiles, setLoadingFiles] = useState(false)
     const [dragOver, setDragOver] = useState(false)
     const [spinning, setSpinning] = useState(false)
+    const [showAllFiles, setShowAllFiles] = useState(false)
 
     const inputRef = useRef<HTMLInputElement>(null)
     const dcRef = useRef(0)
@@ -173,6 +174,7 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Props
         if (!id) return
         if (folderId) setStack((s) => [...s, folderId])
         setFolderId(id)
+        setShowAllFiles(false)
         void loadFiles(id)
     }
 
@@ -408,24 +410,35 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Props
                                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                             </div>
                         ) : (
-                            files.map((f) => {
-                                const Icon = fileIcon(f.mimeType)
-                                const url = f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`
-                                return (
-                                    <a
-                                        key={f.id}
-                                        href={url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-muted/50 transition-colors group"
+                            <>
+                                {(showAllFiles ? files : files.slice(0, 3)).map((f) => {
+                                    const Icon = fileIcon(f.mimeType)
+                                    const url = f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`
+                                    return (
+                                        <a
+                                            key={f.id}
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-muted/50 transition-colors group"
+                                        >
+                                            <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                                            <span className="flex-1 text-xs truncate">{f.name}</span>
+                                            <span className="text-[10px] text-muted-foreground shrink-0">{relDate(f.modifiedTime)}</span>
+                                            <ExternalLink className="h-3 w-3 text-muted-foreground/0 group-hover:text-muted-foreground shrink-0 transition-colors" />
+                                        </a>
+                                    )
+                                })}
+                                {files.length > 3 && (
+                                    <button
+                                        onClick={() => setShowAllFiles((v) => !v)}
+                                        className="w-full flex items-center justify-center gap-1 px-3 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                                     >
-                                        <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-                                        <span className="flex-1 text-xs truncate">{f.name}</span>
-                                        <span className="text-[10px] text-muted-foreground shrink-0">{relDate(f.modifiedTime)}</span>
-                                        <ExternalLink className="h-3 w-3 text-muted-foreground/0 group-hover:text-muted-foreground shrink-0 transition-colors" />
-                                    </a>
-                                )
-                            })
+                                        {showAllFiles ? "Show less" : `${files.length - 3} more files`}
+                                        <ChevronDown className={cn("h-3 w-3 transition-transform", showAllFiles && "rotate-180")} />
+                                    </button>
+                                )}
+                            </>
                         )}
 
                         {/* empty */}
