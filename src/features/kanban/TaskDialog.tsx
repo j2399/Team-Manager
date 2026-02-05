@@ -132,6 +132,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const [loadingFolders, setLoadingFolders] = useState(false)
     const [selectedFolder, setSelectedFolder] = useState<{ id: string; name: string } | null>(null)
     const folderInitRef = useRef(false)
+    const driveConfigLoadedRef = useRef(false)
 
     // Checklist state
     const [enableChecklist, setEnableChecklist] = useState(false)
@@ -175,7 +176,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 setDescription("")
                 setAssigneeId(initialAssigneeIds?.[0] || "")
                 setAssigneeIds(initialAssigneeIds || [])
-                setStartDate(today)
+                setStartDate("")
                 setEndDate("")
                 setRequireAttachment(true)
                 setEnableProgress(false)
@@ -187,7 +188,8 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     }, [task, today, open])
 
     useEffect(() => {
-        if (!open) return
+        if (driveConfigLoadedRef.current) return
+        driveConfigLoadedRef.current = true
         let cancelled = false
         const loadDriveConfig = async () => {
             setDriveLoading(true)
@@ -212,7 +214,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         }
         loadDriveConfig()
         return () => { cancelled = true }
-    }, [open])
+    }, [])
 
     useEffect(() => {
         if (!open || folderInitRef.current) return
@@ -322,7 +324,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     }
 
     useEffect(() => {
-        if (!open || !driveConfig?.connected || !rootId) return
+        if (!driveConfig?.connected || !rootId) return
         if (folderTree.length > 0) return
 
         const cached = readCachedTree()
@@ -335,7 +337,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         if (!cached || isStale) {
             void loadFolderTree(true)
         }
-    }, [open, driveConfig?.connected, rootId])
+    }, [driveConfig?.connected, rootId])
 
     const openFolderPicker = async () => {
         if (!rootId) return
@@ -714,13 +716,13 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                         {(instructionsFile || existingInstructionsFile) && (
                                             <button
                                                 type="button"
-                                                className="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition-colors"
+                                                className="absolute top-2.5 right-3 text-muted-foreground hover:text-foreground transition-colors"
                                                 onClick={() => {
                                                     setInstructionsFile(null)
                                                     setExistingInstructionsFile(null)
                                                 }}
                                             >
-                                                <X className="h-3 w-3" />
+                                                <X className="h-2.5 w-2.5" />
                                             </button>
                                         )}
                                     </div>
