@@ -1251,7 +1251,14 @@ export function Board({
                                         </div>
 
                                         <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
-                                            {!isComplete && push.taskCount > 0 && (
+                                            <div
+                                                className={cn(
+                                                    "hidden md:flex items-center overflow-hidden transition-all duration-200 ease-out",
+                                                    !isComplete && push.taskCount > 0
+                                                        ? "max-w-28 opacity-100"
+                                                        : "max-w-0 opacity-0 pointer-events-none"
+                                                )}
+                                            >
                                                 <TooltipProvider delayDuration={100}>
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
@@ -1267,12 +1274,19 @@ export function Board({
                                                         </TooltipContent>
                                                     </Tooltip>
                                                 </TooltipProvider>
-                                            )}
-                                            {!isComplete && (
-                                                <span className="hidden md:inline text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded">
+                                            </div>
+                                            <div
+                                                className={cn(
+                                                    "hidden md:flex items-center overflow-hidden transition-all duration-200 ease-out",
+                                                    !isComplete
+                                                        ? "max-w-[260px] opacity-100"
+                                                        : "max-w-0 opacity-0 pointer-events-none"
+                                                )}
+                                            >
+                                                <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded whitespace-nowrap">
                                                     {new Date(push.startDate).toLocaleDateString([], { month: 'short', day: 'numeric' })} - {push.endDate ? new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Ongoing'}
                                                 </span>
-                                            )}
+                                            </div>
                                             {isAdmin && (
                                                 <div
                                                     role="button"
