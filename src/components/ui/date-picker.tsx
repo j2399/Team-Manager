@@ -535,7 +535,7 @@ function DateRangePicker({
                                                 "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
                                                 "disabled:pointer-events-none disabled:opacity-30",
                                                 inRange && "bg-primary/15 text-foreground",
-                                                (isStart || isEnd) && "bg-primary text-primary-foreground hover:bg-primary/90",
+                                                (isStart || isEnd) && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
                                                 isToday(day) && !isStart && !isEnd && "border border-primary text-primary"
                                             )}
                                         >
