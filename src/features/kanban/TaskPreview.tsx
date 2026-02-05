@@ -965,6 +965,9 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                         </button>
                                     )}
                                 </div>
+                                <div className="text-[10px] text-muted-foreground mb-2">
+                                    Uploads go to: {task.attachmentFolderName || "Team Manager"}
+                                </div>
                                 <input
                                     ref={fileInputRef}
                                     type="file"
