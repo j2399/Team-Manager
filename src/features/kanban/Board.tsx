@@ -99,6 +99,27 @@ type BoardProps = {
     initialPushId?: string | null
 }
 
+function inferLoadedPushes(
+    cols: ColumnData[],
+    pushList: PushType[]
+): Record<string, true> {
+    const countsByPush = new Map<string, number>()
+    for (const col of cols) {
+        for (const task of col.tasks) {
+            const pushId = task.push?.id
+            if (!pushId) continue
+            countsByPush.set(pushId, (countsByPush.get(pushId) || 0) + 1)
+        }
+    }
+
+    const loaded: Record<string, true> = {}
+    for (const push of pushList) {
+        const actual = countsByPush.get(push.id) || 0
+        if (actual === push.taskCount) loaded[push.id] = true
+    }
+    return loaded
+}
+
 export function Board({
     board,
     projectId,
@@ -127,7 +148,9 @@ export function Board({
         new Set(pushes.filter(p => p.id !== expandPushId).map(p => p.id))
     )
     const [loadingPushes, setLoadingPushes] = useState<Record<string, true>>({})
-    const [loadedPushes, setLoadedPushes] = useState<Record<string, true>>({})
+    const [loadedPushes, setLoadedPushes] = useState<Record<string, true>>(() =>
+        inferLoadedPushes(board.columns, pushes)
+    )
     const [pushStatusOverrides, setPushStatusOverrides] = useState<Record<string, 'Active' | 'Completed'>>({})
     const { toast } = useToast()
 
@@ -321,6 +344,19 @@ export function Board({
         setColumns((prev) => {
             const prevTasksByColId = new Map(prev.map((c) => [c.id, c.tasks]))
             return board.columns.map((c) => ({ ...c, tasks: prevTasksByColId.get(c.id) || [] }))
+        })
+
+        const inferred = inferLoadedPushes(board.columns, pushes)
+        setLoadedPushes((prev) => {
+            let changed = false
+            const next = { ...prev }
+            Object.keys(inferred).forEach((pushId) => {
+                if (!next[pushId]) {
+                    next[pushId] = true
+                    changed = true
+                }
+            })
+            return changed ? next : prev
         })
 
         // Ensure new pushes start collapsed
@@ -900,7 +936,7 @@ export function Board({
             else next.add(pushId)
             return next
         })
-        if (willOpen) void loadPushTasks(pushId)
+        if (willOpen && !loadedPushes[pushId]) void loadPushTasks(pushId)
     }
 
     const getPushTasks = (pushId: string | null) => {
