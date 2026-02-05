@@ -890,7 +890,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                                     <ArrowLeft className="h-4 w-4" />
                                                 </Button>
                                                 <div className="text-xs text-muted-foreground truncate">
-                                                    {currentFolderId === rootId ? rootName : folderMap.get(currentFolderId || \"\")?.name || \"Folder\"}
+                                                    {currentFolderId === rootId ? rootName : folderMap.get(currentFolderId || "")?.name || "Folder"}
                                                 </div>
                                             </div>
 
