@@ -849,12 +849,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                             className="w-full h-10 flex items-center justify-between gap-2 px-3 pr-16 bg-background rounded-md border hover:bg-muted/30 transition-colors disabled:opacity-60"
                                         >
                                             <div className="flex items-center gap-2 min-w-0">
-                                                <img
-                                                    src="/google-drive.svg"
-                                                    alt=""
-                                                    aria-hidden="true"
-                                                    className="h-4 w-4 shrink-0 opacity-70"
-                                                />
+                                                <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
                                                 <span className="text-sm font-normal truncate">
                                                     {selectedFolder?.name || "Select a folder"}
                                                 </span>
@@ -879,16 +874,17 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                             </DialogHeader>
 
                                             <div className="flex items-center gap-2 px-4 py-2 border-b">
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="icon-sm"
-                                                    onClick={backFolder}
-                                                    className="h-7 w-7"
-                                                    disabled={folderStack.length === 0}
-                                                >
-                                                    <ArrowLeft className="h-4 w-4" />
-                                                </Button>
+                                                {folderStack.length > 0 && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon-sm"
+                                                        onClick={backFolder}
+                                                        className="h-7 w-7"
+                                                    >
+                                                        <ArrowLeft className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                                 <div className="text-xs text-muted-foreground truncate">
                                                     {currentFolderId === rootId ? rootName : folderMap.get(currentFolderId || "")?.name || "Folder"}
                                                 </div>
