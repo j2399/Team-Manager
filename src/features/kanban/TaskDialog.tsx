@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Plus, Trash2, ChevronDown, X, ListChecks, Folder, ChevronRight, Loader2 } from "lucide-react"
+import { Plus, Trash2, X, ListChecks, Folder, ChevronRight, Loader2 } from "lucide-react"
 import { useState, useEffect, useMemo, useRef } from "react"
 import { createTask, updateTaskDetails, deleteTask } from "@/app/actions/kanban"
 import { RemoveScroll } from "react-remove-scroll"
@@ -176,7 +176,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 setDescription("")
                 setAssigneeId(initialAssigneeIds?.[0] || "")
                 setAssigneeIds(initialAssigneeIds || [])
-                setStartDate("")
+                setStartDate(today)
                 setEndDate("")
                 setRequireAttachment(true)
                 setEnableProgress(false)
@@ -393,6 +393,13 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const requiredTagClass = (met: boolean) =>
         `text-[10px] font-normal text-destructive transition-all duration-200 overflow-hidden whitespace-nowrap pointer-events-none select-none ${met ? "opacity-0 max-w-0 ml-0" : "opacity-100 max-w-[80px] ml-0"}`
 
+    const adjustDescriptionHeight = () => {
+        const el = descriptionRef.current
+        if (!el) return
+        el.style.height = "auto"
+        el.style.height = `${el.scrollHeight}px`
+    }
+
     // Validation - all fields required
     const isValid = useMemo(() => {
         return (
@@ -403,6 +410,11 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
             (!requiresDriveFolder || hasDriveFolder)
         )
     }, [hasTitle, hasDescriptionValue, hasAssignees, hasDateRange, requiresDriveFolder, hasDriveFolder])
+
+    useEffect(() => {
+        if (!open) return
+        adjustDescriptionHeight()
+    }, [description, open])
 
     const toggleAssignee = (userId: string) => {
         setAssigneeIds(prev =>
@@ -687,8 +699,10 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                             value={description}
                                             onChange={(e) => setDescription(e.target.value)}
                                             autoComplete="off"
-                                            placeholder="Type Description or Drag Files"
-                                            className={`min-h-[120px] resize-y pr-24 ${isDraggingFile ? "ring-1 ring-primary/40" : ""}`}
+                                            placeholder={(instructionsFile || existingInstructionsFile) && description.trim() === ""
+                                                ? "Type Description"
+                                                : "Type Description or Drag Files"}
+                                            className={`min-h-[120px] resize-none overflow-hidden pr-24 ${isDraggingFile ? "ring-1 ring-primary/40" : ""}`}
                                         />
                                         <div
                                             className={`absolute top-2 ${instructionsFile || existingInstructionsFile ? "right-8" : "right-2"} flex items-center gap-2 text-[11px] text-muted-foreground pointer-events-none`}
@@ -703,13 +717,13 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                         {(instructionsFile || existingInstructionsFile) && (
                                             <button
                                                 type="button"
-                                                className="absolute top-2 right-2 text-muted-foreground hover:text-destructive transition-colors"
+                                                className="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition-colors"
                                                 onClick={() => {
                                                     setInstructionsFile(null)
                                                     setExistingInstructionsFile(null)
                                                 }}
                                             >
-                                                <X className="h-3.5 w-3.5" />
+                                                <X className="h-3 w-3" />
                                             </button>
                                         )}
                                     </div>
@@ -725,7 +739,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                                 <Button
                                                     variant="outline"
                                                     role="combobox"
-                                                    className="w-full justify-between h-10 font-normal px-3 pr-20 relative"
+                                                    className="w-full justify-between h-10 font-normal px-3 pr-16"
                                                 >
                                                     <span className="truncate">
                                                         {assigneeIds.length === 0
@@ -734,7 +748,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                                                 ? users.find(u => u.id === assigneeIds[0])?.name || "1 selected"
                                                                 : `${assigneeIds.length} selected`}
                                                     </span>
-                                                    <ChevronDown className="h-4 w-4 shrink-0 opacity-50 absolute right-11" />
                                                 </Button>
                                             </PopoverTrigger>
                                         <PopoverContent className="w-[260px] p-0" align="start">
@@ -898,6 +911,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                             )}
 
                             <div className="pt-2 pb-2 space-y-3">
+                                <p className="text-xs font-medium text-muted-foreground">Extra features</p>
                                 <div className="flex items-center space-x-2 border p-3 rounded-lg bg-muted/20">
                                     <Checkbox
                                         id="requireAttachment"
