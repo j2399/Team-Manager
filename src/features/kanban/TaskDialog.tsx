@@ -125,7 +125,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const [dragFileName, setDragFileName] = useState<string | null>(null)
     const descriptionRef = useRef<HTMLTextAreaElement>(null)
     const [driveConfig, setDriveConfig] = useState<DriveConfig | null>(null)
-    const [driveLoading, setDriveLoading] = useState(false)
+    const [driveLoading, setDriveLoading] = useState(true)
     const [folderTree, setFolderTree] = useState<FolderNode[]>([])
     const [pickerOpen, setPickerOpen] = useState(false)
     const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
@@ -255,6 +255,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const rootId = driveConfig?.folderId || null
     const rootName = driveConfig?.folderName || "Drive"
     const requiresDriveFolder = !task && (driveLoading ? true : !!(driveConfig?.connected && rootId))
+    const showDriveSection = driveLoading || (!!(driveConfig?.connected && rootId))
     const driveConfigCacheKey = "driveConfig:state"
     const driveConfigCacheTimeKey = "driveConfig:state:ts"
     const driveConfigCacheTtlMs = 30 * 60 * 1000
@@ -888,25 +889,14 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 </div>
                             </div>
 
-                            {driveLoading && !driveConfig && (
-                                <div className="space-y-1">
-                                    <div className="relative">
-                                        <div className="w-full h-10 rounded-md border bg-muted/20 animate-pulse" />
-                                    </div>
-                                    <p className="text-[11px] text-muted-foreground">
-                                        Attachments uploaded to this task will be stored in this Drive folder.
-                                    </p>
-                                </div>
-                            )}
-
-                            {driveConfig?.connected && rootId && (
+                            {showDriveSection && (
                                 <div className="space-y-1">
                                     <Label className="sr-only">Submission Folder</Label>
                                     <div className="relative">
                                         <button
                                             type="button"
                                             onClick={openFolderPicker}
-                                            disabled={driveLoading}
+                                            disabled={driveLoading || !rootId}
                                             className="w-full h-10 flex items-center justify-between gap-2 px-3 pr-16 bg-background rounded-md border hover:bg-muted/30 transition-colors disabled:opacity-60"
                                         >
                                             <div className="flex items-center gap-2 min-w-0">
