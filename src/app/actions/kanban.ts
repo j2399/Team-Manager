@@ -154,13 +154,14 @@ export async function createTask(input: CreateTaskInput) {
 
         if (driveConfig?.refreshToken && driveConfig.folderId) {
             if (!attachmentFolderId) {
-                attachmentFolderId = driveConfig.folderId
-                attachmentFolderName = driveConfig.folderName || attachmentFolderName || "Drive"
+                return { error: "Submission folder is required for Drive uploads" }
             } else if (attachmentFolderId !== driveConfig.folderId) {
                 const cached = await getDriveFolderCache(user.workspaceId)
                 if (!isFolderWithinRoot(cached, driveConfig.folderId, attachmentFolderId)) {
                     return { error: "Selected upload folder is outside the configured Drive root" }
                 }
+            } else if (!attachmentFolderName) {
+                attachmentFolderName = driveConfig.folderName || attachmentFolderName || "Drive"
             }
         } else {
             attachmentFolderId = null

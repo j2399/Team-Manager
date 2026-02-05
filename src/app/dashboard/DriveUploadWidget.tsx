@@ -90,6 +90,8 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Props
 
     const root = initialConfig.folderId
     const rootName = initialConfig.folderName || "Drive"
+    const cacheKey = root ? `driveFolderTree:${root}` : null
+    const cacheTimeKey = cacheKey ? `${cacheKey}:ts` : null
 
     const folderMap = useMemo(() => {
         const m = new Map<string, FolderNode>()
@@ -144,7 +146,16 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Props
             const r = await fetch(`/api/google-drive/folders/tree?rootId=${root}`)
             if (!r.ok) throw 0
             const d = await r.json()
-            setTree(Array.isArray(d.folders) ? d.folders : [])
+            const nextTree = Array.isArray(d.folders) ? d.folders : []
+            setTree(nextTree)
+            if (cacheKey && cacheTimeKey && nextTree.length > 0) {
+                try {
+                    sessionStorage.setItem(cacheKey, JSON.stringify(nextTree))
+                    sessionStorage.setItem(cacheTimeKey, String(Date.now()))
+                } catch {
+                    // Ignore cache write failures
+                }
+            }
             if (!keep) { setFolderId(root); setStack([]) }
         } catch { flash(false, "Failed to load") }
         finally { setLoading(false) }

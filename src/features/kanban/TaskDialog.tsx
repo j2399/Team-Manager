@@ -241,6 +241,9 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const rootId = driveConfig?.folderId || null
     const rootName = driveConfig?.folderName || "Drive"
     const requiresDriveFolder = !task && (driveLoading ? true : !!(driveConfig?.connected && rootId))
+    const folderCacheKey = rootId ? `driveFolderTree:${rootId}` : null
+    const folderCacheTimeKey = folderCacheKey ? `${folderCacheKey}:ts` : null
+    const folderCacheTtlMs = 30 * 60 * 1000
 
     const folderMap = useMemo(() => {
         const map = new Map<string, FolderNode>()
@@ -269,14 +272,52 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const children = currentFolderId ? childMap.get(currentFolderId) || [] : []
     const atRoot = currentFolderId === rootId
 
-    const loadFolderTree = async () => {
+    const readCachedTree = () => {
+        if (!folderCacheKey) return null
+        try {
+            const raw = sessionStorage.getItem(folderCacheKey)
+            if (!raw) return null
+            const parsed = JSON.parse(raw)
+            return Array.isArray(parsed) ? (parsed as FolderNode[]) : null
+        } catch {
+            return null
+        }
+    }
+
+    const readCachedTreeTime = () => {
+        if (!folderCacheTimeKey) return 0
+        try {
+            const raw = sessionStorage.getItem(folderCacheTimeKey)
+            const ts = raw ? Number(raw) : 0
+            return Number.isFinite(ts) ? ts : 0
+        } catch {
+            return 0
+        }
+    }
+
+    const writeCachedTree = (tree: FolderNode[]) => {
+        if (!folderCacheKey || !folderCacheTimeKey) return
+        try {
+            sessionStorage.setItem(folderCacheKey, JSON.stringify(tree))
+            sessionStorage.setItem(folderCacheTimeKey, String(Date.now()))
+        } catch {
+            // Ignore cache write failures
+        }
+    }
+
+    const loadFolderTree = async (force = false) => {
         if (!rootId) return
+        if (!force && folderTree.length > 0) return
         setLoadingFolders(true)
         try {
             const res = await fetch(`/api/google-drive/folders/tree?rootId=${rootId}`)
             if (!res.ok) throw new Error("Failed")
             const data = await res.json()
-            setFolderTree(Array.isArray(data.folders) ? data.folders : [])
+            const nextTree = Array.isArray(data.folders) ? data.folders : []
+            setFolderTree(nextTree)
+            if (nextTree.length > 0) {
+                writeCachedTree(nextTree)
+            }
         } catch {
             setFolderTree([])
         } finally {
@@ -284,13 +325,37 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         }
     }
 
+    useEffect(() => {
+        if (!open || !driveConfig?.connected || !rootId) return
+        if (folderTree.length > 0) return
+
+        const cached = readCachedTree()
+        const cachedAt = readCachedTreeTime()
+        const isStale = !cachedAt || Date.now() - cachedAt > folderCacheTtlMs
+
+        if (cached && cached.length > 0) {
+            setFolderTree(cached)
+        }
+        if (!cached || isStale) {
+            void loadFolderTree(true)
+        }
+    }, [open, driveConfig?.connected, rootId])
+
     const openFolderPicker = async () => {
         if (!rootId) return
         setPickerOpen(true)
         setCurrentFolderId(rootId)
         setFolderStack([])
         if (folderTree.length === 0) {
-            await loadFolderTree()
+            const cached = readCachedTree()
+            const cachedAt = readCachedTreeTime()
+            const isStale = !cachedAt || Date.now() - cachedAt > folderCacheTtlMs
+            if (cached && cached.length > 0) {
+                setFolderTree(cached)
+            }
+            if (!cached || isStale) {
+                await loadFolderTree(true)
+            }
         }
     }
 
@@ -346,18 +411,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         )
     }, [title, description, assigneeIds, startDate, endDate, requiresDriveFolder, selectedFolder])
 
-    // Validation errors for display
-    const getValidationErrors = () => {
-        const errors: string[] = []
-        if (!title.trim()) errors.push("Title")
-        if (!description.trim()) errors.push("Description")
-        if (assigneeIds.length === 0) errors.push("Assignee")
-        if (!startDate) errors.push("Start Date")
-        if (!endDate) errors.push("Due Date")
-        if (requiresDriveFolder && !selectedFolder) errors.push("Submission Folder")
-        return errors
-    }
-
     const toggleAssignee = (userId: string) => {
         setAssigneeIds(prev =>
             prev.includes(userId)
@@ -385,14 +438,13 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
         setIsLoading(true)
         try {
-            const attachmentFolderPayload = (driveConfig?.connected && rootId)
-                ? {
-                    attachmentFolderId: selectedFolder?.id || task?.attachmentFolderId || rootId,
-                    attachmentFolderName: selectedFolder?.name || task?.attachmentFolderName || rootName
-                }
-                : {}
-
             if (task) {
+                const attachmentFolderPayload = (driveConfig?.connected && rootId)
+                    ? {
+                        attachmentFolderId: selectedFolder?.id || task.attachmentFolderId || rootId,
+                        attachmentFolderName: selectedFolder?.name || task.attachmentFolderName || rootName
+                    }
+                    : {}
                 const result = await updateTaskDetails(task.id, {
                     title: title.trim(),
                     description: description.trim(),
@@ -444,6 +496,12 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
                 handleClose()
             } else {
+                const attachmentFolderPayload = (driveConfig?.connected && rootId)
+                    ? {
+                        attachmentFolderId: selectedFolder?.id || null,
+                        attachmentFolderName: selectedFolder?.name || null
+                    }
+                    : {}
                 const result = await createTask({
                     title: title.trim(),
                     description: description.trim(),
@@ -616,7 +674,10 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
                             <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="title" className="text-sm font-medium">Task Title</Label>
+                                    <Label htmlFor="title" className="text-sm font-medium flex items-center gap-2">
+                                        Task Title
+                                        <span className="text-[10px] font-normal text-muted-foreground">Required</span>
+                                    </Label>
                                     <Input
                                         id="title"
                                         value={title}
@@ -627,7 +688,10 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="description" className="text-sm font-medium">Description</Label>
+                                    <Label htmlFor="description" className="text-sm font-medium flex items-center gap-2">
+                                        Description
+                                        <span className="text-[10px] font-normal text-muted-foreground">Required</span>
+                                    </Label>
                                     <Textarea
                                         id="description"
                                         value={description}
@@ -640,7 +704,10 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <Label className="text-sm font-medium">Assignees</Label>
+                                    <Label className="text-sm font-medium flex items-center gap-2">
+                                        Assignees
+                                        <span className="text-[10px] font-normal text-muted-foreground">Required</span>
+                                    </Label>
                                     <Popover>
                                         <PopoverTrigger asChild>
                                             <Button
@@ -704,7 +771,10 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="startDate" className="text-sm font-medium">Start Date</Label>
+                                    <Label htmlFor="startDate" className="text-sm font-medium flex items-center gap-2">
+                                        Start Date
+                                        <span className="text-[10px] font-normal text-muted-foreground">Required</span>
+                                    </Label>
                                     <DatePicker
                                         id="startDate"
                                         value={startDate}
@@ -716,7 +786,10 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
-                                    <Label htmlFor="endDate" className="text-sm font-medium">Due Date</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Label htmlFor="endDate" className="text-sm font-medium">Due Date</Label>
+                                        <span className="text-[10px] font-normal text-muted-foreground">Required</span>
+                                    </div>
                                     {!task && startDate && (
                                         <div className="flex gap-2">
                                             <button
@@ -744,6 +817,107 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                     className="h-10"
                                 />
                             </div>
+
+                            {driveConfig?.connected && rootId && (
+                                <div className="space-y-2">
+                                    <Label className="text-sm font-medium flex items-center gap-2">
+                                        Submission Folder
+                                        <span className="text-xs font-normal text-muted-foreground">(Google Drive)</span>
+                                        {requiresDriveFolder && (
+                                            <span className="text-[10px] font-medium text-muted-foreground">Required</span>
+                                        )}
+                                    </Label>
+                                    <div className="flex items-center justify-between gap-2 p-3 bg-muted/30 rounded-lg border">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
+                                            <span className="text-sm font-medium truncate">
+                                                {selectedFolder?.name || "Select a folder"}
+                                            </span>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={openFolderPicker}
+                                            disabled={driveLoading}
+                                        >
+                                            {driveLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Change"}
+                                        </Button>
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground">
+                                        Attachments uploaded to this task will be stored in this Drive folder.
+                                    </p>
+
+                                    {/* Folder picker dialog */}
+                                    <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+                                        <DialogContent className="sm:max-w-md p-0 gap-0">
+                                            <DialogHeader className="px-4 py-3 border-b">
+                                                <DialogTitle className="text-sm">Choose upload folder</DialogTitle>
+                                            </DialogHeader>
+
+                                            <div className="flex items-center gap-1 px-3 py-2 border-b bg-muted/30">
+                                                <button
+                                                    onClick={backFolder}
+                                                    disabled={atRoot}
+                                                    className="p-1 rounded hover:bg-muted disabled:opacity-30 shrink-0 transition-colors"
+                                                >
+                                                    <ArrowLeft className="h-3.5 w-3.5" />
+                                                </button>
+                                                <span className="text-xs font-medium truncate flex-1">
+                                                    {currentFolderId === rootId ? rootName : folderMap.get(currentFolderId || "")?.name || "Folder"}
+                                                </span>
+                                            </div>
+
+                                            <ScrollArea className="h-64">
+                                                {loadingFolders ? (
+                                                    <div className="flex items-center justify-center py-8">
+                                                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                                    </div>
+                                                ) : children.length === 0 ? (
+                                                    <div className="flex flex-col items-center justify-center py-8 gap-1">
+                                                        <Folder className="h-5 w-5 text-muted-foreground/30" />
+                                                        <span className="text-xs text-muted-foreground">No folders here</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="py-1">
+                                                        {children.map((f) => (
+                                                            <button
+                                                                key={f.id}
+                                                                onClick={() => goFolder(f.id)}
+                                                                className="w-full flex items-center gap-2.5 px-4 py-2 text-left hover:bg-muted/50 transition-colors group"
+                                                            >
+                                                                <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                                <span className="flex-1 text-sm truncate">{f.name}</span>
+                                                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 transition-colors" />
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </ScrollArea>
+
+                                            <div className="border-t px-4 py-3 flex items-center gap-2">
+                                                <Button
+                                                    onClick={confirmFolder}
+                                                    disabled={!currentFolderId}
+                                                    size="sm"
+                                                    className="flex-1"
+                                                >
+                                                    Select "{currentFolderId === rootId ? rootName : folderMap.get(currentFolderId || "")?.name || "Folder"}"
+                                                </Button>
+                                                <Button variant="ghost" size="sm" onClick={() => setPickerOpen(false)}>
+                                                    Cancel
+                                                </Button>
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
+                                </div>
+                            )}
+
+                            {driveConfig?.connected && !rootId && (
+                                <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+                                    Google Drive is connected but no root folder is set yet. Ask an admin to configure it in Settings → Integrations.
+                                </div>
+                            )}
 
                             <div className="pt-2 pb-2 space-y-3">
                                 <div className="flex items-center space-x-2 border p-3 rounded-lg bg-muted/20">
@@ -859,107 +1033,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 )}
                             </div>
 
-                            {driveConfig?.connected && rootId && (
-                                <div className="space-y-2">
-                                    <Label className="text-sm font-medium flex items-center gap-2">
-                                        Submission Folder
-                                        <span className="text-xs font-normal text-muted-foreground">(Google Drive)</span>
-                                        {requiresDriveFolder && (
-                                            <span className="text-[10px] font-medium text-amber-600">Required</span>
-                                        )}
-                                    </Label>
-                                    <div className="flex items-center justify-between gap-2 p-3 bg-muted/30 rounded-lg border">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
-                                            <span className={`text-sm font-medium truncate ${requiresDriveFolder && !selectedFolder ? 'text-amber-600' : ''}`}>
-                                                {selectedFolder?.name || "Select a folder"}
-                                            </span>
-                                        </div>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={openFolderPicker}
-                                            disabled={driveLoading}
-                                        >
-                                            {driveLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Change"}
-                                        </Button>
-                                    </div>
-                                    <p className="text-[11px] text-muted-foreground">
-                                        Attachments uploaded to this task will be stored in this Drive folder.
-                                    </p>
-
-                                    {/* Folder picker dialog */}
-                                    <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-                                        <DialogContent className="sm:max-w-md p-0 gap-0">
-                                            <DialogHeader className="px-4 py-3 border-b">
-                                                <DialogTitle className="text-sm">Choose upload folder</DialogTitle>
-                                            </DialogHeader>
-
-                                            <div className="flex items-center gap-1 px-3 py-2 border-b bg-muted/30">
-                                                <button
-                                                    onClick={backFolder}
-                                                    disabled={atRoot}
-                                                    className="p-1 rounded hover:bg-muted disabled:opacity-30 shrink-0 transition-colors"
-                                                >
-                                                    <ArrowLeft className="h-3.5 w-3.5" />
-                                                </button>
-                                                <span className="text-xs font-medium truncate flex-1">
-                                                    {currentFolderId === rootId ? rootName : folderMap.get(currentFolderId || "")?.name || "Folder"}
-                                                </span>
-                                            </div>
-
-                                            <ScrollArea className="h-64">
-                                                {loadingFolders ? (
-                                                    <div className="flex items-center justify-center py-8">
-                                                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                                                    </div>
-                                                ) : children.length === 0 ? (
-                                                    <div className="flex flex-col items-center justify-center py-8 gap-1">
-                                                        <Folder className="h-5 w-5 text-muted-foreground/30" />
-                                                        <span className="text-xs text-muted-foreground">No folders here</span>
-                                                    </div>
-                                                ) : (
-                                                    <div className="py-1">
-                                                        {children.map((f) => (
-                                                            <button
-                                                                key={f.id}
-                                                                onClick={() => goFolder(f.id)}
-                                                                className="w-full flex items-center gap-2.5 px-4 py-2 text-left hover:bg-muted/50 transition-colors group"
-                                                            >
-                                                                <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
-                                                                <span className="flex-1 text-sm truncate">{f.name}</span>
-                                                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 transition-colors" />
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </ScrollArea>
-
-                                            <div className="border-t px-4 py-3 flex items-center gap-2">
-                                                <Button
-                                                    onClick={confirmFolder}
-                                                    disabled={!currentFolderId}
-                                                    size="sm"
-                                                    className="flex-1"
-                                                >
-                                                    Select "{currentFolderId === rootId ? rootName : folderMap.get(currentFolderId || "")?.name || "Folder"}"
-                                                </Button>
-                                                <Button variant="ghost" size="sm" onClick={() => setPickerOpen(false)}>
-                                                    Cancel
-                                                </Button>
-                                            </div>
-                                        </DialogContent>
-                                    </Dialog>
-                                </div>
-                            )}
-
-                            {driveConfig?.connected && !rootId && (
-                                <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
-                                    Google Drive is connected but no root folder is set yet. Ask an admin to configure it in Settings → Integrations.
-                                </div>
-                            )}
-
                             <div className="space-y-3">
                                 <Label className="text-sm font-medium flex items-center gap-2">
                                     Instructions File
@@ -1026,26 +1099,17 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
                             <DialogFooter className="flex w-full items-center justify-between sm:justify-between gap-2">
                                 <div className="flex-1 mr-2 min-w-0">
-                                    {(task || !isValid) && (
-                                        <div className="flex items-center gap-2">
-                                            {task && (
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="icon"
-                                                    onClick={() => setShowDeleteConfirm(true)}
-                                                    disabled={isLoading}
-                                                    className="shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            )}
-                                            {!isValid && (
-                                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium text-amber-600 bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-200/50 dark:from-amber-950/40 dark:to-amber-900/40 dark:text-amber-400 dark:border-amber-900">
-                                                    <span>Please fill required fields: {getValidationErrors().join(", ")}</span>
-                                                </div>
-                                            )}
-                                        </div>
+                                    {task && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() => setShowDeleteConfirm(true)}
+                                            disabled={isLoading}
+                                            className="shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
                                     )}
                                 </div>
                                 <div className="flex gap-2 shrink-0">

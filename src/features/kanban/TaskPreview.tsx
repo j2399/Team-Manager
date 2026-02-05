@@ -71,6 +71,8 @@ type Attachment = {
     type: string
     uploadedBy?: string
     createdAt: string
+    storageProvider?: string
+    externalId?: string | null
 }
 
 type TaskPreviewProps = {
@@ -91,6 +93,16 @@ const formatTimeAgo = (date: string) => {
     if (hours > 0) return `${hours}h ago`
     if (minutes > 0) return `${minutes}m ago`
     return 'Just now'
+}
+
+const getAttachmentUrls = (attachment: Attachment) => {
+    if (attachment.storageProvider === 'google' && attachment.externalId) {
+        return {
+            preview: `https://drive.google.com/uc?export=view&id=${attachment.externalId}`,
+            download: `https://drive.google.com/uc?export=download&id=${attachment.externalId}`
+        }
+    }
+    return { preview: attachment.url, download: attachment.url }
 }
 
 type CommentNodeProps = {
@@ -721,7 +733,8 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
 
     const downloadAllAttachments = async () => {
         for (const attachment of attachments) {
-            await forceDownload(attachment.url, attachment.name)
+            const { download } = getAttachmentUrls(attachment)
+            await forceDownload(download, attachment.name)
             // Small delay between downloads
             await new Promise(resolve => setTimeout(resolve, 300))
         }
@@ -981,6 +994,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                     <div className="flex gap-2 pb-2 min-w-max">
                                         {/* Render all attachments */}
                                         {attachments.map(a => {
+                                            const { preview, download } = getAttachmentUrls(a)
                                             if (deletingIds.has(a.id)) {
                                                 return (
                                                     <div key={a.id} className="relative group bg-muted/80 rounded overflow-hidden border border-border shrink-0 w-24 h-24 flex flex-col items-center justify-center gap-1.5">
@@ -1004,7 +1018,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                                 return (
                                                     <div key={a.id} className={`relative group bg-muted/50 rounded overflow-hidden border border-muted shrink-0 w-24 h-24 flex-shrink-0 ${isSvgFile(a.name) ? 'dark:bg-white' : ''}`}>
                                                         <img
-                                                            src={a.url}
+                                                            src={preview}
                                                             alt={a.name}
                                                             className="w-full h-full object-cover pointer-events-none select-none"
                                                             loading="lazy"
@@ -1013,7 +1027,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation()
-                                                                    setEnlargedImage({ url: a.url, name: a.name })
+                                                                    setEnlargedImage({ url: preview, name: a.name })
                                                                 }}
                                                                 className="p-1.5 bg-background/90 rounded hover:bg-background shadow-sm"
                                                                 title="Enlarge"
@@ -1044,7 +1058,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation()
-                                                                    forceDownload(a.url, a.name)
+                                                                    forceDownload(download, a.name)
                                                                 }}
                                                                 className="p-1 bg-background/90 rounded hover:bg-background shadow-sm"
                                                                 title="Download"
@@ -1064,7 +1078,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                                         </div>
 
                                                         <a
-                                                            href={a.url}
+                                                            href={download}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="flex flex-col items-center justify-center w-full h-full gap-1 group-hover:opacity-50 transition-opacity"
