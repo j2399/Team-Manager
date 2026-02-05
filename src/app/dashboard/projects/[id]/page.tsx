@@ -26,49 +26,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                         select: {
                             id: true,
                             name: true,
-                            order: true,
-                            tasks: {
-                                select: {
-                                    id: true,
-                                    title: true,
-                                    description: true,
-                                    columnId: true,
-                                    assigneeId: true,
-                                    startDate: true,
-                                    endDate: true,
-                                    updatedAt: true,
-                                    requireAttachment: true,
-                                    enableProgress: true,
-                                    attachmentFolderId: true,
-                                    attachmentFolderName: true,
-                                    instructionsFileUrl: true,
-                                    instructionsFileName: true,
-                                    push: {
-                                        select: {
-                                            id: true,
-                                            name: true,
-                                            color: true,
-                                            status: true
-                                        }
-                                    },
-                                    assignee: {
-                                        select: {
-                                            id: true,
-                                            name: true
-                                        }
-                                    },
-                                    assignees: {
-                                        select: {
-                                            user: {
-                                                select: {
-                                                    id: true,
-                                                    name: true
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            order: true
                         },
                         orderBy: { order: "asc" }
                     }
@@ -94,12 +52,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         ...boardData,
         columns: boardData.columns.map((col: any) => ({
             ...col,
-            tasks: col.tasks.map((t: any) => ({
-                ...t,
-                startDate: t.startDate ? t.startDate.toISOString() : null,
-                endDate: t.endDate ? t.endDate.toISOString() : null,
-                updatedAt: t.updatedAt ? t.updatedAt.toISOString() : null
-            }))
+            tasks: []
         }))
     } : null
 

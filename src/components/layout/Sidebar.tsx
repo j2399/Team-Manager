@@ -367,6 +367,68 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
         fetchUsers()
     }, [fetchProjects, fetchUsers])
 
+    // Prefetch lean tasks for projects after list loads (to speed up opening divisions)
+    React.useEffect(() => {
+        if (projects.length === 0 || typeof window === "undefined") return
+        let cancelled = false
+        const maxConcurrent = 2
+        const queue = projects.map((p) => p.id)
+
+        const isFresh = (projectId: string) => {
+            try {
+                const raw = window.sessionStorage.getItem(`cupi:leanTasks:${projectId}`)
+                if (!raw) return false
+                const parsed = JSON.parse(raw) as { ts?: number }
+                if (!parsed?.ts) return false
+                return Date.now() - parsed.ts < 2 * 60 * 1000
+            } catch {
+                return false
+            }
+        }
+
+        const runNext = async () => {
+            if (cancelled) return
+            const projectId = queue.shift()
+            if (!projectId) return
+            if (isFresh(projectId)) {
+                runNext()
+                return
+            }
+            try {
+                const res = await fetch(`/api/projects/${projectId}/tasks?lean=true`)
+                const data = await res.json()
+                if (!res.ok) throw new Error(data?.error || "Failed to prefetch tasks")
+                if (!cancelled && Array.isArray(data?.tasks)) {
+                    window.sessionStorage.setItem(
+                        `cupi:leanTasks:${projectId}`,
+                        JSON.stringify({ ts: Date.now(), tasks: data.tasks })
+                    )
+                }
+            } catch {
+                // ignore
+            } finally {
+                if (!cancelled) runNext()
+            }
+        }
+
+        const start = () => {
+            for (let i = 0; i < maxConcurrent; i += 1) {
+                runNext()
+            }
+        }
+
+        const idle = (window as any).requestIdleCallback
+        if (idle) {
+            idle(start, { timeout: 2000 })
+        } else {
+            setTimeout(start, 800)
+        }
+
+        return () => {
+            cancelled = true
+        }
+    }, [projects])
+
     // When editing project changes, update the lead id state
     React.useEffect(() => {
         if (editingProject) {

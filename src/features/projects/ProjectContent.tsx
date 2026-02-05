@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import dynamic from "next/dynamic"
 import { Button } from "@/components/ui/button"
@@ -106,6 +106,47 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
     const [showPushDialog, setShowPushDialog] = useState(false)
     const [showTimelineDialog, setShowTimelineDialog] = useState(false)
     const [userRole, setUserRole] = useState<string>('Member')
+    const [loadingTasks, setLoadingTasks] = useState(false)
+
+    const leanCacheKey = `cupi:leanTasks:${project.id}`
+    const leanCacheTtlMs = 2 * 60 * 1000
+
+    const [boardState, setBoardState] = useState(() => {
+        if (!board) return board
+        if (typeof window === "undefined") return board
+        try {
+            const raw = window.sessionStorage.getItem(leanCacheKey)
+            if (!raw) return board
+            const parsed = JSON.parse(raw) as { ts?: number; tasks?: TaskType[] }
+            if (!parsed?.tasks || !Array.isArray(parsed.tasks)) return board
+            if (!parsed.ts || Date.now() - parsed.ts > leanCacheTtlMs) return board
+
+            const byColumn = new Map<string, TaskType[]>()
+            parsed.tasks.forEach((task) => {
+                if (!task.columnId) return
+                const list = byColumn.get(task.columnId) || []
+                list.push(task)
+                byColumn.set(task.columnId, list)
+            })
+            byColumn.forEach((list) =>
+                list.sort((a, b) => {
+                    const at = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+                    const bt = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
+                    return bt - at
+                })
+            )
+
+            return {
+                ...board,
+                columns: board.columns.map((col) => ({
+                    ...col,
+                    tasks: byColumn.get(col.id) || []
+                }))
+            }
+        } catch {
+            return board
+        }
+    })
 
     // Handle view change
     const handleViewChange = (newView: 'kanban' | 'gantt') => {
@@ -125,7 +166,7 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
     const projectColor = project.color || "#3b82f6"
 
     // Get all tasks for Gantt chart with column and push info
-    const allTasks = board?.columns.flatMap(col =>
+    const allTasks = boardState?.columns.flatMap(col =>
         col.tasks.map(task => ({
             ...task,
             column: { name: col.name },
@@ -138,8 +179,8 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
 
     // Find task from URL and open preview
     useEffect(() => {
-        if (taskIdFromUrl && board) {
-            for (const col of board.columns) {
+        if (taskIdFromUrl && boardState) {
+            for (const col of boardState.columns) {
                 const task = col.tasks.find(t => t.id === taskIdFromUrl)
                 if (task) {
                     setPreviewTask({ ...task, column: { name: col.name } })
@@ -147,7 +188,7 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                 }
             }
         }
-    }, [taskIdFromUrl, board])
+    }, [taskIdFromUrl, boardState])
 
     // Clear highlight param after animation to prevent repeating on reload/move
     useEffect(() => {
@@ -181,6 +222,97 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
             query ? `/dashboard/projects/${project.id}?${query}` : `/dashboard/projects/${project.id}`
         )
     }
+
+    const applyTasksToBoard = useCallback((tasks: TaskType[]) => {
+        setBoardState((prev) => {
+            if (!prev) return prev
+            const byColumn = new Map<string, TaskType[]>()
+            tasks.forEach((task) => {
+                if (!task.columnId) return
+                const list = byColumn.get(task.columnId) || []
+                list.push(task)
+                byColumn.set(task.columnId, list)
+            })
+            byColumn.forEach((list) =>
+                list.sort((a, b) => {
+                    const at = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
+                    const bt = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
+                    return bt - at
+                })
+            )
+            return {
+                ...prev,
+                columns: prev.columns.map((col) => ({
+                    ...col,
+                    tasks: byColumn.get(col.id) || []
+                }))
+            }
+        })
+    }, [])
+
+    const mergeFullTasks = useCallback((tasks: TaskType[]) => {
+        const fullMap = new Map(tasks.map((t) => [t.id, t]))
+        setBoardState((prev) => {
+            if (!prev) return prev
+            return {
+                ...prev,
+                columns: prev.columns.map((col) => ({
+                    ...col,
+                    tasks: col.tasks.map((task) => ({
+                        ...task,
+                        ...(fullMap.get(task.id) || {})
+                    }))
+                }))
+            }
+        })
+    }, [])
+
+    useEffect(() => {
+        if (!board) return
+        let cancelled = false
+
+        const fetchLeanTasks = async () => {
+            setLoadingTasks(true)
+            try {
+                const res = await fetch(`/api/projects/${project.id}/tasks?lean=true`)
+                const data = await res.json()
+                if (!res.ok) throw new Error(data?.error || "Failed to load tasks")
+                const tasks: TaskType[] = Array.isArray(data?.tasks) ? data.tasks : []
+                if (!cancelled) {
+                    applyTasksToBoard(tasks)
+                    window.sessionStorage.setItem(leanCacheKey, JSON.stringify({ ts: Date.now(), tasks }))
+                }
+            } catch {
+                // ignore
+            } finally {
+                if (!cancelled) setLoadingTasks(false)
+            }
+        }
+
+        const fetchFullTasks = async () => {
+            try {
+                const res = await fetch(`/api/projects/${project.id}/tasks`)
+                const data = await res.json()
+                if (!res.ok) return
+                const tasks: TaskType[] = Array.isArray(data?.tasks) ? data.tasks : []
+                if (!cancelled && tasks.length > 0) {
+                    mergeFullTasks(tasks)
+                }
+            } catch {
+                // ignore
+            }
+        }
+
+        fetchLeanTasks().then(() => {
+            window.setTimeout(() => {
+                if (!cancelled) fetchFullTasks()
+            }, 300)
+        })
+
+        return () => {
+            cancelled = true
+        }
+    }, [board, project.id, applyTasksToBoard, mergeFullTasks, leanCacheKey])
 
     return (
         <div className="flex flex-col h-full animate-fade-in-up">
@@ -260,9 +392,13 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
 
             <div className="flex-1 min-h-0">
                 {view === 'kanban' ? (
-                    board ? (
-                        <Board
-                            board={board}
+                    boardState ? (
+                        <>
+                            {loadingTasks && boardState.columns.every(col => col.tasks.length === 0) && (
+                                <div className="px-4 py-2 text-xs text-muted-foreground">Loading tasks…</div>
+                            )}
+                            <Board
+                                board={boardState}
                             projectId={project.id}
                             projectColor={projectColor}
                             users={users}
@@ -272,7 +408,8 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                             initialNewTask={searchParams.get('newTask') === 'true'}
                             initialAssigneeId={searchParams.get('assigneeId')}
                             initialPushId={pushIdFromUrl}
-                        />
+                            />
+                        </>
                     ) : (
                         <div className="p-10 text-center text-muted-foreground">
                             No Kanban board found for this project.

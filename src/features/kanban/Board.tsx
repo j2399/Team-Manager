@@ -193,13 +193,17 @@ export function Board({
         )
     }, [fetchUserRole])
 
+    useEffect(() => {
+        setColumns(board.columns)
+    }, [board.columns])
+
     const processedHighlightRef = useRef<string | null>(null)
 
     const loadPushTasks = useCallback(async (pushId: string) => {
         if (loadedPushes[pushId] || loadingPushes[pushId]) return
         setLoadingPushes((prev) => ({ ...prev, [pushId]: true }))
         try {
-            const res = await fetch(`/api/projects/${projectId}/tasks?pushId=${encodeURIComponent(pushId)}`)
+            const res = await fetch(`/api/projects/${projectId}/tasks?pushId=${encodeURIComponent(pushId)}&lean=true`)
             const data = await res.json()
             if (!res.ok) throw new Error(data?.error || "Failed to load tasks")
 

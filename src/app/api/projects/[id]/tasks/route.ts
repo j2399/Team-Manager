@@ -36,6 +36,49 @@ export async function GET(
             where.pushId = (pushIdParam === "null" || pushIdParam === "backlog") ? null : pushIdParam
         }
 
+        const lean = searchParams.get("lean") === "true"
+
+        if (lean) {
+            const tasks = await prisma.task.findMany({
+                where,
+                select: {
+                    id: true,
+                    title: true,
+                    description: true,
+                    columnId: true,
+                    assigneeId: true,
+                    startDate: true,
+                    endDate: true,
+                    dueDate: true,
+                    updatedAt: true,
+                    requireAttachment: true,
+                    enableProgress: true,
+                    attachmentFolderId: true,
+                    attachmentFolderName: true,
+                    instructionsFileUrl: true,
+                    instructionsFileName: true,
+                    push: { select: { id: true, name: true, color: true, status: true } },
+                    assignee: { select: { id: true, name: true } },
+                    assignees: {
+                        include: {
+                            user: { select: { id: true, name: true } }
+                        }
+                    }
+                },
+                orderBy: { updatedAt: "desc" }
+            })
+
+            return NextResponse.json({
+                tasks: tasks.map((t) => ({
+                    ...t,
+                    startDate: t.startDate?.toISOString() || null,
+                    endDate: t.endDate?.toISOString() || null,
+                    dueDate: t.dueDate?.toISOString() || null,
+                    updatedAt: t.updatedAt?.toISOString() || null,
+                }))
+            })
+        }
+
         const tasks = await prisma.task.findMany({
             where,
             include: {
