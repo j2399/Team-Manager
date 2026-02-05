@@ -151,21 +151,24 @@ export function TaskChecklist({ taskId, isEditable = true }: TaskChecklistProps)
 
     return (
         <div className="space-y-3">
-            {/* Progress header */}
+            {/* Header + progress */}
             {totalCount > 0 && (
                 <div className="flex items-center gap-2">
-                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div
-                            className={cn(
-                                "h-full rounded-full transition-all duration-300",
-                                progress === 100 ? "bg-green-500" : "bg-primary"
-                            )}
-                            style={{ width: `${progress}%` }}
-                        />
+                    <span className="text-[10px] font-medium text-foreground">Checklist</span>
+                    <div className="ml-auto flex items-center gap-2 min-w-0">
+                        <div className="h-1.5 w-24 sm:w-28 bg-muted rounded-full overflow-hidden">
+                            <div
+                                className={cn(
+                                    "h-full rounded-full transition-all duration-300",
+                                    progress === 100 ? "bg-green-500" : "bg-primary"
+                                )}
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground shrink-0">
+                            {completedCount}/{totalCount}
+                        </span>
                     </div>
-                    <span className="text-[10px] text-muted-foreground shrink-0">
-                        {completedCount}/{totalCount}
-                    </span>
                 </div>
             )}
 
@@ -228,7 +231,7 @@ export function TaskChecklist({ taskId, isEditable = true }: TaskChecklistProps)
                         value={newItemContent}
                         onChange={(e) => setNewItemContent(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        className="flex-1 text-sm bg-transparent border-none outline-none placeholder:text-muted-foreground/50"
+                        className="flex-1 text-[11px] bg-transparent border-none outline-none placeholder:text-muted-foreground/50"
                     />
                     {newItemContent.trim() && (
                         <button

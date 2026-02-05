@@ -1148,7 +1148,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                             if (deletingIds.has(a.id)) {
                                                 return (
                                                     <div key={a.id} className="relative group bg-muted/80 rounded overflow-hidden border border-border shrink-0 w-24 h-24 flex flex-col items-center justify-center gap-1.5">
-                                                        <span className="text-[10px] text-muted-foreground font-medium">Removing...</span>
+                                                        <span className="text-[10px] text-muted-foreground font-medium">Removed</span>
                                                         <Button
                                                             variant="secondary"
                                                             size="sm"
@@ -1268,12 +1268,6 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                             {/* Checklist Section - Only shown if task has checklist items */}
                             {checklistCount > 0 && (
                                 <div className="border-t pt-3">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-[10px] font-medium flex items-center gap-1">
-                                            <ListChecks className="h-3 w-3" />
-                                            Checklist
-                                        </span>
-                                    </div>
                                     <TaskChecklist taskId={task.id} isEditable={true} />
                                 </div>
                             )}
