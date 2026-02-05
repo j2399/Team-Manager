@@ -676,7 +676,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 <div className="space-y-2">
                                     <Label htmlFor="title" className="text-sm font-medium flex items-center gap-2">
                                         Task Title
-                                        <span className="text-[10px] font-normal text-muted-foreground">Required</span>
+                                        <span className="text-[10px] font-normal text-destructive">Required</span>
                                     </Label>
                                     <Input
                                         id="title"
@@ -690,7 +690,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 <div className="space-y-2">
                                     <Label htmlFor="description" className="text-sm font-medium flex items-center gap-2">
                                         Description
-                                        <span className="text-[10px] font-normal text-muted-foreground">Required</span>
+                                        <span className="text-[10px] font-normal text-destructive">Required</span>
                                     </Label>
                                     <Textarea
                                         id="description"
@@ -706,7 +706,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium flex items-center gap-2">
                                         Assignees
-                                        <span className="text-[10px] font-normal text-muted-foreground">Required</span>
+                                        <span className="text-[10px] font-normal text-destructive">Required</span>
                                     </Label>
                                     <Popover>
                                         <PopoverTrigger asChild>
@@ -773,7 +773,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 <div className="space-y-2">
                                     <Label htmlFor="startDate" className="text-sm font-medium flex items-center gap-2">
                                         Start Date
-                                        <span className="text-[10px] font-normal text-muted-foreground">Required</span>
+                                        <span className="text-[10px] font-normal text-destructive">Required</span>
                                     </Label>
                                     <DatePicker
                                         id="startDate"
@@ -788,7 +788,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <Label htmlFor="endDate" className="text-sm font-medium">Due Date</Label>
-                                        <span className="text-[10px] font-normal text-muted-foreground">Required</span>
+                                        <span className="text-[10px] font-normal text-destructive">Required</span>
                                     </div>
                                     {!task && startDate && (
                                         <div className="flex gap-2">
@@ -824,26 +824,23 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                         Submission Folder
                                         <span className="text-xs font-normal text-muted-foreground">(Google Drive)</span>
                                         {requiresDriveFolder && (
-                                            <span className="text-[10px] font-medium text-muted-foreground">Required</span>
+                                            <span className="text-[10px] font-medium text-destructive">Required</span>
                                         )}
                                     </Label>
-                                    <div className="flex items-center justify-between gap-2 p-3 bg-muted/30 rounded-lg border">
+                                    <button
+                                        type="button"
+                                        onClick={openFolderPicker}
+                                        disabled={driveLoading}
+                                        className="w-full flex items-center justify-between gap-2 p-3 bg-muted/30 rounded-lg border hover:bg-muted/40 transition-colors disabled:opacity-60"
+                                    >
                                         <div className="flex items-center gap-2 min-w-0">
                                             <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
                                             <span className="text-sm font-medium truncate">
                                                 {selectedFolder?.name || "Select a folder"}
                                             </span>
                                         </div>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={openFolderPicker}
-                                            disabled={driveLoading}
-                                        >
-                                            {driveLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Change"}
-                                        </Button>
-                                    </div>
+                                        {driveLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />}
+                                    </button>
                                     <p className="text-[11px] text-muted-foreground">
                                         Attachments uploaded to this task will be stored in this Drive folder.
                                     </p>
