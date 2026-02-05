@@ -4,12 +4,13 @@ import { useState, useTransition } from "react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Check, Loader2, Pencil, X } from "lucide-react"
+import { BarChart3, Check, ChevronDown, ChevronRight, Loader2, Pencil, X } from "lucide-react"
 import { RoleSelect } from "../members/RoleSelect"
 import { ProjectSelect } from "../members/ProjectSelect"
 import { MemberActions } from "../members/MemberActions"
 import { updateMemberName } from "@/app/actions/user-settings"
 import { useRouter } from "next/navigation"
+import { WorkloadSettings } from "./WorkloadSettings"
 
 type Project = {
     id: string
@@ -30,6 +31,7 @@ type MembersTabProps = {
     allProjects: Project[]
     currentUserEmail: string
     canManage: boolean
+    showWorkload: boolean
 }
 
 function EditableName({
@@ -118,7 +120,9 @@ function EditableName({
     )
 }
 
-export function MembersTab({ members, allProjects, currentUserEmail, canManage }: MembersTabProps) {
+export function MembersTab({ members, allProjects, currentUserEmail, canManage, showWorkload }: MembersTabProps) {
+    const [workloadOpen, setWorkloadOpen] = useState(false)
+
     return (
         <div className="space-y-6">
             <div>
@@ -209,6 +213,40 @@ export function MembersTab({ members, allProjects, currentUserEmail, canManage }
                     </table>
                 </div>
             </div>
+
+            {showWorkload && (
+                <div className="space-y-3">
+                    <div>
+                        <h3 className="text-sm font-semibold">Workload Scoring</h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            Configure how team member status is computed on the heatmap.
+                        </p>
+                    </div>
+
+                    <div className="border rounded-lg overflow-hidden">
+                        <button
+                            onClick={() => setWorkloadOpen(!workloadOpen)}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/50 transition-colors"
+                        >
+                            <BarChart3 className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium">Advanced Scoring Configuration</p>
+                                <p className="text-xs text-muted-foreground">Thresholds, weights, capacity, and baseline settings</p>
+                            </div>
+                            {workloadOpen ? (
+                                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                            ) : (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                            )}
+                        </button>
+                        {workloadOpen && (
+                            <div className="border-t px-4 py-4">
+                                <WorkloadSettings />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

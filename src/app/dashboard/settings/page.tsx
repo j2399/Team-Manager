@@ -108,7 +108,6 @@ export default async function SettingsPage() {
                         userRole={user.role}
                         inviteCode={workspace?.inviteCode || null}
                         inviteLink={workspace?.inviteCode ? appUrl(`/invite/${workspace.inviteCode}`) : null}
-                        showWorkload={user.role === "Admin"}
                     />
                 ),
                 members: (
@@ -117,6 +116,7 @@ export default async function SettingsPage() {
                         allProjects={allProjects}
                         currentUserEmail={user.email}
                         canManage={isAdmin}
+                        showWorkload={user.role === "Admin"}
                     />
                 ),
                 integrations: (
