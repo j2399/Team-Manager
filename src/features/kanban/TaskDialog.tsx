@@ -13,7 +13,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { DatePicker } from "@/components/ui/date-picker"
+import { DateRangePicker } from "@/components/ui/date-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -399,17 +399,25 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
     const [isLoading, setIsLoading] = useState(false)
 
+    const hasTitle = title.trim().length > 0
+    const hasDescription = description.trim().length > 0
+    const hasAssignees = assigneeIds.length > 0
+    const hasDateRange = startDate !== "" && endDate !== ""
+    const hasDriveFolder = !!selectedFolder
+
+    const requiredTagClass = (met: boolean) =>
+        `text-[10px] font-normal ${met ? "text-foreground" : "text-destructive"}`
+
     // Validation - all fields required
     const isValid = useMemo(() => {
         return (
-            title.trim().length > 0 &&
-            description.trim().length > 0 &&
-            assigneeIds.length > 0 &&
-            startDate !== "" &&
-            endDate !== "" &&
-            (!requiresDriveFolder || !!selectedFolder)
+            hasTitle &&
+            hasDescription &&
+            hasAssignees &&
+            hasDateRange &&
+            (!requiresDriveFolder || hasDriveFolder)
         )
-    }, [title, description, assigneeIds, startDate, endDate, requiresDriveFolder, selectedFolder])
+    }, [hasTitle, hasDescription, hasAssignees, hasDateRange, requiresDriveFolder, hasDriveFolder])
 
     const toggleAssignee = (userId: string) => {
         setAssigneeIds(prev =>
@@ -626,20 +634,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         }
     }
 
-    const handleAddDay = () => {
-        const base = endDate ? new Date(endDate) : (startDate ? new Date(startDate) : new Date(today))
-        const next = new Date(base)
-        next.setDate(base.getDate() + 1)
-        setEndDate(next.toISOString().split('T')[0])
-    }
-
-    const handleAddWeek = () => {
-        const base = endDate ? new Date(endDate) : (startDate ? new Date(startDate) : new Date(today))
-        const next = new Date(base)
-        next.setDate(base.getDate() + 7)
-        setEndDate(next.toISOString().split('T')[0])
-    }
-
     return (
         <>
             <Dialog open={open} onOpenChange={isControlled ? onOpenChange : setInternalOpen}>
@@ -676,7 +670,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 <div className="space-y-2">
                                     <Label htmlFor="title" className="text-sm font-medium flex items-center gap-2">
                                         Task Title
-                                        <span className="text-[10px] font-normal text-destructive">Required</span>
+                                        <span className={requiredTagClass(hasTitle)}>Required</span>
                                     </Label>
                                     <Input
                                         id="title"
@@ -690,7 +684,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 <div className="space-y-2">
                                     <Label htmlFor="description" className="text-sm font-medium flex items-center gap-2">
                                         Description
-                                        <span className="text-[10px] font-normal text-destructive">Required</span>
+                                        <span className={requiredTagClass(hasDescription)}>Required</span>
                                     </Label>
                                     <Textarea
                                         id="description"
@@ -706,7 +700,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium flex items-center gap-2">
                                         Assignees
-                                        <span className="text-[10px] font-normal text-destructive">Required</span>
+                                        <span className={requiredTagClass(hasAssignees)}>Required</span>
                                     </Label>
                                     <Popover>
                                         <PopoverTrigger asChild>
@@ -771,60 +765,33 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="startDate" className="text-sm font-medium flex items-center gap-2">
-                                        Start Date
-                                        <span className="text-[10px] font-normal text-destructive">Required</span>
+                                    <Label htmlFor="taskDates" className="text-sm font-medium flex items-center gap-2">
+                                        Dates
+                                        <span className={requiredTagClass(hasDateRange)}>Required</span>
                                     </Label>
-                                    <DatePicker
-                                        id="startDate"
-                                        value={startDate}
-                                        onChange={setStartDate}
+                                    <DateRangePicker
+                                        id="taskDates"
+                                        startDate={startDate}
+                                        endDate={endDate}
+                                        onChange={(start, end) => {
+                                            setStartDate(start)
+                                            setEndDate(end)
+                                        }}
                                         className="h-10"
+                                        quickActions={!task ? [
+                                            { label: "+1 Day", days: 1 },
+                                            { label: "+7 Days", days: 7 }
+                                        ] : []}
                                     />
                                 </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <Label htmlFor="endDate" className="text-sm font-medium">Due Date</Label>
-                                        <span className="text-[10px] font-normal text-destructive">Required</span>
-                                    </div>
-                                    {!task && startDate && (
-                                        <div className="flex gap-2">
-                                            <button
-                                                type="button"
-                                                className="text-xs text-primary hover:underline font-medium"
-                                                onClick={handleAddDay}
-                                            >
-                                                + 1 Day
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="text-xs text-primary hover:underline font-medium"
-                                                onClick={handleAddWeek}
-                                            >
-                                                + 7 Days
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                                <DatePicker
-                                    id="endDate"
-                                    value={endDate}
-                                    onChange={setEndDate}
-                                    min={startDate}
-                                    className="h-10"
-                                />
                             </div>
 
                             {driveConfig?.connected && rootId && (
                                 <div className="space-y-2">
                                     <Label className="text-sm font-medium flex items-center gap-2">
                                         Submission Folder
-                                        <span className="text-xs font-normal text-muted-foreground">(Google Drive)</span>
                                         {requiresDriveFolder && (
-                                            <span className="text-[10px] font-medium text-destructive">Required</span>
+                                            <span className={requiredTagClass(hasDriveFolder)}>Required</span>
                                         )}
                                     </Label>
                                     <button
