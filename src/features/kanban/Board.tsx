@@ -951,6 +951,13 @@ export function Board({
                 next.add(pushId)
                 return next
             })
+        } else {
+            setCollapsedPushes((prev) => {
+                const next = new Set(prev)
+                next.delete(pushId)
+                return next
+            })
+            void loadPushTasks(pushId)
         }
         try {
             await updatePush({ id: pushId, status })
@@ -1166,30 +1173,39 @@ export function Board({
                                                     {push.name}
                                                 </span>
                                                 {isAdmin && (isComplete || allTasksDone) && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            setPushStatus(push.id, isComplete ? 'Active' : 'Completed')
-                                                        }}
-                                                        className={cn(
-                                                            "h-7 inline-flex items-center overflow-hidden rounded-md border text-xs font-medium transition-[max-width,padding,border-color,background-color] duration-200 ease-out",
-                                                            isComplete
-                                                                ? "max-w-7 px-0 gap-0 border-transparent bg-transparent text-green-600 justify-center"
-                                                                : "max-w-[140px] px-2 gap-1 border-green-200 bg-green-50 text-green-600 hover:bg-green-100"
-                                                        )}
-                                                        title={isComplete ? "Mark as not complete" : "Mark this push complete"}
-                                                    >
-                                                        <CheckCircle2 className="h-3.5 w-3.5" />
-                                                        <span
-                                                            className={cn(
-                                                                "hidden sm:inline whitespace-nowrap transition-all duration-200",
-                                                                isComplete ? "opacity-0 w-0 translate-x-1" : "opacity-100"
-                                                            )}
-                                                        >
-                                                            Mark Complete
-                                                        </span>
-                                                    </button>
+                                                    <TooltipProvider delayDuration={100}>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        setPushStatus(push.id, isComplete ? 'Active' : 'Completed')
+                                                                    }}
+                                                                    className={cn(
+                                                                        "h-7 inline-flex items-center overflow-hidden rounded-md border text-xs font-medium transition-[max-width,padding,border-color,background-color] duration-200 ease-out",
+                                                                        isComplete
+                                                                            ? "max-w-7 px-0 gap-0 border-transparent bg-transparent text-green-600 justify-center"
+                                                                            : "max-w-[140px] px-2 gap-1 border-green-200 bg-green-50 text-green-600 hover:bg-green-100"
+                                                                    )}
+                                                                    title={isComplete ? "Mark as not complete" : "Mark this push complete"}
+                                                                >
+                                                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                                                    <span
+                                                                        className={cn(
+                                                                            "hidden sm:inline whitespace-nowrap transition-all duration-200",
+                                                                            isComplete ? "opacity-0 w-0 translate-x-1" : "opacity-100"
+                                                                        )}
+                                                                    >
+                                                                        Mark Complete
+                                                                    </span>
+                                                                </button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent side="top" className="text-xs">
+                                                                {isComplete ? "Click to unmark complete" : "Mark this project complete"}
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
                                                 )}
                                             </div>
 

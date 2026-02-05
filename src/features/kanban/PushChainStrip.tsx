@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { ChevronDown, Pencil, Plus, Lock, CheckCircle2 } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 type PushType = {
     id: string
@@ -389,36 +390,48 @@ export function PushChainStrip({
                                             {push.name}
                                         </span>
                                         {isAdmin && (pushIsComplete || isAllDone(push.id)) && (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    if (pushIsComplete) {
-                                                        onUnmarkComplete(push)
-                                                        return
-                                                    }
-                                                    onMarkComplete(push)
-                                                    setIsContentOpen(false)
-                                                    setUserSelectedPushId(null)
-                                                }}
-                                                className={cn(
-                                                    "h-7 inline-flex items-center overflow-hidden rounded-md border text-xs font-medium transition-[max-width,padding,border-color,background-color] duration-200 ease-out",
-                                                    pushIsComplete
-                                                        ? "max-w-7 px-0 gap-0 border-transparent bg-transparent text-green-600 justify-center"
-                                                        : "max-w-[140px] px-2 gap-1 border-green-200 bg-green-50 text-green-600 hover:bg-green-100"
-                                                )}
-                                                title={pushIsComplete ? "Mark as not complete" : "Mark this push complete"}
-                                            >
-                                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                                <span
-                                                    className={cn(
-                                                        "hidden sm:inline whitespace-nowrap transition-all duration-200",
-                                                        pushIsComplete ? "opacity-0 w-0 translate-x-1" : "opacity-100"
-                                                    )}
-                                                >
-                                                    Mark Complete
-                                                </span>
-                                            </button>
+                                            <TooltipProvider delayDuration={100}>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                if (pushIsComplete) {
+                                                                    onUnmarkComplete(push)
+                                                                    setUserSelectedPushId(push.id)
+                                                                    setIsContentOpen(true)
+                                                                    ensureTasksLoaded(push.id)
+                                                                    return
+                                                                }
+                                                                onMarkComplete(push)
+                                                                setIsContentOpen(false)
+                                                                setUserSelectedPushId(null)
+                                                            }}
+                                                            className={cn(
+                                                                "h-7 inline-flex items-center overflow-hidden rounded-md border text-xs font-medium transition-[max-width,padding,border-color,background-color] duration-200 ease-out",
+                                                                pushIsComplete
+                                                                    ? "max-w-7 px-0 gap-0 border-transparent bg-transparent text-green-600 justify-center"
+                                                                    : "max-w-[140px] px-2 gap-1 border-green-200 bg-green-50 text-green-600 hover:bg-green-100"
+                                                            )}
+                                                            title={pushIsComplete ? "Mark as not complete" : "Mark this push complete"}
+                                                        >
+                                                            <CheckCircle2 className="h-3.5 w-3.5" />
+                                                            <span
+                                                                className={cn(
+                                                                    "hidden sm:inline whitespace-nowrap transition-all duration-200",
+                                                                    pushIsComplete ? "opacity-0 w-0 translate-x-1" : "opacity-100"
+                                                                )}
+                                                            >
+                                                                Mark Complete
+                                                            </span>
+                                                        </button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="top" className="text-xs">
+                                                        {pushIsComplete ? "Click to unmark complete" : "Mark this project complete"}
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
                                         )}
 
                                         {isAdmin && (
