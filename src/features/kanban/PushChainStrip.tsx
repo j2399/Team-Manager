@@ -20,9 +20,11 @@ type PushType = {
 type PushChainStripProps = {
     chain: PushType[]
     isComplete: (pushId: string) => boolean
+    isAllDone: (pushId: string) => boolean
     isAdmin: boolean
     onEditPush: (e: React.MouseEvent, push: PushType) => void
     onAddTask: (push: PushType) => void
+    onMarkComplete: (push: PushType) => void
     loadPushTasks: (pushId: string) => void
     loadedPushes: Record<string, true>
     loadingPushes: Record<string, true>
@@ -39,9 +41,11 @@ type AnimationPhase = 'filling' | 'transitioning' | 'fading' | null
 export function PushChainStrip({
     chain,
     isComplete,
+    isAllDone,
     isAdmin,
     onEditPush,
     onAddTask,
+    onMarkComplete,
     loadPushTasks,
     loadedPushes,
     loadingPushes,
@@ -382,6 +386,22 @@ export function PushChainStrip({
                                         )}>
                                             {push.name}
                                         </span>
+                                        {isAdmin && isAllDone(push.id) && !pushIsComplete && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    onMarkComplete(push)
+                                                    setIsContentOpen(false)
+                                                    setUserSelectedPushId(null)
+                                                }}
+                                                className="h-7 flex items-center gap-1 px-2 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-medium hover:bg-emerald-100 transition-colors"
+                                                title="Mark this push complete"
+                                            >
+                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                                <span className="hidden sm:inline">Mark Complete</span>
+                                            </button>
+                                        )}
                                         {pushIsComplete && (
                                             <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
                                         )}

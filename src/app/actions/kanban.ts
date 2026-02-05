@@ -397,7 +397,7 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
             updateData.approvedAt = null
         }
 
-        const updatedTask = await prisma.task.update({
+        let updatedTask = await prisma.task.update({
             where: { id: taskId },
             data: updateData,
             include: {
@@ -418,6 +418,18 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
                 }
             }
         })
+
+        // If a completed push has tasks moved out of Done, reopen it (manual completion required again)
+        if (updatedTask.push?.id && updatedTask.push.status === 'Completed' && targetColumnName !== 'Done') {
+            await prisma.push.update({
+                where: { id: updatedTask.push.id },
+                data: { status: 'Active' }
+            })
+            updatedTask = {
+                ...updatedTask,
+                push: { ...updatedTask.push, status: 'Active' }
+            }
+        }
 
         // Create activity log for status change
         await prisma.activityLog.create({

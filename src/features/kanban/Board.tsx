@@ -128,6 +128,7 @@ export function Board({
     )
     const [loadingPushes, setLoadingPushes] = useState<Record<string, true>>({})
     const [loadedPushes, setLoadedPushes] = useState<Record<string, true>>({})
+    const [pushStatusOverrides, setPushStatusOverrides] = useState<Record<string, 'Active' | 'Completed'>>({})
     const { toast } = useToast()
 
     // Dialog States
@@ -534,6 +535,13 @@ export function Board({
                 if (originalColumnId) setColumns(board.columns)
                 return false
             }
+            const push = result.task?.push
+            if (push?.id && push.status) {
+                setPushStatusOverrides((prev) => ({
+                    ...prev,
+                    [push.id]: push.status as 'Active' | 'Completed'
+                }))
+            }
             return true
         } catch (e) {
             console.error('Save failed:', e)
@@ -921,15 +929,32 @@ export function Board({
         return !!push && push.taskCount > 0 && push.completedCount === push.taskCount
     }
 
+    const getPushStatus = (pushId: string) => {
+        return pushStatusOverrides[pushId] ?? pushes.find((p) => p.id === pushId)?.status ?? 'Active'
+    }
+
     const isPushMarkedComplete = (pushId: string) => {
-        const push = pushes.find((p) => p.id === pushId)
-        return push?.status === 'Completed'
+        return getPushStatus(pushId) === 'Completed'
     }
 
     const isPushLocked = (push: PushType) => {
         if (!push.dependsOnId) return false
         // A push is locked if its parent is not complete
         return !isPushMarkedComplete(push.dependsOnId)
+    }
+
+    const markPushComplete = async (pushId: string) => {
+        setPushStatusOverrides((prev) => ({ ...prev, [pushId]: 'Completed' }))
+        setCollapsedPushes((prev) => {
+            const next = new Set(prev)
+            next.add(pushId)
+            return next
+        })
+        try {
+            await updatePush({ id: pushId, status: 'Completed' })
+        } catch {
+            setPushStatusOverrides((prev) => ({ ...prev, [pushId]: 'Active' }))
+        }
     }
 
     const getParentPushName = (parentId: string) => {
@@ -1072,6 +1097,8 @@ export function Board({
                                     <PushChainStrip
                                         chain={chain}
                                         isComplete={isPushMarkedComplete}
+                                        isAllDone={isPushAllDone}
+                                        onMarkComplete={(push) => markPushComplete(push.id)}
                                         isAdmin={isAdmin}
                                         onEditPush={handleEditPush}
                                         onAddTask={(push) => {
@@ -1097,7 +1124,7 @@ export function Board({
                         const push = chain[0]
                         const pushColumns = getPushTasks(push.id)
                         const allTasksDone = isPushAllDone(push.id)
-                        const isComplete = push.status === 'Completed'
+                        const isComplete = isPushMarkedComplete(push.id)
                         const isLocked = isPushLocked(push)
                         const isCollapsed = collapsedPushes.has(push.id)
                         const isOpen = !isCollapsed
@@ -1135,6 +1162,20 @@ export function Board({
                                                 )}>
                                                     {push.name}
                                                 </span>
+                                                {isAdmin && allTasksDone && !isComplete && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation()
+                                                            markPushComplete(push.id)
+                                                        }}
+                                                        className="h-7 flex items-center gap-1 px-2 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-medium hover:bg-emerald-100 transition-colors"
+                                                        title="Mark this push complete"
+                                                    >
+                                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                                        <span className="hidden sm:inline">Mark Complete</span>
+                                                    </button>
+                                                )}
                                                 {isComplete && (
                                                     <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
                                                 )}
@@ -1203,21 +1244,6 @@ export function Board({
                                                 <span className="hidden md:inline text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded">
                                                     {new Date(push.startDate).toLocaleDateString([], { month: 'short', day: 'numeric' })} - {push.endDate ? new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Ongoing'}
                                                 </span>
-                                            )}
-                                            {isAdmin && allTasksDone && !isComplete && (
-                                                <button
-                                                    type="button"
-                                                    onClick={async (e) => {
-                                                        e.stopPropagation()
-                                                        await updatePush({ id: push.id, status: 'Completed' })
-                                                        router.refresh()
-                                                    }}
-                                                    className="h-7 flex items-center gap-1 px-2 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-medium hover:bg-emerald-100 transition-colors"
-                                                    title="Mark this push complete"
-                                                >
-                                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                                    <span className="hidden sm:inline">Mark Complete</span>
-                                                </button>
                                             )}
                                             {isAdmin && (
                                                 <div
