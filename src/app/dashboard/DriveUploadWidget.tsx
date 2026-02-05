@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react"
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react"
 import Link from "next/link"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
@@ -84,8 +84,13 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Props
     const [dragOver, setDragOver] = useState(false)
     const [spinning, setSpinning] = useState(false)
     const [showAllFiles, setShowAllFiles] = useState(false)
+    const [maxFilesToShow, setMaxFilesToShow] = useState(3)
 
     const inputRef = useRef<HTMLInputElement>(null)
+    const widgetRef = useRef<HTMLDivElement>(null)
+    const foldersRef = useRef<HTMLDivElement>(null)
+    const fileRowRef = useRef<HTMLAnchorElement>(null)
+    const dividerRef = useRef<HTMLDivElement>(null)
     const dcRef = useRef(0)
 
     const root = initialConfig.folderId
@@ -273,6 +278,34 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Props
         setSpinning(false)
     }
 
+    const getViewport = () =>
+        widgetRef.current?.querySelector("[data-slot='scroll-area-viewport']") as HTMLDivElement | null
+
+    useLayoutEffect(() => {
+        const viewport = getViewport()
+        if (!viewport) return
+
+        const measure = () => {
+            const rowHeight = fileRowRef.current?.offsetHeight || 0
+            if (!rowHeight) return
+            const viewportHeight = viewport.clientHeight
+            const foldersHeight = foldersRef.current?.offsetHeight || 0
+            const dividerHeight = dividerRef.current?.offsetHeight || 0
+            const available = viewportHeight - foldersHeight - dividerHeight - 8
+            const nextMax = Math.max(3, Math.floor(available / rowHeight))
+            setMaxFilesToShow(nextMax)
+        }
+
+        measure()
+        const ro = new ResizeObserver(measure)
+        ro.observe(viewport)
+        if (foldersRef.current) ro.observe(foldersRef.current)
+        return () => ro.disconnect()
+    }, [children.length, files.length, loadingFiles, loading])
+
+    const shouldCollapseFiles = files.length > maxFilesToShow
+    const visibleFiles = showAllFiles || !shouldCollapseFiles ? files : files.slice(0, maxFilesToShow)
+
     const onInput = (e: ChangeEvent<HTMLInputElement>) => {
         const f = Array.from(e.target.files || [])
         if (f.length) pick(f)
@@ -308,10 +341,23 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Props
                 dragOver && "ring-2 ring-blue-400 ring-inset",
                 className
             )}
+            ref={widgetRef}
             onDragEnter={onEnter}
             onDragLeave={onLeave}
             onDragOver={onOver}
             onDrop={onDrop}
+            onWheel={(e) => {
+                const viewport = getViewport()
+                if (!viewport) return
+                const canScroll = viewport.scrollHeight > viewport.clientHeight
+                if (!canScroll) return
+                const atTop = viewport.scrollTop <= 0
+                const atBottom = viewport.scrollTop + viewport.clientHeight >= viewport.scrollHeight - 1
+                if ((e.deltaY < 0 && atTop) || (e.deltaY > 0 && atBottom)) {
+                    return
+                }
+                e.stopPropagation()
+            }}
         >
             <input ref={inputRef} type="file" multiple className="hidden" onChange={onInput} />
 
@@ -340,7 +386,8 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Props
                             <button
                                 onClick={() => jumpTo(i)}
                                 className={cn(
-                                    "px-1 py-0.5 rounded transition-colors truncate max-w-[90px]",
+                                    "px-1 py-0.5 rounded transition-colors truncate",
+                                    i === crumbs.length - 1 ? "max-w-[220px] sm:max-w-[320px]" : "max-w-[140px]",
                                     i === crumbs.length - 1
                                         ? "font-medium text-foreground"
                                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -398,21 +445,23 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Props
                 <ScrollArea className="flex-1">
                     <div className="py-1">
                         {/* folders */}
-                        {children.map((f) => (
-                            <button
-                                key={f.id}
-                                onClick={() => clickFolder(f)}
-                                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left hover:bg-muted/50 transition-colors group"
-                            >
-                                <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
-                                <span className="flex-1 text-xs truncate">{f.name}</span>
-                                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 group-hover:text-muted-foreground transition-colors" />
-                            </button>
-                        ))}
+                        <div ref={foldersRef}>
+                            {children.map((f) => (
+                                <button
+                                    key={f.id}
+                                    onClick={() => clickFolder(f)}
+                                    className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left hover:bg-muted/50 transition-colors group"
+                                >
+                                    <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    <span className="flex-1 text-xs truncate">{f.name}</span>
+                                    <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 group-hover:text-muted-foreground transition-colors" />
+                                </button>
+                            ))}
+                        </div>
 
                         {/* divider */}
                         {children.length > 0 && files.length > 0 && !loadingFiles && (
-                            <div className="border-t border-border mx-3 my-1" />
+                            <div ref={dividerRef} className="border-t border-border mx-3 my-1" />
                         )}
 
                         {/* files */}
@@ -422,12 +471,13 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Props
                             </div>
                         ) : (
                             <>
-                                {(showAllFiles ? files : files.slice(0, 3)).map((f) => {
+                                {visibleFiles.map((f, idx) => {
                                     const Icon = fileIcon(f.mimeType)
                                     const url = f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`
                                     return (
                                         <a
                                             key={f.id}
+                                            ref={idx === 0 ? fileRowRef : undefined}
                                             href={url}
                                             target="_blank"
                                             rel="noopener noreferrer"
@@ -440,12 +490,12 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Props
                                         </a>
                                     )
                                 })}
-                                {files.length > 3 && (
+                                {shouldCollapseFiles && (
                                     <button
                                         onClick={() => setShowAllFiles((v) => !v)}
                                         className="w-full flex items-center justify-center gap-1 px-3 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
                                     >
-                                        {showAllFiles ? "Show less" : `${files.length - 3} more files`}
+                                        {showAllFiles ? "Show less" : `${files.length - maxFilesToShow} more files`}
                                         <ChevronDown className={cn("h-3 w-3 transition-transform", showAllFiles && "rotate-180")} />
                                     </button>
                                 )}
