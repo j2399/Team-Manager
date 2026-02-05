@@ -42,7 +42,7 @@ export default async function SettingsPage() {
     }
 
     const isAdmin = user.role === "Admin" || user.role === "Team Lead"
-    const headerList = headers()
+    const headerList = await headers()
     const forwardedHost = headerList.get("x-forwarded-host")
     const host = forwardedHost || headerList.get("host")
     const forwardedProto = headerList.get("x-forwarded-proto")
