@@ -537,7 +537,7 @@ function DateRangePicker({
                                             {isToday(day) && (
                                                 <span
                                                     className={cn(
-                                                        "text-[7px] leading-none mt-0.5",
+                                                        "text-[7px] leading-none mt-0",
                                                         (isStart || isEnd) ? "text-primary-foreground/80" : "text-muted-foreground"
                                                     )}
                                                 >

@@ -143,7 +143,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         if (open) {
             setError(null)
             folderInitRef.current = false
-            setFolderTree([])
             setPickerOpen(false)
             setCurrentFolderId(null)
             setSelectedFolder(null)
@@ -340,18 +339,16 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
     const openFolderPicker = async () => {
         if (!rootId) return
-        setPickerOpen(true)
+        const cached = readCachedTree()
+        const cachedAt = readCachedTreeTime()
+        const isStale = !cachedAt || Date.now() - cachedAt > folderCacheTtlMs
+        if (cached && cached.length > 0) {
+            setFolderTree(cached)
+        }
         setCurrentFolderId(rootId)
-        if (folderTree.length === 0) {
-            const cached = readCachedTree()
-            const cachedAt = readCachedTreeTime()
-            const isStale = !cachedAt || Date.now() - cachedAt > folderCacheTtlMs
-            if (cached && cached.length > 0) {
-                setFolderTree(cached)
-            }
-            if (!cached || isStale) {
-                await loadFolderTree(true)
-            }
+        setPickerOpen(true)
+        if (!cached || isStale) {
+            await loadFolderTree(true)
         }
     }
 
@@ -832,11 +829,11 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                             type="button"
                                             onClick={openFolderPicker}
                                             disabled={driveLoading}
-                                            className="w-full flex items-center justify-between gap-2 p-3 pr-16 bg-muted/30 rounded-lg border hover:bg-muted/40 transition-colors disabled:opacity-60"
+                                            className="w-full h-10 flex items-center justify-between gap-2 px-3 pr-16 bg-background rounded-md border hover:bg-muted/30 transition-colors disabled:opacity-60"
                                         >
                                             <div className="flex items-center gap-2 min-w-0">
                                                 <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
-                                                <span className="text-sm font-medium truncate">
+                                                <span className="text-sm font-normal truncate">
                                                     {selectedFolder?.name || "Select a folder"}
                                                 </span>
                                             </div>
