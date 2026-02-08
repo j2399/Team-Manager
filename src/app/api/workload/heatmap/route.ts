@@ -3,16 +3,13 @@ import prisma from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/auth"
 import { buildWorkloadTasks, computeWorkloadStats, getWorkloadConfig } from "@/lib/workload"
 
-export async function GET(request: Request) {
+export async function GET() {
     const user = await getCurrentUser()
     if (!user || !user.workspaceId) {
         return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
 
     try {
-        const requestUrl = new URL(request.url)
-        const summaryMode = requestUrl.searchParams.get("summary") === "1"
-        const requestedUserId = requestUrl.searchParams.get("userId")
         const workspaceId = user.workspaceId
         const [config, memberships, tasks, projects] = await Promise.all([
             getWorkloadConfig(workspaceId),
@@ -135,25 +132,6 @@ export async function GET(request: Request) {
                 message: `${totalUnassigned} tasks unassigned`,
                 count: totalUnassigned,
                 tasks: workloadTasks.filter(t => t.isUnassigned)
-            })
-        }
-
-        if (requestedUserId) {
-            const userStat = sortedUserStats.find((userStat) => userStat.id === requestedUserId)
-            if (!userStat) {
-                return NextResponse.json({ error: "User not found in workload stats" }, { status: 404 })
-            }
-            return NextResponse.json({ userStat })
-        }
-
-        if (summaryMode) {
-            return NextResponse.json({
-                userIds: sortedUserStats.map((userStat) => userStat.id),
-                criticalIssues,
-                overloadedUsers,
-                idleUsers,
-                allTasks: workloadTasks,
-                projects
             })
         }
 

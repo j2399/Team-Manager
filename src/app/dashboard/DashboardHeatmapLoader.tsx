@@ -13,103 +13,29 @@ type HeatmapResponse = {
     projects: any[]
 }
 
-type HeatmapSummaryResponse = {
-    userIds: string[]
-    criticalIssues: any[]
-    overloadedUsers: any[]
-    idleUsers: any[]
-    allTasks: any[]
-    projects: any[]
-}
-
 export function DashboardHeatmapLoader() {
-    const [data, setData] = useState<HeatmapResponse>({
-        userStats: [],
-        criticalIssues: [],
-        overloadedUsers: [],
-        idleUsers: [],
-        allTasks: [],
-        projects: []
-    })
+    const [data, setData] = useState<HeatmapResponse | null>(null)
     const [loading, setLoading] = useState(true)
-    const [hasMeta, setHasMeta] = useState(false)
 
     useEffect(() => {
         let cancelled = false
         const load = async () => {
             try {
-                const summaryRes = await fetch("/api/workload/heatmap?summary=1", { cache: "no-store" })
-                const summaryPayload = await summaryRes.json() as HeatmapSummaryResponse
-                if (!summaryRes.ok) {
-                    throw new Error("Failed to load workload summary")
-                }
-
-                const userIds = Array.isArray(summaryPayload?.userIds) ? summaryPayload.userIds : []
-                if (cancelled) return
-
-                setData((prev) => ({
-                    ...prev,
-                    criticalIssues: Array.isArray(summaryPayload?.criticalIssues) ? summaryPayload.criticalIssues : [],
-                    overloadedUsers: Array.isArray(summaryPayload?.overloadedUsers) ? summaryPayload.overloadedUsers : [],
-                    idleUsers: Array.isArray(summaryPayload?.idleUsers) ? summaryPayload.idleUsers : [],
-                    allTasks: Array.isArray(summaryPayload?.allTasks) ? summaryPayload.allTasks : [],
-                    projects: Array.isArray(summaryPayload?.projects) ? summaryPayload.projects : [],
-                    userStats: []
-                }))
-                setHasMeta(true)
-                setLoading(false)
-
-                for (const userId of userIds) {
-                    if (cancelled) return
-                    try {
-                        const userRes = await fetch(`/api/workload/heatmap?userId=${encodeURIComponent(userId)}`, {
-                            cache: "no-store"
-                        })
-                        const userPayload = await userRes.json()
-                        if (!userRes.ok || !userPayload?.userStat) continue
-
-                        setData((prev) => {
-                            if (prev.userStats.some((existingUser) => existingUser.id === userPayload.userStat.id)) {
-                                return prev
-                            }
-                            return {
-                                ...prev,
-                                userStats: [...prev.userStats, userPayload.userStat]
-                            }
-                        })
-                    } catch {
-                        // Skip failed user card and continue loading remaining cards.
-                    }
+                const res = await fetch("/api/workload/heatmap", { cache: "no-store" })
+                const payload = await res.json()
+                if (!res.ok) throw new Error(payload?.error || "Failed to load heatmap")
+                if (!cancelled) {
+                    setData({
+                        userStats: Array.isArray(payload?.userStats) ? payload.userStats : [],
+                        criticalIssues: Array.isArray(payload?.criticalIssues) ? payload.criticalIssues : [],
+                        overloadedUsers: Array.isArray(payload?.overloadedUsers) ? payload.overloadedUsers : [],
+                        idleUsers: Array.isArray(payload?.idleUsers) ? payload.idleUsers : [],
+                        allTasks: Array.isArray(payload?.allTasks) ? payload.allTasks : [],
+                        projects: Array.isArray(payload?.projects) ? payload.projects : []
+                    })
                 }
             } catch {
-                try {
-                    const fallbackRes = await fetch("/api/workload/heatmap", { cache: "no-store" })
-                    const payload = await fallbackRes.json()
-                    if (!fallbackRes.ok) throw new Error(payload?.error || "Failed to load heatmap")
-                    if (!cancelled) {
-                        setData({
-                            userStats: Array.isArray(payload?.userStats) ? payload.userStats : [],
-                            criticalIssues: Array.isArray(payload?.criticalIssues) ? payload.criticalIssues : [],
-                            overloadedUsers: Array.isArray(payload?.overloadedUsers) ? payload.overloadedUsers : [],
-                            idleUsers: Array.isArray(payload?.idleUsers) ? payload.idleUsers : [],
-                            allTasks: Array.isArray(payload?.allTasks) ? payload.allTasks : [],
-                            projects: Array.isArray(payload?.projects) ? payload.projects : []
-                        })
-                        setHasMeta(true)
-                    }
-                } catch {
-                    if (!cancelled) {
-                        setData({
-                            userStats: [],
-                            criticalIssues: [],
-                            overloadedUsers: [],
-                            idleUsers: [],
-                            allTasks: [],
-                            projects: []
-                        })
-                        setHasMeta(false)
-                    }
-                }
+                if (!cancelled) setData(null)
             } finally {
                 if (!cancelled) setLoading(false)
             }
@@ -120,7 +46,7 @@ export function DashboardHeatmapLoader() {
         }
     }, [])
 
-    if (loading && !hasMeta) {
+    if (loading) {
         return (
             <section className="border border-border rounded-lg p-4">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -131,7 +57,7 @@ export function DashboardHeatmapLoader() {
         )
     }
 
-    if (!hasMeta) {
+    if (!data || !Array.isArray(data.userStats) || data.userStats.length === 0) {
         return null
     }
 
