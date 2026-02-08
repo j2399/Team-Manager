@@ -352,11 +352,11 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                                             onClick={() => setShowTimelineDialog(true)}
                                         >
                                             <Plus className="w-3.5 h-3.5" />
-                                            Edit Divisions
+                                            Edit Projects
                                         </button>
                                     </TooltipTrigger>
                                     <TooltipContent side="bottom" className="max-w-[200px] text-center">
-                                        <p className="text-xs">A division is a time-boxed sprint to group related tasks together</p>
+                                        <p className="text-xs">A project is a time-boxed sprint to group related tasks together</p>
                                     </TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>

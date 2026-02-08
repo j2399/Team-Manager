@@ -144,10 +144,10 @@ export function TimelineManagerDialog({
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Sparkles className="h-4 w-4 text-primary" />
                             <DialogTitle className="text-sm font-normal text-muted-foreground">
-                                Drag to create divisions. Click to edit. Hover for + to chain.
+                                Drag to create projects. Click to edit. Hover for + to chain.
                             </DialogTitle>
                         </div>
-                        <DialogDescription className="sr-only">Visual editor for managing division timelines.</DialogDescription>
+                        <DialogDescription className="sr-only">Visual editor for managing project timelines.</DialogDescription>
                         <div className="flex items-center gap-2 pr-8">
                             <Button
                                 variant="outline"
@@ -184,7 +184,7 @@ export function TimelineManagerDialog({
 
                         {pushes.length > 0 && (
                             <p className="text-xs text-muted-foreground">
-                                {pushes.length} division{pushes.length !== 1 ? 's' : ''} planned
+                                {pushes.length} project{pushes.length !== 1 ? 's' : ''} planned
                             </p>
                         )}
                     </div>

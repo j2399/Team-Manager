@@ -870,8 +870,26 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
                                 <div className="space-y-1">
                                     <Label htmlFor="taskDates" className="sr-only">Dates</Label>
-                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                                        <div className="relative flex-1">
+                                    <div className="relative flex-1 pt-3">
+                                        {!task && (
+                                            <div className="absolute right-0 top-0 z-10 flex items-center gap-2">
+                                                <button
+                                                    type="button"
+                                                    className="text-[10px] leading-none text-muted-foreground hover:text-foreground hover:underline"
+                                                    onClick={() => applyDateQuickAction(1)}
+                                                >
+                                                    +1 day
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="text-[10px] leading-none text-muted-foreground hover:text-foreground hover:underline"
+                                                    onClick={() => applyDateQuickAction(7)}
+                                                >
+                                                    +7 days
+                                                </button>
+                                            </div>
+                                        )}
+                                        <div className="relative">
                                             <DateRangePicker
                                                 id="taskDates"
                                                 startDate={startDate}
@@ -888,28 +906,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                                 Required
                                             </span>
                                         </div>
-                                        {!task && (
-                                            <div className="flex items-center gap-2 sm:shrink-0">
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-10 px-3 text-xs"
-                                                    onClick={() => applyDateQuickAction(1)}
-                                                >
-                                                    +1 Day
-                                                </Button>
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="h-10 px-3 text-xs"
-                                                    onClick={() => applyDateQuickAction(7)}
-                                                >
-                                                    +7 Days
-                                                </Button>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
                             </div>

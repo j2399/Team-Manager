@@ -157,7 +157,7 @@ export function ChainStrip({
                                         </button>
                                     </TooltipTrigger>
                                     <TooltipContent side="right" className="text-xs">
-                                        Add division to chain
+                                        Add project to chain
                                     </TooltipContent>
                                 </Tooltip>
                             )}

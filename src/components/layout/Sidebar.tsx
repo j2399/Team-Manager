@@ -211,17 +211,17 @@ const SortableProjectRow = React.memo(({
                             )}
                         </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" side="right" className="w-40 z-50">
+                    <DropdownMenuContent align="start" side="right" className="w-32 z-50">
                         <DropdownMenuItem onSelect={() => setEditingProject(project)}>
                             <Pencil className="h-4 w-4 mr-2" />
-                            Rename Division
+                            Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             onSelect={() => setDeleteConfirm(project)}
                             className="text-red-600"
                         >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Delete Division
+                            Delete
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -786,12 +786,12 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 onProjectCreated={fetchProjects}
             />
 
-            {/* Edit Division Dialog */}
+            {/* Edit Dialog */}
             <Dialog open={!!editingProject} onOpenChange={(open) => !open && setEditingProject(null)}>
                 <DialogContent ref={editProjectDialogContentRef} className="sm:max-w-md">
                     <form onSubmit={handleUpdate} autoComplete="off">
                         <DialogHeader>
-                            <DialogTitle className="sr-only">Edit Division</DialogTitle>
+                            <DialogTitle className="sr-only">Edit</DialogTitle>
                         </DialogHeader>
                         <div className="grid gap-3 py-4">
                             <div className="grid gap-1.5">
@@ -919,7 +919,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 }
             }}>
                 <DialogContent className="sm:max-w-md">
-                    <DialogTitle>Delete Division</DialogTitle>
+                    <DialogTitle>Delete</DialogTitle>
                     <DialogDescription>
                         Type <strong>{deleteConfirm?.name}</strong> to confirm.
                     </DialogDescription>

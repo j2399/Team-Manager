@@ -1088,8 +1088,8 @@ export function Board({
                 <div className="p-4 space-y-4">
                     {pushes.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-[50vh] text-muted-foreground border-2 border-dashed rounded-xl m-4 bg-muted/10">
-                            <p className="text-lg font-medium">No divisions yet...</p>
-                            <p className="text-sm mt-1">A division is a time-boxed sprint to group related tasks</p>
+                            <p className="text-lg font-medium">No projects yet...</p>
+                            <p className="text-sm mt-1">A project is a time-boxed sprint to group related tasks</p>
                         </div>
                     )}
 
@@ -1238,7 +1238,7 @@ export function Board({
                                                                 </button>
                                                             </TooltipTrigger>
                                                             <TooltipContent side="top" className="text-xs">
-                                                                {isComplete ? "Click to unmark complete" : "Mark this division complete"}
+                                                                {isComplete ? "Click to unmark complete" : "Mark this project complete"}
                                                             </TooltipContent>
                                                         </Tooltip>
                                                     </TooltipProvider>

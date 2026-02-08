@@ -17,7 +17,7 @@ export function GanttChart({ pushes }: GanttChartProps) {
     if (!pushes || pushes.length === 0) {
         return (
             <div className="p-4 text-[11px] text-center text-muted-foreground border border-dashed rounded">
-                No divisions. Create a division to see timeline.
+                No projects. Create a project to see timeline.
             </div>
         )
     }

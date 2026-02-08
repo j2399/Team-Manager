@@ -318,7 +318,7 @@ export function CreateProjectWizard({
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Sparkles className="h-4 w-4 text-primary" />
                                 <span>
-                                    Drag to create divisions. Click to edit. Hover for + to chain.
+                                    Drag to create projects. Click to edit. Hover for + to chain.
                                 </span>
                             </div>
 
@@ -330,7 +330,7 @@ export function CreateProjectWizard({
 
                             {pushes.length > 0 && (
                                 <p className="text-xs text-muted-foreground">
-                                    {pushes.length} division{pushes.length !== 1 ? 's' : ''} planned
+                                    {pushes.length} project{pushes.length !== 1 ? 's' : ''} planned
                                 </p>
                             )}
                         </div>
