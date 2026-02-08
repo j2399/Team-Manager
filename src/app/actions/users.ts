@@ -167,8 +167,8 @@ export async function updateUserProjects(userId: string, projectIds: string[]) {
         revalidatePath('/dashboard')
         return { success: true }
     } catch (error) {
-        console.error("Failed to update project assignments", error)
-        return { error: 'Failed to update project assignments' }
+        console.error("Failed to update division assignments", error)
+        return { error: 'Failed to update division assignments' }
     }
 }
 

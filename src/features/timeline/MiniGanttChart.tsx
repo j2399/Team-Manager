@@ -76,7 +76,7 @@ export function MiniGanttChart({ tasks }: MiniGanttChartProps) {
             <div className="space-y-0.5">
                 {Object.entries(byProject).map(([projectId, { name, tasks: projectTasks }]) => (
                     <div key={projectId}>
-                        {/* Project header */}
+                        {/* Division header */}
                         <div className="flex items-center h-5 bg-muted/50">
                             <div className="w-20 shrink-0 px-1">
                                 <span className="text-[9px] font-semibold truncate">{name}</span>

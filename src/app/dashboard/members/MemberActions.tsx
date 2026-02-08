@@ -72,7 +72,7 @@ export function MemberActions({ userId, isCurrentUser, canRemove }: MemberAction
             variant: "outline" as const,
             title: "Leave Workspace",
             confirmTitle: "Leave Workspace?",
-            confirmDesc: "You'll lose access to all projects."
+            confirmDesc: "You'll lose access to all divisions."
         }
         : {
             icon: Trash2,

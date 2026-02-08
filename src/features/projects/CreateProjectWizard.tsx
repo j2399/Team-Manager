@@ -71,7 +71,7 @@ export function CreateProjectWizard({
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    // Step 1: Basic project info
+    // Step 1: Basic division info
     const [projectData, setProjectData] = useState<ProjectData>({
         name: '',
         description: '',
@@ -122,7 +122,7 @@ export function CreateProjectWizard({
         setError(null)
 
         try {
-            // Create project with pushes
+            // Create division with pushes
             const response = await fetch('/api/projects', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -144,7 +144,7 @@ export function CreateProjectWizard({
 
             if (!response.ok) {
                 const data = await response.json()
-                throw new Error(data.error || 'Failed to create project')
+                throw new Error(data.error || 'Failed to create division')
             }
 
             const project = await response.json()
@@ -161,7 +161,7 @@ export function CreateProjectWizard({
     }
 
     const handleSkipTimeline = async () => {
-        // Create project without pushes
+        // Create division without pushes
         setPushes([])
         await handleSubmit()
     }
@@ -318,7 +318,7 @@ export function CreateProjectWizard({
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Sparkles className="h-4 w-4 text-primary" />
                                 <span>
-                                    Drag to create projects. Click to edit. Hover for + to chain.
+                                    Drag to create divisions. Click to edit. Hover for + to chain.
                                 </span>
                             </div>
 
@@ -330,7 +330,7 @@ export function CreateProjectWizard({
 
                             {pushes.length > 0 && (
                                 <p className="text-xs text-muted-foreground">
-                                    {pushes.length} project{pushes.length !== 1 ? 's' : ''} planned
+                                    {pushes.length} division{pushes.length !== 1 ? 's' : ''} planned
                                 </p>
                             )}
                         </div>

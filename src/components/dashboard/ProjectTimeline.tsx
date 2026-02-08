@@ -21,14 +21,14 @@ type ProjectTimelineProps = {
 export function ProjectTimeline({ tasks }: ProjectTimelineProps) {
     const [todayPos, setTodayPos] = useState<number | null>(null)
 
-    // Filter valid tasks and group by project
+    // Filter valid tasks and group by division
     const tasksWithDates = tasks.filter(t => t.startDate && t.endDate)
 
     const byProject = tasksWithDates.reduce((acc, task) => {
         const projectId = task.project?.id || 'unknown'
         if (!acc[projectId]) {
             acc[projectId] = {
-                name: task.project?.name || 'Unknown Project',
+                name: task.project?.name || 'Unknown Division',
                 id: projectId,
                 tasks: []
             }
@@ -99,7 +99,7 @@ export function ProjectTimeline({ tasks }: ProjectTimelineProps) {
                                     )}
 
                                     <div className="space-y-1">
-                                        {project.tasks.slice(0, 8).map(task => { // Limit to 8 tasks per project to save space
+                                        {project.tasks.slice(0, 8).map(task => { // Limit to 8 tasks per division to save space
                                             const left = getPosition(new Date(task.startDate!))
                                             const right = getPosition(new Date(task.endDate!))
                                             const width = Math.max(right - left, 2) // Minimum width
@@ -117,7 +117,7 @@ export function ProjectTimeline({ tasks }: ProjectTimelineProps) {
                                                             width: `${width}%`,
                                                             backgroundColor: barColor
                                                         }}
-                                                        title={`${task.title} (${task.push?.name || 'No Project'})`}
+                                                        title={`${task.title} (${task.push?.name || 'No Division'})`}
                                                     />
                                                     {/* Label */}
                                                     <span
@@ -163,7 +163,7 @@ export function ProjectTimeline({ tasks }: ProjectTimelineProps) {
                                                         width: `${width}%`,
                                                         backgroundColor: barColor
                                                     }}
-                                                    title={`${task.title} (${task.push?.name || 'No Project'})`}
+                                                    title={`${task.title} (${task.push?.name || 'No Division'})`}
                                                 />
                                                 <span
                                                     className="absolute text-[8px] text-muted-foreground truncate w-24 pl-1"

@@ -20,19 +20,19 @@ export async function createProject(formData: FormData) {
         // RBAC Check
         if (user.role !== 'Admin') {
             console.error('[createProject] Unauthorized user:', user.role)
-            return { error: 'Unauthorized: Only Admins can create projects' }
+            return { error: 'Unauthorized: Only Admins can create divisions' }
         }
 
         const name = formData.get('name') as string
         const description = formData.get('description') as string
         const leadId = formData.get('leadId') as string | null
 
-        if (!name || name.trim().length === 0) return { error: 'Project Name is required' }
-        if (!leadId || leadId === 'none') return { error: 'Project Lead is required' }
+        if (!name || name.trim().length === 0) return { error: 'Division Name is required' }
+        if (!leadId || leadId === 'none') return { error: 'Division Lead is required' }
 
         const allowedLeadIds = await getWorkspaceUserIds([leadId], user.workspaceId)
         if (allowedLeadIds.length !== 1) {
-            return { error: 'Project Lead must belong to this workspace' }
+            return { error: 'Division Lead must belong to this workspace' }
         }
 
         // Use interactive transaction to ensure all parts are created or none
@@ -75,7 +75,7 @@ export async function createProject(formData: FormData) {
         return { success: true, project }
     } catch (error) {
         console.error('[createProject] Error:', error)
-        return { error: 'Failed to create project' }
+        return { error: 'Failed to create division' }
     }
 }
 
@@ -90,7 +90,7 @@ export async function updateProjectLead(projectId: string, leadId: string | null
             return { error: 'Unauthorized: No workspace' }
         }
 
-        // Only Admin can change project lead
+        // Only Admin can change division lead
         if (user.role !== 'Admin') {
             return { error: 'Unauthorized' }
         }
@@ -98,13 +98,13 @@ export async function updateProjectLead(projectId: string, leadId: string | null
         if (leadId) {
             const allowedLeadIds = await getWorkspaceUserIds([leadId], user.workspaceId)
             if (allowedLeadIds.length !== 1) {
-                return { error: 'Project Lead must belong to this workspace' }
+                return { error: 'Division Lead must belong to this workspace' }
             }
         }
 
         const projectContext = await getProjectContext(projectId)
         if (!projectContext || projectContext.workspaceId !== user.workspaceId) {
-            return { error: 'Project not found' }
+            return { error: 'Division not found' }
         }
 
         await prisma.project.update({
@@ -117,6 +117,6 @@ export async function updateProjectLead(projectId: string, leadId: string | null
         return { success: true }
     } catch (error) {
         console.error('[updateProjectLead] Error:', error)
-        return { error: 'Failed to update project lead' }
+        return { error: 'Failed to update division lead' }
     }
 }

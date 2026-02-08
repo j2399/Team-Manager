@@ -286,7 +286,7 @@ export function WorkspaceSelector({ user }: { user: any }) {
                                     </span>
                                     <span className="flex items-center gap-1.5 hover:text-muted-foreground transition-colors">
                                         <FolderKanban className="w-3.5 h-3.5" />
-                                        {m.workspace._count?.projects || 0} Projects
+                                        {m.workspace._count?.projects || 0} Divisions
                                     </span>
                                 </div>
                             </CardContent>

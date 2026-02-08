@@ -19,7 +19,7 @@ export default async function MyBoardPage() {
         return <div className="p-6 text-muted-foreground">User not found.</div>
     }
 
-    // Fetch all tasks assigned to this user across all projects
+    // Fetch all tasks assigned to this user across all divisions
     const tasks = await prisma.task.findMany({
         where: {
             OR: [
@@ -123,7 +123,7 @@ export default async function MyBoardPage() {
         { id: 'done', name: 'Done', tasks: transformedTasks.filter(t => t.columnName === 'Done') }
     ]
 
-    // Get unique projects for filtering
+    // Get unique divisions for filtering
     const projects = [...new Map(
         transformedTasks
             .filter(t => t.projectId)

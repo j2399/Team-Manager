@@ -135,7 +135,7 @@ export function MembersTab({ members, allProjects, currentUserEmail, canManage, 
         <div className="space-y-6">
             <div>
                 <h2 className="text-lg font-semibold">Members</h2>
-                <p className="text-xs text-muted-foreground mt-1">Manage roles, names, and project assignments.</p>
+                <p className="text-xs text-muted-foreground mt-1">Manage roles, names, and division assignments.</p>
             </div>
 
             <div className="border rounded-lg overflow-hidden">
@@ -195,7 +195,7 @@ export function MembersTab({ members, allProjects, currentUserEmail, canManage, 
                                 <th className="text-left font-medium px-4 py-2.5">Member</th>
                                 <th className="text-left font-medium px-4 py-2.5">Email</th>
                                 <th className="text-right font-medium px-4 py-2.5">Role</th>
-                                <th className="text-right font-medium px-4 py-2.5">Projects</th>
+                                <th className="text-right font-medium px-4 py-2.5">Divisions</th>
                                 {canManage && <th className="w-[50px]"></th>}
                             </tr>
                         </thead>

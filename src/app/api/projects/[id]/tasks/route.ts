@@ -23,7 +23,7 @@ export async function GET(
         })
 
         if (!project || project.workspaceId !== user.workspaceId) {
-            return NextResponse.json({ error: "Project not found" }, { status: 404 })
+            return NextResponse.json({ error: "Division not found" }, { status: 404 })
         }
 
         const where: Prisma.TaskWhereInput = {
@@ -125,7 +125,7 @@ export async function GET(
             }))
         })
     } catch (error) {
-        console.error("Failed to fetch project tasks:", error)
+        console.error("Failed to fetch division tasks:", error)
         return NextResponse.json({ error: "Failed to fetch tasks" }, { status: 500 })
     }
 }

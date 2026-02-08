@@ -64,7 +64,7 @@ export function TaskInfo({ tasks }: TaskInfoProps) {
                                             <Link 
                                                 href={`/dashboard/projects/${task.projectId}`}
                                                 className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded"
-                                                title="Jump to project"
+                                                title="Jump to division"
                                             >
                                                 <ExternalLink className="h-3 w-3 text-muted-foreground" />
                                             </Link>

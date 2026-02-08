@@ -216,7 +216,7 @@ export function ApprovalRow({ task, onApproved, onDenied }: ApprovalRowProps) {
                     )}
                 </div>
 
-                {/* Project Badge */}
+                {/* Division Badge */}
                 <div
                     className="text-[10px] px-2 py-0.5 rounded-sm font-medium text-muted-foreground truncate max-w-[100px] border tag-shimmer"
                     style={{

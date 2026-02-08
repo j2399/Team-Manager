@@ -55,8 +55,8 @@ export function ProjectSelect({
                 })
             } else {
                 toast({
-                    title: "Projects Updated",
-                    description: `User is now assigned to ${selectedProjectIds.length} project(s)`,
+                    title: "Divisions Updated",
+                    description: `User is now assigned to ${selectedProjectIds.length} division(s)`,
                     variant: "success"
                 })
                 setOpen(false)
@@ -66,14 +66,14 @@ export function ProjectSelect({
 
     const selectedCount = selectedProjectIds.length
 
-    // Get the name of the first selected project
+    // Get the name of the first selected division
     const firstProject = allProjects.find(p => selectedProjectIds.includes(p.id))
 
     const displayText = selectedCount === 0
-        ? "No projects"
+        ? "No divisions"
         : selectedCount === 1
-            ? (firstProject?.name || "1 project")
-            : `${firstProject?.name || "Project"} +${selectedCount - 1}`
+            ? (firstProject?.name || "1 division")
+            : `${firstProject?.name || "Division"} +${selectedCount - 1}`
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -111,7 +111,7 @@ export function ProjectSelect({
                     ))}
                     {allProjects.length === 0 && (
                         <p className="text-sm text-muted-foreground text-center py-2">
-                            No projects available
+                            No divisions available
                         </p>
                     )}
                 </div>

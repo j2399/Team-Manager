@@ -420,13 +420,18 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
 
     useEffect(() => {
         if (!open) return
+        if (!task.attachmentFolderId) {
+            setUploadsPath("Blob storage")
+            return
+        }
+
         const rootName = driveConfig?.folderName || "Drive"
         const rootId = driveConfig?.folderId || null
-        const targetId = task.attachmentFolderId || rootId
-        const fallbackName = task.attachmentFolderName || "Team Manager"
+        const targetId = task.attachmentFolderId
+        const fallbackName = task.attachmentFolderName || "Drive Folder"
 
-        if (!rootId || !targetId) {
-            setUploadsPath(`${rootName} / ${fallbackName}`)
+        if (!rootId) {
+            setUploadsPath(fallbackName)
             return
         }
 
@@ -1101,7 +1106,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                             Files ({attachments.length})
                                         </span>
                                         <div className="text-[10px] text-muted-foreground whitespace-nowrap overflow-x-auto scrollbar-none">
-                                            Uploads go to: {uploadsPath || `${task.attachmentFolderName || "Team Manager"}`}
+                                            Uploads go to: {uploadsPath || (task.attachmentFolderId ? (task.attachmentFolderName || "Drive Folder") : "Blob storage")}
                                         </div>
                                     </div>
                                     {attachments.length > 0 && (

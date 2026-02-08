@@ -185,47 +185,47 @@ const SortableProjectRow = React.memo(({
             >
                 <span className="block truncate">{project.name}</span>
             </Link>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="relative z-20 h-6 w-6 shrink-0 ml-auto text-muted-foreground/50 hover:text-muted-foreground hover:bg-transparent focus:bg-transparent"
-                    >
-                        {navigatingTo === `/dashboard/projects/${project.id}` ? (
-                            <div className="flex items-center gap-[3px]">
-                                {[0, 1, 2].map((i) => (
-                                    <span
-                                        key={i}
-                                        className="w-[3px] h-[3px] rounded-full bg-current animate-bounce"
-                                        style={{
-                                            animationDuration: '0.6s',
-                                            animationDelay: `${i * 0.1}s`,
-                                        }}
-                                    />
-                                ))}
-                            </div>
-                        ) : (
-                            <MoreHorizontal className="h-4 w-4" />
-                        )}
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" side="right" className="w-32 z-50">
-                    <DropdownMenuItem onSelect={() => setEditingProject(project)}>
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Edit
-                    </DropdownMenuItem>
-                    {isAdmin && (
+            {isAdmin && (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="relative z-20 h-6 w-6 shrink-0 ml-auto text-muted-foreground/50 hover:text-muted-foreground hover:bg-transparent focus:bg-transparent"
+                        >
+                            {navigatingTo === `/dashboard/projects/${project.id}` ? (
+                                <div className="flex items-center gap-[3px]">
+                                    {[0, 1, 2].map((i) => (
+                                        <span
+                                            key={i}
+                                            className="w-[3px] h-[3px] rounded-full bg-current animate-bounce"
+                                            style={{
+                                                animationDuration: '0.6s',
+                                                animationDelay: `${i * 0.1}s`,
+                                            }}
+                                        />
+                                    ))}
+                                </div>
+                            ) : (
+                                <MoreHorizontal className="h-4 w-4" />
+                            )}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" side="right" className="w-40 z-50">
+                        <DropdownMenuItem onSelect={() => setEditingProject(project)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Rename Division
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                             onSelect={() => setDeleteConfirm(project)}
                             className="text-red-600"
                         >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
+                            Delete Division
                         </DropdownMenuItem>
-                    )}
-                </DropdownMenuContent>
-            </DropdownMenu>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )}
         </div>
     )
 })
@@ -278,6 +278,9 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     const [editLeadId, setEditLeadId] = React.useState<string>("none")
     const [selectedMemberIds, setSelectedMemberIds] = React.useState<string[]>([])
     const [editColor, setEditColor] = React.useState<string>("#3b82f6")
+    const [editName, setEditName] = React.useState<string>("")
+    const [editDescription, setEditDescription] = React.useState<string>("")
+    const [editError, setEditError] = React.useState<string | null>(null)
 
     const isAdmin = userData.role === 'Admin' || userData.role === 'Team Lead'
 
@@ -304,7 +307,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
         return () => clearInterval(interval)
     }, [fetchUserData])
 
-    // Fetch projects with lead info
+    // Fetch divisions with lead info
     const fetchProjects = React.useCallback(() => {
         fetch('/api/projects?includeLead=true')
             .then(res => res.json())
@@ -429,14 +432,20 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
         }
     }, [projects])
 
-    // When editing project changes, update the lead id state
+    // When editing division changes, update the lead id state
     React.useEffect(() => {
         if (editingProject) {
             setEditLeadId(editingProject.leadId || "none")
             setSelectedMemberIds(editingProject.members?.map(m => m.userId) || [])
             setEditColor(editingProject.color || "#3b82f6")
+            setEditName(editingProject.name || "")
+            setEditDescription(editingProject.description || "")
+            setEditError(null)
         } else {
             setSelectedMemberIds([])
+            setEditName("")
+            setEditDescription("")
+            setEditError(null)
         }
     }, [editingProject])
 
@@ -456,7 +465,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
         )
     }
 
-    // Create project
+    // Create division
     const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         setIsSubmitting(true)
@@ -488,7 +497,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 router.refresh()
             } else {
                 const text = await res.text()
-                console.error("Project creation failed. Status:", res.status, res.statusText)
+                console.error("Division creation failed. Status:", res.status, res.statusText)
                 console.error("Raw response body:", text)
 
                 let errorData = {}
@@ -502,25 +511,31 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
             }
         } catch (err) {
             console.error(err)
-            alert('Failed to create project')
+            alert('Failed to create division')
         }
         setIsSubmitting(false)
     }
 
-    // Update project
+    // Update division
     const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         if (!editingProject) return
+        const trimmedName = editName.trim()
+        if (!trimmedName) {
+            setEditError("Division name is required")
+            return
+        }
+
         setIsSubmitting(true)
-        const formData = new FormData(e.currentTarget)
+        setEditError(null)
 
         try {
             const res = await fetch(`/api/projects/${editingProject.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    name: formData.get('name'),
-                    description: formData.get('description'),
+                    name: trimmedName,
+                    description: editDescription.trim(),
                     color: editColor,
                     leadId: editLeadId === 'none' ? null : editLeadId,
                     memberIds: selectedMemberIds
@@ -530,14 +545,19 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 fetchProjects()
                 setEditingProject(null)
                 router.refresh()
+            } else {
+                const data = await res.json().catch(() => ({}))
+                const message = (data as { error?: string })?.error || "Failed to rename division"
+                setEditError(message)
             }
         } catch (err) {
             console.error(err)
+            setEditError("Failed to rename division")
         }
         setIsSubmitting(false)
     }
 
-    // Delete project
+    // Delete division
     const handleDelete = async () => {
         if (!deleteConfirm) return
         if (deleteConfirmName.trim() !== deleteConfirm.name.trim()) {
@@ -559,7 +579,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 router.refresh()
             } else {
                 const data = await res.json().catch(() => ({}))
-                alert(data.error || 'Failed to delete project')
+                alert(data.error || 'Failed to delete division')
             }
         } catch (err) {
             console.error(err)
@@ -642,7 +662,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                             {navigatingTo === "/dashboard/my-board" && <Loader2 className="h-4 w-4 ml-auto animate-spin" />}
                         </Link>
 
-                        {/* Projects Section */}
+                        {/* Divisions Section */}
                         <Collapsible open={projectsOpen} onOpenChange={setProjectsOpen} className="mt-2">
                             <div className="flex items-center">
                                 <CollapsibleTrigger className="flex-1 flex items-center gap-3 rounded-md px-3 py-2 text-muted-foreground transition-all hover:translate-x-0.5 text-sm">
@@ -757,7 +777,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 </Button>
             </div>
 
-            {/* Create Project Wizard */}
+            {/* Create Division Wizard */}
             <CreateProjectWizard
                 open={createDialogOpen}
                 onOpenChange={setCreateDialogOpen}
@@ -766,22 +786,27 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 onProjectCreated={fetchProjects}
             />
 
-            {/* Edit Project Dialog */}
+            {/* Edit Division Dialog */}
             <Dialog open={!!editingProject} onOpenChange={(open) => !open && setEditingProject(null)}>
                 <DialogContent ref={editProjectDialogContentRef} className="sm:max-w-md">
-                    <form onSubmit={handleUpdate}>
+                    <form onSubmit={handleUpdate} autoComplete="off">
                         <DialogHeader>
-                            <DialogTitle className="sr-only">Edit Project</DialogTitle>
+                            <DialogTitle className="sr-only">Edit Division</DialogTitle>
                         </DialogHeader>
                         <div className="grid gap-3 py-4">
                             <div className="grid gap-1.5">
                                 <Label htmlFor="edit-name" className="text-xs">Name</Label>
                                 <Input
                                     id="edit-name"
-                                    name="name"
-                                    defaultValue={editingProject?.name}
+                                    name="divisionName"
+                                    value={editName}
+                                    onChange={(e) => setEditName(e.target.value)}
                                     required
                                     className="h-8 text-sm"
+                                    autoComplete="off"
+                                    autoCorrect="off"
+                                    autoCapitalize="off"
+                                    spellCheck={false}
                                 />
                             </div>
                             <div className="grid gap-1.5">
@@ -789,8 +814,10 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                 <Textarea
                                     id="edit-description"
                                     name="description"
-                                    defaultValue={editingProject?.description || ''}
+                                    value={editDescription}
+                                    onChange={(e) => setEditDescription(e.target.value)}
                                     className="text-sm min-h-[60px]"
+                                    autoComplete="off"
                                 />
                             </div>
                             <div className="grid gap-1.5">
@@ -807,7 +834,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                                 editColor === color ? "ring-2 ring-foreground/70 scale-[1.02]" : "hover:scale-[1.02]"
                                             )}
                                             style={{ backgroundColor: color }}
-                                            aria-label={`Set project color to ${color}`}
+                                            aria-label={`Set division color to ${color}`}
                                             title={color}
                                         />
                                     ))}
@@ -871,6 +898,9 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                     </PopoverContent>
                                 </Popover>
                             </div>
+                            {editError && (
+                                <p className="text-xs text-destructive">{editError}</p>
+                            )}
                         </div>
                         <DialogFooter>
                             <Button type="submit" disabled={isSubmitting} size="sm">
@@ -889,7 +919,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 }
             }}>
                 <DialogContent className="sm:max-w-md">
-                    <DialogTitle>Delete Project</DialogTitle>
+                    <DialogTitle>Delete Division</DialogTitle>
                     <DialogDescription>
                         Type <strong>{deleteConfirm?.name}</strong> to confirm.
                     </DialogDescription>

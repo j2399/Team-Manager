@@ -54,9 +54,9 @@ export async function PATCH(
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
 
-        // SECURITY: Only Admins and Team Leads can update projects
+        // SECURITY: Only Admins and Team Leads can update divisions
         if (user.role !== 'Admin' && user.role !== 'Team Lead') {
-            return NextResponse.json({ error: 'Forbidden: Only Admins and Team Leads can update projects' }, { status: 403 })
+            return NextResponse.json({ error: 'Forbidden: Only Admins and Team Leads can update divisions' }, { status: 403 })
         }
 
         const { id } = await params
@@ -77,6 +77,12 @@ export async function PATCH(
 
         const body = await request.json()
         const { name, description, leadId, memberIds, color } = body
+        const normalizedName = typeof name === 'string' ? name.trim() : undefined
+        const normalizedDescription = typeof description === 'string' ? description.trim() : description
+
+        if (name !== undefined && !normalizedName) {
+            return NextResponse.json({ error: 'Division name is required' }, { status: 400 })
+        }
 
         const memberIdsInput = Array.isArray(memberIds)
             ? memberIds.filter((id: unknown) => typeof id === 'string' && id.trim().length > 0)
@@ -88,13 +94,13 @@ export async function PATCH(
             : (typeof leadId === 'string' && leadId.trim().length > 0 ? leadId : undefined)
 
         if (leadId !== undefined && leadIdValue === undefined) {
-            return NextResponse.json({ error: 'Invalid project lead' }, { status: 400 })
+            return NextResponse.json({ error: 'Invalid division lead' }, { status: 400 })
         }
 
         if (leadIdValue) {
             const allowedLeadIds = await getWorkspaceUserIds([leadIdValue], user.workspaceId)
             if (allowedLeadIds.length !== 1) {
-                return NextResponse.json({ error: 'Project Lead must belong to this workspace' }, { status: 400 })
+                return NextResponse.json({ error: 'Division Lead must belong to this workspace' }, { status: 400 })
             }
         }
 
@@ -116,8 +122,8 @@ export async function PATCH(
             const updatedProject = await tx.project.update({
                 where: { id },
                 data: {
-                    ...(name !== undefined && { name }),
-                    ...(description !== undefined && { description }),
+                    ...(name !== undefined && { name: normalizedName }),
+                    ...(description !== undefined && { description: normalizedDescription || null }),
                     ...(leadId !== undefined && { leadId: leadIdValue }),
                     ...colorUpdate
                 }
@@ -189,7 +195,7 @@ export async function DELETE(
 
         // Verify confirmation name matches (trimmed comparison)
         if (confirmName !== undefined && confirmName.trim() !== existingProject.name.trim()) {
-            return NextResponse.json({ error: 'Project name does not match' }, { status: 400 })
+            return NextResponse.json({ error: 'Division name does not match' }, { status: 400 })
         }
 
         // Delete in order: tasks -> columns -> boards -> pushes -> project

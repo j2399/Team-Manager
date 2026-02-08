@@ -132,6 +132,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const [folderStack, setFolderStack] = useState<string[]>([])
     const [loadingFolders, setLoadingFolders] = useState(false)
     const [selectedFolder, setSelectedFolder] = useState<{ id: string; name: string } | null>(null)
+    const [folderSelectionChanged, setFolderSelectionChanged] = useState(false)
     const folderInitRef = useRef(false)
     const driveConfigLoadedRef = useRef(false)
 
@@ -149,6 +150,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
             setCurrentFolderId(null)
             setFolderStack([])
             setSelectedFolder(null)
+            setFolderSelectionChanged(false)
             if (task) {
                 setTitle(task.title || "")
                 setDescription(task.description || "")
@@ -238,11 +240,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                     id: task.attachmentFolderId,
                     name: task.attachmentFolderName || "Drive Folder"
                 })
-            } else if (task) {
-                setSelectedFolder({
-                    id: driveConfig.folderId,
-                    name: driveConfig.folderName || "Drive"
-                })
             } else {
                 setSelectedFolder(null)
             }
@@ -254,7 +251,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
     const rootId = driveConfig?.folderId || null
     const rootName = driveConfig?.folderName || "Drive"
-    const requiresDriveFolder = !task && (driveLoading ? true : !!(driveConfig?.connected && rootId))
     const showDriveSection = driveLoading || (!!(driveConfig?.connected && rootId))
     const driveConfigCacheKey = "driveConfig:state"
     const driveConfigCacheTimeKey = "driveConfig:state:ts"
@@ -432,6 +428,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 ? rootName
                 : folderMap.get(currentFolderId)?.name || "Folder"
         setSelectedFolder({ id: currentFolderId, name })
+        setFolderSelectionChanged(true)
         setPickerOpen(false)
     }
 
@@ -453,7 +450,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const isDescriptionSatisfied = hasDescriptionValue || isDraggingFile
     const hasAssignees = assigneeIds.length > 0
     const hasDateRange = startDate !== "" && endDate !== ""
-    const hasDriveFolder = !!selectedFolder
 
     const requiredTagClass = (met: boolean) =>
         `text-[10px] font-normal text-destructive transition-all duration-200 overflow-hidden whitespace-nowrap pointer-events-none select-none ${met ? "opacity-0 max-w-0 ml-0" : "opacity-100 max-w-[80px] ml-0"}`
@@ -465,16 +461,24 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         el.style.height = `${el.scrollHeight}px`
     }
 
+    const applyDateQuickAction = (days: number) => {
+        const base = startDate ? new Date(`${startDate}T00:00:00`) : new Date()
+        const start = startDate || base.toISOString().split("T")[0]
+        const end = new Date(base)
+        end.setDate(base.getDate() + days)
+        setStartDate(start)
+        setEndDate(end.toISOString().split("T")[0])
+    }
+
     // Validation - all fields required
     const isValid = useMemo(() => {
         return (
             hasTitle &&
             hasDescriptionValue &&
             hasAssignees &&
-            hasDateRange &&
-            (!requiresDriveFolder || hasDriveFolder)
+            hasDateRange
         )
-    }, [hasTitle, hasDescriptionValue, hasAssignees, hasDateRange, requiresDriveFolder, hasDriveFolder])
+    }, [hasTitle, hasDescriptionValue, hasAssignees, hasDateRange])
 
     useEffect(() => {
         if (!open) return
@@ -511,8 +515,8 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
             if (task) {
                 const attachmentFolderPayload = (driveConfig?.connected && rootId)
                     ? {
-                        attachmentFolderId: selectedFolder?.id || task.attachmentFolderId || rootId,
-                        attachmentFolderName: selectedFolder?.name || task.attachmentFolderName || rootName
+                        attachmentFolderId: folderSelectionChanged ? (selectedFolder?.id || null) : (task.attachmentFolderId || null),
+                        attachmentFolderName: folderSelectionChanged ? (selectedFolder?.name || null) : (task.attachmentFolderName || null)
                     }
                     : {}
                 const result = await updateTaskDetails(task.id, {
@@ -866,25 +870,46 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
                                 <div className="space-y-1">
                                     <Label htmlFor="taskDates" className="sr-only">Dates</Label>
-                                    <div className="relative">
-                                        <DateRangePicker
-                                            id="taskDates"
-                                            startDate={startDate}
-                                            endDate={endDate}
-                                            onChange={(start, end) => {
-                                                setStartDate(start)
-                                                setEndDate(end)
-                                            }}
-                                            className="h-10 pr-16"
-                                            placeholder="Select Days"
-                                            quickActions={!task ? [
-                                                { label: "+1 Day", days: 1 },
-                                                { label: "+7 Days", days: 7 }
-                                            ] : []}
-                                        />
-                                        <span className={`absolute right-3 top-1/2 -translate-y-1/2 ${requiredTagClass(hasDateRange)}`}>
-                                            Required
-                                        </span>
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                        <div className="relative flex-1">
+                                            <DateRangePicker
+                                                id="taskDates"
+                                                startDate={startDate}
+                                                endDate={endDate}
+                                                onChange={(start, end) => {
+                                                    setStartDate(start)
+                                                    setEndDate(end)
+                                                }}
+                                                className="h-10 pr-16"
+                                                placeholder="Select Days"
+                                                quickActions={[]}
+                                            />
+                                            <span className={`absolute right-3 top-1/2 -translate-y-1/2 ${requiredTagClass(hasDateRange)}`}>
+                                                Required
+                                            </span>
+                                        </div>
+                                        {!task && (
+                                            <div className="flex items-center gap-2 sm:shrink-0">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-10 px-3 text-xs"
+                                                    onClick={() => applyDateQuickAction(1)}
+                                                >
+                                                    +1 Day
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-10 px-3 text-xs"
+                                                    onClick={() => applyDateQuickAction(7)}
+                                                >
+                                                    +7 Days
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -897,7 +922,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                             type="button"
                                             onClick={openFolderPicker}
                                             disabled={driveLoading || !rootId}
-                                            className="w-full h-10 flex items-center justify-between gap-2 px-3 pr-16 bg-background rounded-md border hover:bg-muted/30 transition-colors disabled:opacity-60"
+                                            className="w-full h-10 flex items-center justify-between gap-2 px-3 bg-background rounded-md border hover:bg-muted/30 transition-colors disabled:opacity-60"
                                         >
                                             <div className="flex items-center gap-2 min-w-0">
                                                 <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -907,15 +932,24 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                             </div>
                                             {driveLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />}
                                         </button>
-                                        {requiresDriveFolder && (
-                                            <span className={`absolute right-3 top-1/2 -translate-y-1/2 ${requiredTagClass(hasDriveFolder)}`}>
-                                                Required
-                                            </span>
-                                        )}
                                     </div>
                                     <p className="text-[11px] text-muted-foreground">
-                                        Attachments uploaded to this task will be stored in this Drive folder.
+                                        Optional: choose a Drive folder for uploads. {selectedFolder ? "This task currently uses Drive." : "This task currently uses blob storage."}
                                     </p>
+                                    {selectedFolder && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 px-2 text-[11px] text-muted-foreground"
+                                            onClick={() => {
+                                                setSelectedFolder(null)
+                                                setFolderSelectionChanged(true)
+                                            }}
+                                        >
+                                            Use blob storage instead
+                                        </Button>
+                                    )}
 
                                     {/* Folder picker dialog */}
                                     <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
@@ -976,7 +1010,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                                     className="flex-1 min-w-0"
                                                 >
                                                     <span className="truncate">
-                                                        Select "{currentFolderId === rootId ? rootName : folderMap.get(currentFolderId || "")?.name || "Folder"}"
+                                                        Select {currentFolderId === rootId ? rootName : folderMap.get(currentFolderId || "")?.name || "Folder"}
                                                     </span>
                                                 </Button>
                                                 <Button variant="ghost" size="sm" onClick={() => setPickerOpen(false)}>

@@ -42,7 +42,7 @@ export async function GET(
         })
 
         if (!project) {
-            return NextResponse.json({ error: "Project not found or access denied" }, { status: 404 })
+            return NextResponse.json({ error: "Division not found or access denied" }, { status: 404 })
         }
 
         // Build query for tasks updated since timestamp
@@ -150,7 +150,7 @@ export async function GET(
             serverTime: new Date().toISOString()
         })
     } catch (error) {
-        console.error("Failed to sync project:", error)
+        console.error("Failed to sync division:", error)
         return NextResponse.json({ error: "Failed to sync" }, { status: 500 })
     }
 }

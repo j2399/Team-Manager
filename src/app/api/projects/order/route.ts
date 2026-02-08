@@ -12,12 +12,12 @@ export async function POST(request: Request) {
         const body = await request.json().catch(() => null)
         const projectIdsRaw = body?.projectIds
         if (!Array.isArray(projectIdsRaw)) {
-            return NextResponse.json({ error: "projectIds must be an array" }, { status: 400 })
+            return NextResponse.json({ error: "divisionIds must be an array" }, { status: 400 })
         }
 
         const projectIds = Array.from(new Set(projectIdsRaw.filter((x: unknown) => typeof x === "string" && x.trim().length > 0)))
         if (projectIds.length === 0) {
-            return NextResponse.json({ error: "projectIds cannot be empty" }, { status: 400 })
+            return NextResponse.json({ error: "divisionIds cannot be empty" }, { status: 400 })
         }
 
         const workspaceProjects = await prisma.project.findMany({
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
         })
 
         if (workspaceProjects.length !== projectIds.length) {
-            return NextResponse.json({ error: "One or more projects are not accessible" }, { status: 403 })
+            return NextResponse.json({ error: "One or more divisions are not accessible" }, { status: 403 })
         }
 
         const workspaceProjectIds = await prisma.project.findMany({
@@ -56,8 +56,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true })
     } catch (error) {
-        console.error("Failed to update project order:", error)
-        return NextResponse.json({ error: "Failed to update project order" }, { status: 500 })
+        console.error("Failed to update division order:", error)
+        return NextResponse.json({ error: "Failed to update division order" }, { status: 500 })
     }
 }
-

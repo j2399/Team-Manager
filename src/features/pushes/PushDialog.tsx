@@ -89,7 +89,7 @@ export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogPr
         setError(null)
 
         if (!name.trim()) {
-            setError("Project name is required")
+            setError("Division name is required")
             return
         }
 
@@ -148,12 +148,12 @@ export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogPr
         <Dialog open={open} onOpenChange={handleClose}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>{push ? "Edit Project" : "Create New Project"}</DialogTitle>
+                    <DialogTitle>{push ? "Edit Division" : "Create New Division"}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit}>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="name">Project Name</Label>
+                            <Label htmlFor="name">Division Name</Label>
                             <Input
                                 id="name"
                                 value={name}
@@ -208,7 +208,7 @@ export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogPr
                                 Cancel
                             </Button>
                             <Button type="submit" disabled={isPending}>
-                                {isPending ? (push ? "Updating..." : "Creating...") : (push ? "Update Project" : "Create Project")}
+                                {isPending ? (push ? "Updating..." : "Creating...") : (push ? "Update Division" : "Create Division")}
                             </Button>
                         </div>
                     </DialogFooter>
@@ -218,7 +218,7 @@ export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogPr
             <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Project</AlertDialogTitle>
+                        <AlertDialogTitle>Delete Division</AlertDialogTitle>
                         <AlertDialogDescription>
                             Are you sure you want to delete "{push?.name}"? Tasks will be moved to backlog.
                         </AlertDialogDescription>
@@ -230,7 +230,7 @@ export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogPr
                             disabled={isDeleting}
                             className="bg-destructive hover:bg-destructive/90 text-white"
                         >
-                            {isDeleting ? "Deleting..." : "Delete Project"}
+                            {isDeleting ? "Deleting..." : "Delete Division"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

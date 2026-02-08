@@ -18,11 +18,11 @@ export function PushInfo({ push }: PushInfoProps) {
         return (
             <Card className="h-full">
                 <CardHeader>
-                    <CardTitle className="text-base">Current Project</CardTitle>
-                    <CardDescription>No active project found.</CardDescription>
+                    <CardTitle className="text-base">Current Division</CardTitle>
+                    <CardDescription>No active division found.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <p className="text-sm text-muted-foreground">No projects are currently active.</p>
+                    <p className="text-sm text-muted-foreground">No divisions are currently active.</p>
                 </CardContent>
             </Card>
         )

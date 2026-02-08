@@ -71,8 +71,11 @@ async function getWorkspaceDriveConfig(workspaceId: string) {
                 folderName: true
             }
         })
-    } catch (error: any) {
-        if (error?.code === "P2021" || error?.code === "P2022") return null
+    } catch (error: unknown) {
+        const code = typeof error === "object" && error !== null && "code" in error
+            ? (error as { code?: string }).code
+            : undefined
+        if (code === "P2021" || code === "P2022") return null
         throw error
     }
 }
@@ -153,14 +156,12 @@ export async function createTask(input: CreateTaskInput) {
         let attachmentFolderName = input.attachmentFolderName?.trim() || null
 
         if (driveConfig?.refreshToken && driveConfig.folderId) {
-            if (!attachmentFolderId) {
-                return { error: "Submission folder is required for Drive uploads" }
-            } else if (attachmentFolderId !== driveConfig.folderId) {
+            if (attachmentFolderId && attachmentFolderId !== driveConfig.folderId) {
                 const cached = await getDriveFolderCache(user.workspaceId)
                 if (!isFolderWithinRoot(cached, driveConfig.folderId, attachmentFolderId)) {
                     return { error: "Selected upload folder is outside the configured Drive root" }
                 }
-            } else if (!attachmentFolderName) {
+            } else if (attachmentFolderId === driveConfig.folderId && !attachmentFolderName) {
                 attachmentFolderName = driveConfig.folderName || attachmentFolderName || "Drive"
             }
         } else {
@@ -675,8 +676,8 @@ export async function updateTaskDetails(taskId: string, input: Partial<CreateTas
 
             if (driveConfig?.refreshToken && driveConfig.folderId) {
                 if (!requestedId) {
-                    nextAttachmentFolderId = driveConfig.folderId
-                    nextAttachmentFolderName = driveConfig.folderName || requestedName || "Drive"
+                    nextAttachmentFolderId = null
+                    nextAttachmentFolderName = null
                 } else if (requestedId !== driveConfig.folderId) {
                     const cached = await getDriveFolderCache(user.workspaceId)
                     if (!isFolderWithinRoot(cached, driveConfig.folderId, requestedId)) {

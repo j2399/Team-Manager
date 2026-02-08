@@ -93,7 +93,7 @@ export async function POST(request: Request) {
         }
 
         if (user.role !== 'Admin') {
-            return NextResponse.json({ error: 'Forbidden: Only Admins can create projects' }, { status: 403 })
+            return NextResponse.json({ error: 'Forbidden: Only Admins can create divisions' }, { status: 403 })
         }
 
         const body = await request.json()
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
         }
 
         if (!leadId || leadId === 'none') {
-            return NextResponse.json({ error: 'Project Lead is required' }, { status: 400 })
+            return NextResponse.json({ error: 'Division Lead is required' }, { status: 400 })
         }
 
         const memberIdsInput = Array.isArray(memberIds)
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
         const allowedUserIds = await getWorkspaceUserIds(userIdsToCheck, user.workspaceId)
 
         if (!allowedUserIds.includes(leadId)) {
-            return NextResponse.json({ error: 'Project Lead must belong to this workspace' }, { status: 400 })
+            return NextResponse.json({ error: 'Division Lead must belong to this workspace' }, { status: 400 })
         }
 
         const validMemberIds = await getWorkspaceUserIds(uniqueMemberIds, user.workspaceId)
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'One or more members are not in this workspace' }, { status: 400 })
         }
 
-        // Create project with default board and columns
+        // Create division with default board and columns
         const project = await prisma.$transaction(async (tx) => {
             const normalizedColor = normalizeHexColor(color)
             const generatedColor = normalizedColor
@@ -217,12 +217,12 @@ export async function POST(request: Request) {
 
         return NextResponse.json(project, { status: 201 })
     } catch (error: any) {
-        console.error('[API] Failed to create project:', error)
+        console.error('[API] Failed to create division:', error)
         if (error.code) console.error('[API] Error Code:', error.code)
         if (error.meta) console.error('[API] Error Meta:', error.meta)
 
         return NextResponse.json({
-            error: error.message || 'Failed to create project',
+            error: error.message || 'Failed to create division',
             details: error.meta || error.code || undefined
         }, { status: 500 })
     }

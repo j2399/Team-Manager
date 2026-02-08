@@ -433,7 +433,7 @@ export function TimelineEditor({
                         </span>
                     </div>
                     <span className="text-xs text-muted-foreground">
-                        {pushes.length} project{pushes.length !== 1 ? 's' : ''}
+                        {pushes.length} division{pushes.length !== 1 ? 's' : ''}
                     </span>
                 </div>
 
@@ -566,7 +566,7 @@ export function TimelineEditor({
                     {pushes.length === 0 && !isCreating && (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ top: `${HEADER_HEIGHT}px` }}>
                             <p className="text-sm text-muted-foreground">
-                                {readOnly ? 'No projects' : 'Drag to create a project'}
+                                {readOnly ? 'No divisions' : 'Drag to create a division'}
                             </p>
                         </div>
                     )}

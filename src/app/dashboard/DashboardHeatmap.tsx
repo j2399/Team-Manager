@@ -631,14 +631,14 @@ function QuickAddTaskDialog({
 
                     {selectedProjectId && (
                         <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Select Project</label>
+                            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Select Division</label>
                             <Select
                                 value={selectedPushId}
                                 onValueChange={setSelectedPushId}
                                 disabled={activePushes.length === 0}
                             >
                                 <SelectTrigger className="w-full text-xs h-9">
-                                    <SelectValue placeholder={activePushes.length === 0 ? "No active projects" : "Select target project"} />
+                                    <SelectValue placeholder={activePushes.length === 0 ? "No active divisions" : "Select target division"} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {activePushes.map(push => (
@@ -649,7 +649,7 @@ function QuickAddTaskDialog({
                                 </SelectContent>
                             </Select>
                             {activePushes.length === 0 && (
-                                <p className="text-[9px] text-muted-foreground italic px-1">This division has no active projects. Tasks must be assigned to a project.</p>
+                                <p className="text-[9px] text-muted-foreground italic px-1">This division has no active timelines. Tasks must be assigned to a division timeline.</p>
                             )}
                         </div>
                     )}

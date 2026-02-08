@@ -504,7 +504,7 @@ export function PersonalKanban({ columns: initialColumns, projects, userName }: 
                         <div>
                             <h1 className="text-lg font-semibold">{userName}'s Board</h1>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                                {filteredTotalTasks} tasks across {projects.length} projects
+                                {filteredTotalTasks} tasks across {projects.length} divisions
                             </p>
                         </div>
 
@@ -549,7 +549,7 @@ export function PersonalKanban({ columns: initialColumns, projects, userName }: 
                                 {projects.length > 0 && (
                                     <>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuLabel className="text-xs">Projects</DropdownMenuLabel>
+                                        <DropdownMenuLabel className="text-xs">Divisions</DropdownMenuLabel>
                                         {projects.map(project => (
                                             <DropdownMenuCheckboxItem
                                                 key={project.id}

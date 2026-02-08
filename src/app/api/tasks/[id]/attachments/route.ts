@@ -98,7 +98,7 @@ export async function POST(
 
         const task = await prisma.task.findUnique({
             where: { id },
-            select: { attachmentFolderId: true, attachmentFolderName: true }
+            select: { attachmentFolderId: true }
         })
 
         let driveConfig: { refreshToken: string | null; folderId: string | null } | null = null
@@ -111,72 +111,20 @@ export async function POST(
 
         const hasDrive = !!driveConfig?.refreshToken && !!driveConfig.folderId
         const rootFolderId = driveConfig?.folderId || null
-        const FALLBACK_FOLDER_NAME = "team manager"
-        let targetFolderId = task?.attachmentFolderId || null
-        let targetFolderName = task?.attachmentFolderName || null
+        const targetFolderId = task?.attachmentFolderId || null
 
         let attachmentUrl = ''
         let storageProvider = 'vercel'
         let externalId: string | null = null
 
-        if (hasDrive && rootFolderId) {
+        const shouldUploadToDrive = hasDrive && !!rootFolderId && !!targetFolderId
+
+        if (shouldUploadToDrive) {
             const drive = await getDriveClientForWorkspace(user.workspaceId)
-            const ensureFallbackFolder = async () => {
-                try {
-                    const existing = await drive.files.list({
-                        q: `'${rootFolderId}' in parents and name = '${FALLBACK_FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
-                        fields: "files(id, name)",
-                        pageSize: 1,
-                        supportsAllDrives: true,
-                        includeItemsFromAllDrives: true,
-                    })
-                    const match = existing.data.files?.[0]
-                    if (match?.id) return { id: match.id, name: match.name || FALLBACK_FOLDER_NAME }
-                } catch {
-                    // fall through to create
-                }
-                const created = await drive.files.create({
-                    requestBody: {
-                        name: FALLBACK_FOLDER_NAME,
-                        mimeType: "application/vnd.google-apps.folder",
-                        parents: [rootFolderId],
-                    },
-                    fields: "id, name",
-                    supportsAllDrives: true,
-                })
-                const createdId = created.data.id || ""
-                return createdId ? { id: createdId, name: created.data.name || FALLBACK_FOLDER_NAME } : null
-            }
-
-            if (!targetFolderId) {
-                const fallback = await ensureFallbackFolder()
-                if (fallback?.id) {
-                    targetFolderId = fallback.id
-                    targetFolderName = fallback.name
-                    await prisma.task.update({
-                        where: { id },
-                        data: { attachmentFolderId: targetFolderId, attachmentFolderName: targetFolderName }
-                    })
-                } else {
-                    targetFolderId = rootFolderId
-                    targetFolderName = targetFolderName || "Drive"
-                }
-            }
-
-            if (rootFolderId && targetFolderId !== rootFolderId) {
+            if (rootFolderId && targetFolderId && targetFolderId !== rootFolderId) {
                 const cached = await getDriveFolderCache(user.workspaceId)
                 if (!isFolderWithinRoot(cached, rootFolderId, targetFolderId)) {
-                    const fallback = await ensureFallbackFolder()
-                    if (fallback?.id) {
-                        targetFolderId = fallback.id
-                        targetFolderName = fallback.name
-                        await prisma.task.update({
-                            where: { id },
-                            data: { attachmentFolderId: targetFolderId, attachmentFolderName: targetFolderName }
-                        })
-                    } else {
-                        return NextResponse.json({ error: 'Upload folder is outside the configured Drive root' }, { status: 400 })
-                    }
+                    return NextResponse.json({ error: 'Upload folder is outside the configured Drive root' }, { status: 400 })
                 }
             }
 
@@ -184,7 +132,7 @@ export async function POST(
             const driveResponse = await drive.files.create({
                 requestBody: {
                     name: file.name,
-                    parents: [targetFolderId],
+                    parents: targetFolderId ? [targetFolderId] : undefined,
                 },
                 media: {
                     mimeType: file.type || "application/octet-stream",
@@ -269,13 +217,14 @@ export async function POST(
         })
 
         return NextResponse.json(attachment, { status: 201 })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Failed to upload attachment:', error)
-        const message = error?.message || 'Unknown error'
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        const stack = error instanceof Error ? error.stack : undefined
         return NextResponse.json({
             error: `Failed to upload attachment: ${message}`,
             details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
-            stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+            stack: process.env.NODE_ENV === 'development' ? stack : undefined
         }, { status: 500 })
     }
 }

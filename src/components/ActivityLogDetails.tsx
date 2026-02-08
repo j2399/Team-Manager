@@ -91,7 +91,7 @@ export function ActivityLogDetails({ open, onOpenChange, activity }: ActivityLog
                         </div>
                         {activity.task?.column?.board?.project && (
                             <div className="text-xs text-muted-foreground pl-6">
-                                Project: {activity.task.column.board.project.name}
+                                Division: {activity.task.column.board.project.name}
                             </div>
                         )}
                         {!activity.task && activity.taskTitle && (

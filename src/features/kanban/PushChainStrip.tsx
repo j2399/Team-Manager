@@ -428,7 +428,7 @@ export function PushChainStrip({
                                                         </button>
                                                     </TooltipTrigger>
                                                     <TooltipContent side="top" className="text-xs">
-                                                        {pushIsComplete ? "Click to unmark complete" : "Mark this project complete"}
+                                                        {pushIsComplete ? "Click to unmark complete" : "Mark this division complete"}
                                                     </TooltipContent>
                                                 </Tooltip>
                                             </TooltipProvider>

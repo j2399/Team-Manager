@@ -70,7 +70,7 @@ export function TaskTimeline({ tasks }: TaskTimelineProps) {
                     const left = getPosition(new Date(task.startDate!))
                     const right = getPosition(new Date(task.endDate!))
                     const width = Math.max(right - left, 2)
-                    const projectName = task.column?.board?.project?.name || 'Unknown'
+                    const divisionName = task.column?.board?.project?.name || 'Unknown Division'
 
                     return (
                         <Link
@@ -85,9 +85,9 @@ export function TaskTimeline({ tasks }: TaskTimelineProps) {
                                 <div
                                     className="absolute h-5 top-1 rounded bg-primary/80 text-xs text-primary-foreground flex items-center px-1.5 gap-1 group-hover:bg-primary transition-colors"
                                     style={{ left: `${left}%`, width: `${width}%` }}
-                                    title={`${projectName}: ${task.title}`}
+                                    title={`${divisionName}: ${task.title}`}
                                 >
-                                    <span className="font-medium truncate text-xs">{projectName}</span>
+                                    <span className="font-medium truncate text-xs">{divisionName}</span>
                                     <span className="text-primary-foreground/70 truncate text-[10px]">
                                         {task.title}
                                     </span>
@@ -100,7 +100,6 @@ export function TaskTimeline({ tasks }: TaskTimelineProps) {
         </div>
     )
 }
-
 
 
 
