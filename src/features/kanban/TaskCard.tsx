@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ArrowLeft, ArrowRight, Clock, CalendarDays, CheckCircle2, Lock } from "lucide-react"
 import { cn, getInitials } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useRef } from "react"
+import { useMemo, useRef } from "react"
 
 type TaskCardProps = {
     task: {
@@ -36,13 +36,14 @@ type TaskCardProps = {
     domId?: string
     currentUserId?: string | null
     projectId?: string
+    validAssigneeUserIds?: string[]
 }
 
 const animateLayoutChanges = () => false
 
 import { useRouter } from "next/navigation"
 
-export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn, isAdmin, isDragDisabled, isHighlighted, domId, currentUserId, projectId }: TaskCardProps) {
+export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn, isAdmin, isDragDisabled, isHighlighted, domId, currentUserId, projectId, validAssigneeUserIds = [] }: TaskCardProps) {
     const router = useRouter()
     const {
         setNodeRef,
@@ -84,6 +85,8 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
             : task.assignee?.name
                 ? [{ id: task.assignee.id ?? "legacy", name: task.assignee.name }]
                 : []
+
+    const validAssigneeIdSet = useMemo(() => new Set(validAssigneeUserIds), [validAssigneeUserIds])
 
     const maxVisibleAssignees = 3
     const visibleAssignees = assigneeUsers.slice(0, maxVisibleAssignees)
@@ -221,16 +224,27 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
                 <div className="flex items-center justify-end">
                     <div className="flex -space-x-[5px]">
                         {visibleAssignees.map((u, index) => (
-                            <Avatar
-                                key={u.id ?? u.name}
-                                className="relative h-6 w-6 shrink-0 bg-background text-[10px] ring-2 ring-background"
-                                title={u.name}
-                                style={{ zIndex: 30 - index }}
-                            >
-                                <AvatarFallback className="bg-primary/5 text-primary">
-                                    {getInitials(u.name)}
-                                </AvatarFallback>
-                            </Avatar>
+                            (() => {
+                                const isStaleAssignee = !!u.id && !validAssigneeIdSet.has(u.id)
+                                return (
+                                    <Avatar
+                                        key={u.id ?? u.name}
+                                        className={cn(
+                                            "relative h-6 w-6 shrink-0 bg-background text-[10px] ring-2 ring-background",
+                                            isStaleAssignee && "ring-red-200"
+                                        )}
+                                        title={isStaleAssignee ? `${u.name} (removed from workspace)` : u.name}
+                                        style={{ zIndex: 30 - index }}
+                                    >
+                                        <AvatarFallback className={cn(
+                                            "bg-primary/5 text-primary",
+                                            isStaleAssignee && "bg-red-100 text-red-700"
+                                        )}>
+                                            {getInitials(u.name)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                )
+                            })()
                         ))}
                         {extraAssigneeCount > 0 && (
                             <Avatar
