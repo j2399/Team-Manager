@@ -1,5 +1,6 @@
 'use server'
 
+import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/auth'
@@ -76,17 +77,17 @@ export async function createPush(formData: FormData) {
             where: { projectId }
         })
 
-        const push = await prisma.push.create({
-            data: {
-                name: name.trim(),
-                projectId,
-                startDate: start,
-                endDate: end,
-                color: color || PUSH_COLORS[existingCount % PUSH_COLORS.length],
-                status: 'Active',
-                dependsOnId: dependsOnId || null
-            } as any
-        })
+        const pushData: Prisma.PushUncheckedCreateInput = {
+            name: name.trim(),
+            projectId,
+            startDate: start,
+            endDate: end,
+            color: color || PUSH_COLORS[existingCount % PUSH_COLORS.length],
+            status: 'Active',
+            dependsOnId: dependsOnId || null
+        }
+
+        const push = await prisma.push.create({ data: pushData })
 
         revalidatePath('/dashboard')
         revalidatePath(`/dashboard/projects/${projectId}`)
@@ -130,7 +131,7 @@ export async function updatePush(input: {
             return { error: 'Push not found' }
         }
 
-        const updateData: Record<string, unknown> = {}
+        const updateData: Prisma.PushUncheckedUpdateInput = {}
         if (input.name) updateData.name = input.name
         if (input.startDate) updateData.startDate = new Date(input.startDate)
 
@@ -160,7 +161,7 @@ export async function updatePush(input: {
 
         await prisma.push.update({
             where: { id: input.id },
-            data: updateData as any
+            data: updateData
         })
 
         revalidatePath('/dashboard')
@@ -308,11 +309,11 @@ export async function getPushes(projectId: string) {
             orderBy: { startDate: 'asc' }
         })
 
-        return pushes.map((push: any) => ({
+        return pushes.map((push) => ({
             ...push,
             dependsOnId: push.dependsOnId,
             taskCount: push.tasks.length,
-            completedCount: push.tasks.filter((t: any) => t.column?.name === 'Done').length
+            completedCount: push.tasks.filter((task) => task.column?.name === 'Done').length
         }))
     } catch (error) {
         console.error('Failed to get pushes:', error)

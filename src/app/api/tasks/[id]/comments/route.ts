@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { getErrorCode, getErrorMessage } from '@/lib/errors'
 
 export async function GET(
     request: Request,
@@ -45,7 +47,7 @@ export async function GET(
             return NextResponse.json({ count })
         }
 
-        const where: any = { taskId: id }
+        const where: Prisma.CommentWhereInput = { taskId: id }
 
         // If since is provided, only fetch newer comments
         if (since) {
@@ -112,14 +114,17 @@ export async function POST(
             return NextResponse.json({ error: 'User account not found. Please log in again.' }, { status: 401 })
         }
 
-        let body: any = {}
+        let body: { content?: unknown; replyToId?: unknown } = {}
         try {
-            body = await request.json()
-        } catch (parseError) {
+            body = (await request.json()) as { content?: unknown; replyToId?: unknown }
+        } catch {
             return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
         }
 
         const { content, replyToId } = body
+        const normalizedReplyToId = typeof replyToId === 'string' && replyToId.trim().length > 0
+            ? replyToId
+            : null
 
         if (!content || typeof content !== 'string' || content.trim().length === 0) {
             return NextResponse.json({ error: 'Content is required' }, { status: 400 })
@@ -150,9 +155,9 @@ export async function POST(
             return NextResponse.json({ error: 'Task not found' }, { status: 404 })
         }
 
-        if (replyToId) {
+        if (normalizedReplyToId) {
             const replyTarget = await prisma.comment.findUnique({
-                where: { id: replyToId },
+                where: { id: normalizedReplyToId },
                 select: { taskId: true }
             })
 
@@ -166,7 +171,7 @@ export async function POST(
             content: content.trim(),
             authorId: dbUser.id,
             authorName: (dbUser.name || user.name || 'User').substring(0, 255),
-            replyToId: replyToId || null
+            replyToId: normalizedReplyToId
         }
 
         const comment = await prisma.comment.create({
@@ -218,19 +223,20 @@ export async function POST(
         }
 
         return NextResponse.json(comment, { status: 201 })
-    } catch (error: any) {
+    } catch (error: unknown) {
         let errorMessage = 'Failed to create comment. Please try again.'
-        if (error?.code === 'P2002') {
+        const code = getErrorCode(error)
+        if (code === 'P2002') {
             errorMessage = 'A comment with this data already exists.'
-        } else if (error?.code === 'P2003') {
+        } else if (code === 'P2003') {
             errorMessage = 'Invalid task or user reference.'
-        } else if (error?.message) {
-            errorMessage = error.message
+        } else {
+            errorMessage = getErrorMessage(error, errorMessage)
         }
 
         return NextResponse.json({
             error: errorMessage,
-            code: error?.code || 'UNKNOWN_ERROR'
+            code: code || 'UNKNOWN_ERROR'
         }, { status: 500 })
     }
 }

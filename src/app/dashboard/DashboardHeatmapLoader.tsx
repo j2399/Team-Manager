@@ -3,15 +3,9 @@
 import { useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { DashboardHeatmap } from "./DashboardHeatmap"
+import type { DashboardHeatmapProps } from "./DashboardHeatmap"
 
-type HeatmapResponse = {
-    userStats: any[]
-    criticalIssues: any[]
-    overloadedUsers: any[]
-    idleUsers: any[]
-    allTasks: any[]
-    projects: any[]
-}
+type HeatmapResponse = DashboardHeatmapProps
 
 export function DashboardHeatmapLoader() {
     const [data, setData] = useState<HeatmapResponse | null>(null)

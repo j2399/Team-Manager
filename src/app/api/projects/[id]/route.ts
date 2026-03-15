@@ -64,7 +64,7 @@ export async function PATCH(
         // Verify project exists and belongs to user's workspace
         const existingProject = await prisma.project.findUnique({
             where: { id },
-            select: { workspaceId: true }
+            select: { workspaceId: true, leadId: true }
         })
 
         if (!existingProject) {
@@ -73,6 +73,10 @@ export async function PATCH(
 
         if (existingProject.workspaceId !== user.workspaceId) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 })
+        }
+
+        if (user.role === 'Team Lead' && existingProject.leadId !== user.id) {
+            return NextResponse.json({ error: 'Forbidden: You can only update projects you lead' }, { status: 403 })
         }
 
         const body = await request.json()
@@ -183,7 +187,7 @@ export async function DELETE(
         // Verify project exists and belongs to user's workspace
         const existingProject = await prisma.project.findUnique({
             where: { id },
-            select: { workspaceId: true, name: true }
+            select: { workspaceId: true, name: true, leadId: true }
         })
 
         if (!existingProject) {
@@ -192,6 +196,10 @@ export async function DELETE(
 
         if (existingProject.workspaceId !== user.workspaceId) {
             return NextResponse.json({ error: 'Not found' }, { status: 404 })
+        }
+
+        if (user.role === 'Team Lead' && existingProject.leadId !== user.id) {
+            return NextResponse.json({ error: 'Forbidden: You can only delete projects you lead' }, { status: 403 })
         }
 
         // Verify confirmation name matches (trimmed comparison)

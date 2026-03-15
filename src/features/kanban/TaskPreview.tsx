@@ -108,15 +108,10 @@ const formatTimeAgo = (date: string) => {
 }
 
 const getAttachmentUrls = (attachment: Attachment) => {
-    if (attachment.storageProvider === 'google' && attachment.externalId) {
-        const viewUrl = `https://drive.google.com/uc?export=view&id=${attachment.externalId}`
-        return {
-            preview: `https://drive.google.com/thumbnail?id=${attachment.externalId}&sz=w400`,
-            fallbackPreview: viewUrl,
-            download: `https://drive.google.com/uc?export=download&id=${attachment.externalId}`
-        }
+    return {
+        preview: attachment.url,
+        download: `${attachment.url}?download=1`
     }
-    return { preview: attachment.url, download: attachment.url }
 }
 
 type CommentNodeProps = {

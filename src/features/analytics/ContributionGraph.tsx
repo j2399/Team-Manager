@@ -8,6 +8,7 @@ interface ContributionGraphProps {
 
 export function ContributionGraph({ data }: ContributionGraphProps) {
     const days = 365
+    const endDate = new Date()
 
     const activityMap = new Map<string, number>()
     data.forEach(item => {
@@ -16,7 +17,8 @@ export function ContributionGraph({ data }: ContributionGraphProps) {
     })
 
     const contributions = Array.from({ length: days }).map((_, i) => {
-        const d = new Date(Date.now() - (days - i) * 24 * 60 * 60 * 1000)
+        const d = new Date(endDate)
+        d.setDate(endDate.getDate() - (days - i))
         const dateStr = d.toISOString().split('T')[0]
         return {
             date: dateStr,

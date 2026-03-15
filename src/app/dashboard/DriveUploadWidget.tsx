@@ -182,7 +182,6 @@ export function DriveUploadWidget({ initialConfig, canManage, className }: Props
             void loadTree()
             void loadFiles(root)
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [initialConfig.connected, root])
 
     /* nav */

@@ -3,6 +3,100 @@ import { cookies } from 'next/headers'
 import prisma from '@/lib/prisma'
 import { createSession, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS } from '@/lib/session'
 import { joinWorkspaceByCode } from '@/lib/workspaceInvites'
+import { createWorkspaceForUser } from '@/lib/workspaces'
+
+type PendingWorkspaceFlow = {
+    mode: 'create' | 'join'
+    value: string
+    username: string
+}
+
+function getPendingWorkspaceFlow(cookieStore: Awaited<ReturnType<typeof cookies>>): PendingWorkspaceFlow | null {
+    const mode = cookieStore.get('pending_mode')?.value
+    const value = cookieStore.get('pending_value')?.value?.trim()
+    const username = cookieStore.get('pending_username')?.value?.trim()
+
+    if ((mode === 'create' || mode === 'join') && value && username) {
+        return { mode, value, username }
+    }
+
+    return null
+}
+
+function clearPendingWorkspaceFlow(cookieStore: Awaited<ReturnType<typeof cookies>>) {
+    cookieStore.delete('pending_mode')
+    cookieStore.delete('pending_value')
+    cookieStore.delete('pending_username')
+}
+
+async function syncPendingUserName(userId: string, currentName: string, pendingName: string, shouldSync: boolean) {
+    const trimmedPendingName = pendingName.trim()
+    if (!shouldSync || !trimmedPendingName || trimmedPendingName === currentName) {
+        return currentName
+    }
+
+    await prisma.user.update({
+        where: { id: userId },
+        data: { name: trimmedPendingName },
+    })
+
+    return trimmedPendingName
+}
+
+async function applyPendingWorkspaceFlow({
+    cookieStore,
+    userId,
+    currentName,
+    shouldSyncName,
+}: {
+    cookieStore: Awaited<ReturnType<typeof cookies>>
+    userId: string
+    currentName: string
+    shouldSyncName: boolean
+}) {
+    const pendingInvite = cookieStore.get('pending_invite')?.value?.trim()
+    if (pendingInvite) {
+        const result = await joinWorkspaceByCode({
+            userId,
+            userName: currentName,
+            code: pendingInvite,
+        })
+        cookieStore.delete('pending_invite')
+        return { redirectToDashboard: !result.error }
+    }
+
+    const pendingFlow = getPendingWorkspaceFlow(cookieStore)
+    if (!pendingFlow) {
+        return { redirectToDashboard: false }
+    }
+
+    const effectiveName = await syncPendingUserName(
+        userId,
+        currentName,
+        pendingFlow.username,
+        shouldSyncName
+    )
+
+    try {
+        if (pendingFlow.mode === 'create') {
+            await createWorkspaceForUser({
+                userId,
+                userName: effectiveName,
+                workspaceName: pendingFlow.value,
+            })
+            return { redirectToDashboard: true }
+        }
+
+        const result = await joinWorkspaceByCode({
+            userId,
+            userName: effectiveName,
+            code: pendingFlow.value,
+        })
+        return { redirectToDashboard: !result.error }
+    } finally {
+        clearPendingWorkspaceFlow(cookieStore)
+    }
+}
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
@@ -149,19 +243,16 @@ export async function GET(request: Request) {
 
             const session = await createSession(user.id)
 
-            const pendingInvite = cookieStore.get('pending_invite')?.value
-            if (pendingInvite) {
-                await joinWorkspaceByCode({
-                    userId: user.id,
-                    userName: user.name,
-                    code: pendingInvite,
-                })
-                cookieStore.delete('pending_invite')
-            }
+            const pendingFlow = await applyPendingWorkspaceFlow({
+                cookieStore,
+                userId: user.id,
+                currentName: nextUserData.name || user.name,
+                shouldSyncName: !user.hasOnboarded,
+            })
 
             // Redirect to Workspaces or Dashboard if invite processed
             const response = NextResponse.redirect(
-                new URL(pendingInvite ? '/dashboard' : '/workspaces', request.url)
+                new URL(pendingFlow.redirectToDashboard ? '/dashboard' : '/workspaces', request.url)
             )
 
             // Set session cookie on the response
@@ -197,15 +288,12 @@ export async function GET(request: Request) {
 
         console.log(`[Auth] Created new user ${user.id} with role Member.`)
 
-        const pendingInvite = cookieStore.get('pending_invite')?.value
-        if (pendingInvite) {
-            await joinWorkspaceByCode({
-                userId: user.id,
-                userName: user.name,
-                code: pendingInvite,
-            })
-            cookieStore.delete('pending_invite')
-        }
+        await applyPendingWorkspaceFlow({
+            cookieStore,
+            userId: user.id,
+            currentName: user.name,
+            shouldSyncName: true,
+        })
 
         const response = NextResponse.redirect(new URL('/onboarding', request.url))
 

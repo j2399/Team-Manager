@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import type { Prisma } from '@prisma/client'
 import prisma from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/auth"
 
@@ -46,10 +47,10 @@ export async function GET(
         }
 
         // Build query for tasks updated since timestamp
-        const where: any = {
+        const where: Prisma.TaskWhereInput = {
             column: { board: { projectId } }
         }
-        const and: any[] = []
+        const and: Prisma.TaskWhereInput[] = []
         if (since) {
             and.push({ updatedAt: { gt: new Date(since) } })
         }
@@ -102,7 +103,7 @@ export async function GET(
             ? `${lastTask.updatedAt.toISOString()}::${lastTask.id}`
             : null
 
-        const deletedWhere: any = { projectId }
+        const deletedWhere: Prisma.TaskDeletionWhereInput = { projectId }
         if (since) {
             deletedWhere.deletedAt = { gt: new Date(since) }
         }

@@ -4,6 +4,8 @@ import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { getTaskContext } from '@/lib/access'
 import { driveConfigTableExists, getDriveClientForWorkspace, getDriveFolderCache, isFolderWithinRoot } from '@/lib/googleDrive'
+import { buildAttachmentAccessUrl, buildAttachmentStoragePath, isAllowedAttachmentType, MAX_ATTACHMENT_SIZE } from '@/lib/attachments'
+import { getErrorMessage } from '@/lib/errors'
 import { Readable } from 'stream'
 
 export async function GET(
@@ -27,7 +29,12 @@ export async function GET(
             where: { taskId: id },
             orderBy: [{ order: 'asc' }, { createdAt: 'desc' }]
         })
-        return NextResponse.json(attachments)
+        return NextResponse.json(
+            attachments.map((attachment) => ({
+                ...attachment,
+                url: buildAttachmentAccessUrl(attachment.id)
+            }))
+        )
     } catch (error) {
         console.error('Failed to fetch attachments:', error)
         return NextResponse.json([], { status: 200 })
@@ -62,37 +69,11 @@ export async function POST(
             return NextResponse.json({ error: 'File is required' }, { status: 400 })
         }
 
-        // File size validation (max 50MB)
-        const MAX_FILE_SIZE = 50 * 1024 * 1024
-        if (file.size > MAX_FILE_SIZE) {
+        if (file.size > MAX_ATTACHMENT_SIZE) {
             return NextResponse.json({ error: 'File too large. Maximum size is 50MB' }, { status: 400 })
         }
 
-        // File type validation - allow common file types
-        // Check by MIME type prefix OR by file extension for better compatibility
-        const ALLOWED_MIME_PREFIXES = [
-            'image/', 'video/', 'audio/', 'application/pdf',
-            'application/msword', 'application/vnd.openxmlformats',
-            'application/vnd.ms-excel', 'application/vnd.ms-powerpoint',
-            'text/', 'application/zip', 'application/x-zip',
-            'application/json', 'application/xml'
-        ]
-        const ALLOWED_EXTENSIONS = [
-            'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico',
-            'mp4', 'webm', 'mov', 'avi', 'mkv',
-            'mp3', 'wav', 'ogg', 'flac',
-            'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
-            'txt', 'md', 'json', 'xml', 'csv',
-            'zip', 'rar', '7z', 'tar', 'gz'
-        ]
-
-        const fileExtension = file.name.split('.').pop()?.toLowerCase() || ''
-        const isAllowedByMime = file.type && ALLOWED_MIME_PREFIXES.some(type => file.type.startsWith(type))
-        const isAllowedByExtension = ALLOWED_EXTENSIONS.includes(fileExtension)
-        const isGenericBinary = !file.type || file.type === 'application/octet-stream'
-
-        // Allow if: valid MIME type OR valid extension OR generic binary with valid extension
-        if (!isAllowedByMime && !isAllowedByExtension && !isGenericBinary) {
+        if (!isAllowedAttachmentType(file.name, file.type || '')) {
             return NextResponse.json({ error: 'File type not allowed' }, { status: 400 })
         }
 
@@ -147,33 +128,16 @@ export async function POST(
                 return NextResponse.json({ error: 'Failed to upload to Google Drive' }, { status: 500 })
             }
 
-            const isImage = (file.type && file.type.startsWith('image/')) || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(fileExtension)
-            const viewUrl = `https://drive.google.com/uc?export=view&id=${fileId}`
-            const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`
-
-            attachmentUrl = isImage ? viewUrl : downloadUrl
+            attachmentUrl = fileId
             storageProvider = 'google'
             externalId = fileId
-
-            try {
-                await drive.permissions.create({
-                    fileId,
-                    requestBody: { role: 'reader', type: 'anyone' },
-                    supportsAllDrives: true,
-                })
-            } catch (permError) {
-                console.warn("Drive permission set failed:", permError)
-            }
         } else {
-            // Upload to Vercel Blob
-            const filename = `${id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+            const filename = buildAttachmentStoragePath(id, file.name)
             const fileBuffer = await file.arrayBuffer()
-            console.log(`[UPLOAD] Processing file: ${filename}, size: ${file.size} bytes`);
             const blob = await put(filename, fileBuffer, {
                 access: 'public',
                 contentType: file.type || 'application/octet-stream',
             })
-            console.log(`[UPLOAD] Blob created: ${blob.url}`);
             attachmentUrl = blob.url
             storageProvider = 'vercel'
             externalId = null
@@ -199,7 +163,6 @@ export async function POST(
                 order: (maxOrder._max.order ?? -1) + 1
             }
         })
-        console.log(`[UPLOAD] Attachment record created in DB: ${attachment.id}`);
 
         // Log activity for attachment being added
         await prisma.activityLog.create({
@@ -216,10 +179,13 @@ export async function POST(
             }
         })
 
-        return NextResponse.json(attachment, { status: 201 })
+        return NextResponse.json({
+            ...attachment,
+            url: buildAttachmentAccessUrl(attachment.id)
+        }, { status: 201 })
     } catch (error: unknown) {
         console.error('Failed to upload attachment:', error)
-        const message = error instanceof Error ? error.message : 'Unknown error'
+        const message = getErrorMessage(error)
         const stack = error instanceof Error ? error.stack : undefined
         return NextResponse.json({
             error: `Failed to upload attachment: ${message}`,
@@ -279,7 +245,6 @@ export async function DELETE(
         } else {
             // Delete from Vercel Blob
             try {
-                console.log(`[DELETE] Deleting blob: ${attachment.url}`);
                 await del(attachment.url)
             } catch (e) {
                 console.error('Failed to delete from blob storage:', e)

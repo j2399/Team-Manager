@@ -39,12 +39,12 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
                 }
             }
         }
-    }) as Promise<any>
+    })
 
     const pushesPromise = prisma.push.findMany({
         where: { projectId: id },
         orderBy: { startDate: "asc" }
-    }) as Promise<any[]>
+    })
 
     const [project, projectPushes] = await Promise.all([projectPromise, pushesPromise])
 
@@ -60,7 +60,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
     const board = boardData ? {
         ...boardData,
-        columns: boardData.columns.map((col: any) => ({
+        columns: boardData.columns.map((col) => ({
             ...col,
             tasks: []
         }))
@@ -79,7 +79,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         }
     }) : []
 
-    const projectMemberIds = new Set((project.members as any[]).map((m: any) => m.userId))
+    const projectMemberIds = new Set(project.members.map((member) => member.userId))
 
     const users = usersRaw.map(u => {
         const membership = u.memberships[0]
@@ -91,7 +91,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         }
     })
 
-    const pushIds = projectPushes.map((p: any) => p.id)
+    const pushIds = projectPushes.map((push) => push.id)
     const counts = pushIds.length > 0
         ? await prisma.task.groupBy({
             by: ["pushId"],
@@ -113,10 +113,14 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         })
         : []
 
-    const totalByPushId = new Map(counts.map((c: any) => [c.pushId as string, c._count._all]))
-    const doneByPushId = new Map(doneCounts.map((c: any) => [c.pushId as string, c._count._all]))
+    const totalByPushId = new Map(
+        counts.map((count) => [count.pushId || '', count._count._all])
+    )
+    const doneByPushId = new Map(
+        doneCounts.map((count) => [count.pushId || '', count._count._all])
+    )
 
-    const pushes = projectPushes.map((push: any) => ({
+    const pushes = projectPushes.map((push) => ({
         id: push.id,
         name: push.name,
         startDate: push.startDate.toISOString(),

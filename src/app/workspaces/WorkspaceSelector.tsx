@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useEffect } from "react"
+import { useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardTitle } from "@/components/ui/card"
@@ -13,8 +13,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
+import type { CurrentUser } from "@/lib/auth"
 
-export function WorkspaceSelector({ user }: { user: any }) {
+export function WorkspaceSelector({ user }: { user: CurrentUser }) {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
     const [loadingWorkspaceId, setLoadingWorkspaceId] = useState<string | null>(null)
@@ -37,12 +38,10 @@ export function WorkspaceSelector({ user }: { user: any }) {
     const [deleteConfirmation, setDeleteConfirmation] = useState("")
 
     // Theme State
-    const [theme, setTheme] = useState<'light' | 'dark'>('light')
-
-    // Initialize theme from DOM on mount
-    useEffect(() => {
-        setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light')
-    }, [])
+    const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+        if (typeof document === 'undefined') return 'light'
+        return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+    })
 
     // Custom notification state
     const [notification, setNotification] = useState<{
@@ -173,7 +172,7 @@ export function WorkspaceSelector({ user }: { user: any }) {
             <div className="flex flex-col gap-4 md:gap-6 pb-4 md:pb-6 border-b border-border">
                 <div className="flex items-center gap-3 md:gap-4">
                     <Avatar className="h-12 w-12 md:h-16 md:w-16 border-2 border-background shadow-lg">
-                        <AvatarImage src={user.avatar} />
+                        <AvatarImage src={user.avatar || undefined} />
                         <AvatarFallback>{displayName?.[0]}</AvatarFallback>
                     </Avatar>
                     <div className="space-y-0.5 md:space-y-1 flex-1">
@@ -255,7 +254,7 @@ export function WorkspaceSelector({ user }: { user: any }) {
             {/* Grid */}
             {/* Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-                {user.memberships?.map((m: any) => {
+                {user.memberships?.map((m) => {
                     const isCardLoading = loadingWorkspaceId === m.workspaceId
                     return (
                         <Card

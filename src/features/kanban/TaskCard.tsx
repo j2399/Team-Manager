@@ -41,6 +41,13 @@ type TaskCardProps = {
 
 const animateLayoutChanges = () => false
 
+function getPendingReviewText(updatedAt?: Date | string | null) {
+    if (!updatedAt) return null
+
+    const days = Math.floor((new Date().getTime() - new Date(updatedAt).getTime()) / (1000 * 60 * 60 * 24))
+    return days === 0 ? 'Pending today' : `Pending ${days}d`
+}
+
 import { useRouter } from "next/navigation"
 
 export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn, isAdmin, isDragDisabled, isHighlighted, domId, currentUserId, projectId, validAssigneeUserIds = [] }: TaskCardProps) {
@@ -78,6 +85,8 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
         daysLeft = Math.ceil((endTime - now) / (1000 * 60 * 60 * 24))
         isOverdue = daysLeft < 0
     }
+
+    const reviewPendingText = isReviewColumn ? getPendingReviewText(task.updatedAt) : null
 
     const assigneeUsers =
         task.assignees && task.assignees.length > 0
@@ -176,7 +185,7 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
                 <div className="flex items-center gap-1.5 min-w-0">
                     {/* Status / Date Badge - Show pending time for Review, due date for others */}
                     {isReviewColumn ? (
-                        task.updatedAt && (
+                        reviewPendingText && (
                             <div
                                 className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium border truncate max-w-[120px] tag-shimmer"
                                 style={{
@@ -187,12 +196,7 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
                                 } as React.CSSProperties}
                             >
                                 <Clock className="w-3 h-3 shrink-0" />
-                                <span className="truncate">
-                                    {(() => {
-                                        const days = Math.floor((Date.now() - new Date(task.updatedAt).getTime()) / (1000 * 60 * 60 * 24))
-                                        return days === 0 ? 'Pending today' : `Pending ${days}d`
-                                    })()}
-                                </span>
+                                <span className="truncate">{reviewPendingText}</span>
                             </div>
                         )
                     ) : (

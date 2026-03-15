@@ -4,7 +4,8 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 model User {
@@ -14,8 +15,9 @@ model User {
   discordId String?  @unique
   avatar    String?
   role      String   @default("Member") // Admin, Team Lead, Member
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  workspace   Workspace? @relation("CurrentWorkspace", fields: [workspaceId], references: [id], onDelete: SetNull)
   workspaceId String?
+  ownedWorkspaces Workspace[] @relation("WorkspaceOwner")
   subteams  Subteam[]
   tasks     Task[]   @relation("TaskAssignee")
   taskAssignments TaskAssignee[] @relation("TaskAssignments")
@@ -23,6 +25,7 @@ model User {
   projectMemberships ProjectMember[] @relation("ProjectMembers")
   projectOrders ProjectUserOrder[]
   memberships WorkspaceMember[]
+  notificationReads NotificationRead[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   chatTyping ChatTyping?
@@ -264,12 +267,17 @@ model ActivityLog {
 model Invite {
   id        String   @id @default(cuid())
   token     String   @unique
+  workspaceId String?
   role      String   @default("Member") // Admin, Team Lead, Member
   expiresAt DateTime?
   maxUses   Int      @default(1)
   uses      Int      @default(0)
   createdBy String
   createdAt DateTime @default(now())
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
 }
 
 model WorkspaceConfig {
@@ -285,9 +293,11 @@ model Workspace {
   inviteCode       String    @unique
   discordChannelId String?
   ownerId          String
-  users            User[]
+  owner            User      @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  users            User[]    @relation("CurrentWorkspace")
   subteams         Subteam[]
   members          WorkspaceMember[]
+  invites          Invite[]
   projects         Project[]
   workloadConfig   WorkloadConfig?
   driveConfig      WorkspaceDriveConfig?
@@ -347,10 +357,24 @@ model Notification {
   link        String?   // Optional link to navigate to
   read        Boolean   @default(false)
   createdAt   DateTime  @default(now())
+  reads       NotificationRead[]
 
   @@index([workspaceId, userId])
   @@index([workspaceId, read])
   @@index([createdAt])
+}
+
+model NotificationRead {
+  id             String       @id @default(cuid())
+  notificationId String
+  userId         String
+  readAt         DateTime     @default(now())
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@index([userId, readAt])
 }
 
 

@@ -160,7 +160,7 @@ function ActivityItem({ log }: { log: ActivityLog }) {
                     <span className="capitalize">{log.action}</span>
                     {log.field && <span className="text-muted-foreground"> {log.field}</span>}
                     {log.taskTitle && (
-                        <span className="font-medium"> on "{log.taskTitle}"</span>
+                        <span className="font-medium"> on &quot;{log.taskTitle}&quot;</span>
                     )}
                 </p>
                 {log.details && (

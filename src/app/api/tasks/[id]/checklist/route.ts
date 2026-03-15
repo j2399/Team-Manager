@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { getTaskContext } from '@/lib/access'
@@ -149,7 +150,7 @@ export async function PATCH(
             return NextResponse.json({ error: 'Checklist item not found' }, { status: 404 })
         }
 
-        const updateData: any = {}
+        const updateData: Prisma.TaskChecklistItemUpdateInput = {}
 
         if (typeof completed === 'boolean') {
             updateData.completed = completed

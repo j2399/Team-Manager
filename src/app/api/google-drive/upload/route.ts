@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { driveConfigTableExists, getDriveClientForWorkspace, getDriveFolderCache, isFolderWithinRoot, refreshDriveFolderCache } from "@/lib/googleDrive"
 import { Readable } from "stream"
+import type { ReadableStream } from "stream/web"
 
 export const runtime = "nodejs"
 
@@ -57,46 +58,33 @@ export async function POST(request: Request) {
     }
 
     try {
-        const payloads: { name: string; type: string; buffer: Buffer }[] = []
+        const drive = await getDriveClientForWorkspace(workspaceId)
+        const uploaded: { id: string; name: string }[] = []
+
         for (const entry of files) {
             if (!(entry instanceof File)) continue
-            const arrayBuffer = await entry.arrayBuffer()
-            payloads.push({
-                name: entry.name,
-                type: entry.type || "application/octet-stream",
-                buffer: Buffer.from(arrayBuffer),
+            const response = await drive.files.create({
+                requestBody: {
+                    name: entry.name,
+                    parents: [targetFolderId],
+                },
+                media: {
+                    mimeType: entry.type || "application/octet-stream",
+                    body: Readable.fromWeb(entry.stream() as unknown as ReadableStream),
+                },
+                fields: "id, name",
+                supportsAllDrives: true,
+            })
+
+            uploaded.push({
+                id: response.data.id || "",
+                name: response.data.name || entry.name,
             })
         }
 
-        const response = NextResponse.json({
-            uploaded: payloads.map((file) => ({ id: "", name: file.name })),
-            queued: true,
-        })
+        void refreshDriveFolderCache(workspaceId)
 
-        void (async () => {
-            try {
-                const drive = await getDriveClientForWorkspace(workspaceId)
-                for (const file of payloads) {
-                    await drive.files.create({
-                        requestBody: {
-                            name: file.name,
-                            parents: [targetFolderId],
-                        },
-                        media: {
-                            mimeType: file.type,
-                            body: Readable.from(file.buffer),
-                        },
-                        fields: "id, name",
-                        supportsAllDrives: true,
-                    })
-                }
-                void refreshDriveFolderCache(workspaceId)
-            } catch (error) {
-                console.error("Google Drive background upload error:", error)
-            }
-        })()
-
-        return response
+        return NextResponse.json({ uploaded, queued: false })
     } catch (error) {
         console.error("Google Drive upload error:", error)
         return NextResponse.json({ error: "Failed to upload files" }, { status: 500 })

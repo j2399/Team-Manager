@@ -83,6 +83,13 @@ type ColumnData = {
     tasks: Task[]
 }
 
+type SyncTask = Partial<Task> & {
+    id: string
+    title: string
+    columnId: string | null
+    hasAttachment?: boolean
+}
+
 type BoardProps = {
     board: {
         id: string
@@ -402,7 +409,7 @@ export function Board({
             try {
                 const baseSince = lastSyncTime.current
                 let cursor: string | null = null
-                const allTasks: any[] = []
+                const allTasks: SyncTask[] = []
                 const deletedIds = new Set<string>()
                 let latestUpdate: string | null = null
                 let latestDeletion: string | null = null
@@ -443,7 +450,7 @@ export function Board({
                 }
 
                 if (allTasks.length > 0 || deletedIds.size > 0) {
-                    const changedById = new Map<string, any>()
+                    const changedById = new Map<string, SyncTask>()
                     for (const task of allTasks) {
                         if (task?.id) {
                             changedById.set(task.id, task)

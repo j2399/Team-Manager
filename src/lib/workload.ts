@@ -154,6 +154,37 @@ export type WorkloadUserStat = {
     tasks: WorkloadTask[]
 }
 
+type WorkloadTaskInput = {
+    id: string
+    title: string
+    columnId?: string | null
+    assigneeId?: string | null
+    assignees?: Array<{ userId?: string | null; user?: { id?: string | null } | null }> | null
+    column?: {
+        name?: string | null
+        board?: {
+            project?: {
+                id?: string | null
+                name?: string | null
+                color?: string | null
+            } | null
+        } | null
+    } | null
+    push?: { id?: string | null; name?: string | null } | null
+    dueDate?: Date | null
+    endDate?: Date | null
+    startDate?: Date | null
+    createdAt: Date
+    updatedAt: Date
+    submittedAt?: Date | null
+    approvedAt?: Date | null
+    progress?: number | null
+    enableProgress?: boolean | null
+    helpRequests?: Array<unknown> | null
+    activityLogs?: Array<{ createdAt?: Date | null }> | null
+    checklistItems?: Array<{ completed?: boolean | null }> | null
+}
+
 const DAY_MS = 1000 * 60 * 60 * 24
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -349,7 +380,7 @@ const getCycleDays = (task: WorkloadTask, config: WorkloadConfig) => {
     return clamp(diffDays, config.baseline.minCycleDays, config.baseline.maxCycleDays)
 }
 
-const getAssigneeIds = (task: any) => {
+const getAssigneeIds = (task: WorkloadTaskInput) => {
     const ids = new Set<string>()
     if (task.assigneeId) ids.add(task.assigneeId)
     if (Array.isArray(task.assignees)) {
@@ -362,7 +393,7 @@ const getAssigneeIds = (task: any) => {
 }
 
 export const buildWorkloadTasks = (
-    tasks: any[],
+    tasks: WorkloadTaskInput[],
     now: Date,
     config: WorkloadConfig
 ): WorkloadTask[] => {
@@ -386,11 +417,12 @@ export const buildWorkloadTasks = (
         const helpRequestCount = task.helpRequests?.length ?? 0
         const isBlockedByHelp = helpRequestCount > 0
         const isUnassigned = assigneeIds.length === 0 && columnName !== 'Done'
-        const isReviewStale =
+        const isReviewStale = Boolean(
             columnName === 'Review' &&
             task.submittedAt &&
             Math.floor((now.getTime() - new Date(task.submittedAt).getTime()) / DAY_MS) >=
                 config.thresholds.reviewStaleDays
+        )
         const checklistItems = task.checklistItems ?? []
 
         return {
@@ -422,7 +454,7 @@ export const buildWorkloadTasks = (
             isUnassigned,
             isReviewStale,
             checklistTotal: checklistItems.length,
-            checklistCompleted: checklistItems.filter((item: any) => item?.completed).length
+            checklistCompleted: checklistItems.filter((item) => item?.completed).length
         }
     })
 }

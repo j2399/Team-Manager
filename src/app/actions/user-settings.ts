@@ -99,27 +99,80 @@ export async function deleteAccount() {
     if (!user) return { error: "Not authenticated" }
 
     try {
-        await prisma.$transaction([
-            // 1. Anonymize Activity Logs
-            prisma.activityLog.updateMany({
+        const ownedWorkspaces = await prisma.workspace.findMany({
+            where: { ownerId: user.id },
+            select: {
+                id: true,
+                name: true,
+                members: {
+                    where: { userId: { not: user.id } },
+                    select: { userId: true, role: true, joinedAt: true },
+                    orderBy: { joinedAt: 'asc' }
+                }
+            }
+        })
+
+        const ownershipTransfers = ownedWorkspaces.map((workspace) => {
+            const replacement =
+                workspace.members.find((member) => member.role === 'Admin') ||
+                workspace.members.find((member) => member.role === 'Team Lead') ||
+                workspace.members[0]
+
+            return {
+                workspaceId: workspace.id,
+                workspaceName: workspace.name,
+                replacement,
+            }
+        })
+
+        const blockedWorkspace = ownershipTransfers.find((entry) => !entry.replacement)
+        if (blockedWorkspace) {
+            return {
+                error: `Delete or transfer workspace \"${blockedWorkspace.workspaceName}\" before deleting your account.`
+            }
+        }
+
+        await prisma.$transaction(async (tx) => {
+            await tx.activityLog.updateMany({
                 where: { changedBy: user.id },
                 data: { changedByName: "Deleted User" }
-            }),
-            // 2. Anonymize Comments
-            prisma.comment.updateMany({
+            })
+
+            await tx.comment.updateMany({
                 where: { authorId: user.id },
                 data: { authorName: "Deleted User" }
-            }),
-            // 3. Anonymize Chat Messages
-            prisma.generalChatMessage.updateMany({
+            })
+
+            await tx.generalChatMessage.updateMany({
                 where: { authorId: user.id },
                 data: { authorName: "Deleted User" }
-            }),
-            // 4. Delete the user
-            prisma.user.delete({
+            })
+
+            for (const transfer of ownershipTransfers) {
+                if (!transfer.replacement) continue
+
+                await tx.workspace.update({
+                    where: { id: transfer.workspaceId },
+                    data: { ownerId: transfer.replacement.userId }
+                })
+
+                if (transfer.replacement.role !== 'Admin') {
+                    await tx.workspaceMember.update({
+                        where: {
+                            userId_workspaceId: {
+                                userId: transfer.replacement.userId,
+                                workspaceId: transfer.workspaceId,
+                            }
+                        },
+                        data: { role: 'Admin' }
+                    })
+                }
+            }
+
+            await tx.user.delete({
                 where: { id: user.id }
             })
-        ])
+        })
 
         const cookieStore = await cookies()
         cookieStore.getAll().forEach((cookie) => {

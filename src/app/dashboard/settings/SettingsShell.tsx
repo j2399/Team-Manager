@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { User, Users, Plug, AlertTriangle } from "lucide-react"
@@ -37,19 +37,8 @@ export function SettingsShell({ children, visibleTabs }: SettingsShellProps) {
         ? tabFromQuery
         : tabIds[0] || "general"
 
-    const [activeTab, setActiveTab] = useState(initialTab)
-
-    const tabKey = tabIds.join("|")
-
-    useEffect(() => {
-        if (tabFromQuery && tabIds.includes(tabFromQuery)) {
-            setActiveTab(tabFromQuery)
-            return
-        }
-        if (!tabIds.includes(activeTab)) {
-            setActiveTab(tabIds[0] || "general")
-        }
-    }, [tabFromQuery, tabKey, activeTab])
+    const [selectedTab, setSelectedTab] = useState<string | null>(null)
+    const activeTab = selectedTab && tabIds.includes(selectedTab) ? selectedTab : initialTab
 
     return (
         <div className="flex flex-col md:flex-row gap-6 w-full max-w-5xl mx-auto p-6 pb-20 animate-fade-in-up">
@@ -58,7 +47,7 @@ export function SettingsShell({ children, visibleTabs }: SettingsShellProps) {
                 {tabs.map((tab) => (
                     <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
+                        onClick={() => setSelectedTab(tab.id)}
                         className={cn(
                             "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors",
                             activeTab === tab.id
@@ -79,7 +68,7 @@ export function SettingsShell({ children, visibleTabs }: SettingsShellProps) {
                 {tabs.map((tab) => (
                     <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
+                        onClick={() => setSelectedTab(tab.id)}
                         className={cn(
                             "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors text-left",
                             activeTab === tab.id

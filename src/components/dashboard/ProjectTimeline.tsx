@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useMemo } from "react"
 import Link from "next/link"
 import { Calendar } from "lucide-react"
 
@@ -19,10 +19,31 @@ type ProjectTimelineProps = {
 }
 
 export function ProjectTimeline({ tasks }: ProjectTimelineProps) {
-    const [todayPos, setTodayPos] = useState<number | null>(null)
-
     // Filter valid tasks and group by division
     const tasksWithDates = tasks.filter(t => t.startDate && t.endDate)
+    const hasTimelineData = tasksWithDates.length > 0
+
+    const dates = tasksWithDates.flatMap(t => [new Date(t.startDate!), new Date(t.endDate!)])
+    const minDate = hasTimelineData ? new Date(Math.min(...dates.map(d => d.getTime()))) : null
+    const maxDate = hasTimelineData ? new Date(Math.max(...dates.map(d => d.getTime()))) : null
+
+    // Add padding to range
+    const startObj = minDate ? new Date(minDate) : new Date()
+    startObj.setDate(startObj.getDate() - 3)
+    const endObj = maxDate ? new Date(maxDate) : new Date(startObj)
+    endObj.setDate(endObj.getDate() + 3)
+
+    const startTime = startObj.getTime()
+    const endTime = endObj.getTime()
+    const totalDuration = endTime - startTime || 1
+
+    const getPosition = (date: Date) => {
+        return ((date.getTime() - startTime) / totalDuration) * 100
+    }
+    const todayPos = useMemo(
+        () => (hasTimelineData ? getPosition(new Date()) : null),
+        [hasTimelineData, startTime, totalDuration]
+    )
 
     const byProject = tasksWithDates.reduce((acc, task) => {
         const projectId = task.project?.id || 'unknown'
@@ -44,29 +65,6 @@ export function ProjectTimeline({ tasks }: ProjectTimelineProps) {
             </div>
         )
     }
-
-    // Determine global date range for the chart
-    const dates = tasksWithDates.flatMap(t => [new Date(t.startDate!), new Date(t.endDate!)])
-    const minDate = new Date(Math.min(...dates.map(d => d.getTime())))
-    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())))
-
-    // Add padding to range
-    const startObj = new Date(minDate)
-    startObj.setDate(startObj.getDate() - 3)
-    const endObj = new Date(maxDate)
-    endObj.setDate(endObj.getDate() + 3)
-
-    const startTime = startObj.getTime()
-    const endTime = endObj.getTime()
-    const totalDuration = endTime - startTime || 1
-
-    const getPosition = (date: Date) => {
-        return ((date.getTime() - startTime) / totalDuration) * 100
-    }
-
-    useEffect(() => {
-        setTodayPos(getPosition(new Date()))
-    }, [])
 
     return (
         <div className="w-full space-y-4">

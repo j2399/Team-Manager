@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useMemo } from "react"
 import Link from "next/link"
 
 type Task = {
@@ -17,26 +17,16 @@ type MiniGanttChartProps = {
 }
 
 export function MiniGanttChart({ tasks }: MiniGanttChartProps) {
-    const [todayPos, setTodayPos] = useState<number | null>(null)
-    
     const tasksWithDates = tasks.filter(t => t.startDate && t.endDate)
-    
-    if (tasksWithDates.length === 0) {
-        return (
-            <div className="p-4 text-xs text-center text-muted-foreground">
-                No tasks with dates
-            </div>
-        )
-    }
-
+    const hasTimelineData = tasksWithDates.length > 0
     const dates = tasksWithDates.flatMap(t => [new Date(t.startDate!), new Date(t.endDate!)])
-    const minDate = new Date(Math.min(...dates.map(d => d.getTime())))
-    const maxDate = new Date(Math.max(...dates.map(d => d.getTime())))
+    const minDate = hasTimelineData ? new Date(Math.min(...dates.map(d => d.getTime()))) : null
+    const maxDate = hasTimelineData ? new Date(Math.max(...dates.map(d => d.getTime()))) : null
 
     // Extend range
-    const startObj = new Date(minDate)
+    const startObj = minDate ? new Date(minDate) : new Date()
     startObj.setDate(startObj.getDate() - 2)
-    const endObj = new Date(maxDate)
+    const endObj = maxDate ? new Date(maxDate) : new Date(startObj)
     endObj.setDate(endObj.getDate() + 2)
 
     const startTime = startObj.getTime()
@@ -46,11 +36,18 @@ export function MiniGanttChart({ tasks }: MiniGanttChartProps) {
     const getPosition = (date: Date) => {
         return ((date.getTime() - startTime) / totalDuration) * 100
     }
+    const todayPos = useMemo(
+        () => (hasTimelineData ? getPosition(new Date()) : null),
+        [hasTimelineData, startTime, totalDuration]
+    )
 
-    // Calculate today position only on client to avoid hydration mismatch
-    useEffect(() => {
-        setTodayPos(getPosition(new Date()))
-    }, [startTime, totalDuration])
+    if (!hasTimelineData) {
+        return (
+            <div className="p-4 text-xs text-center text-muted-foreground">
+                No tasks with dates
+            </div>
+        )
+    }
 
     const getStatusColor = (status: string | undefined) => {
         switch (status) {

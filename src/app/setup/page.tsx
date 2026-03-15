@@ -19,7 +19,7 @@ export default async function SetupPage() {
         <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
             <div className="mb-8 text-center">
                 <h1 className="text-3xl font-bold mb-2">Welcome</h1>
-                <p className="text-muted-foreground">Let's get you set up.</p>
+                <p className="text-muted-foreground">Let&apos;s get you set up.</p>
             </div>
             <SetupContent />
         </div>

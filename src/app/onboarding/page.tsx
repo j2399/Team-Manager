@@ -54,7 +54,7 @@ export default async function OnboardingPage() {
                             Welcome, {discordUser.global_name || discordUser.username}!
                         </CardTitle>
                         <CardDescription className="text-sm sm:text-base text-zinc-500">
-                            Let's get your profile set up on CuPI. <span className="text-zinc-400 text-xs sm:text-sm block mt-1">(You can change these later)</span>
+                            Let&apos;s get your profile set up on CuPI. <span className="text-zinc-400 text-xs sm:text-sm block mt-1">(You can change these later)</span>
                         </CardDescription>
                     </div>
                 </CardHeader>
@@ -70,4 +70,3 @@ export default async function OnboardingPage() {
         </div >
     )
 }
-

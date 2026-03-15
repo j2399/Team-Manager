@@ -37,6 +37,18 @@ type ProjectActivity = {
     pushes: PushStats[]
 }
 
+type ProjectListItem = {
+    id: string
+    name: string
+    color?: string | null
+}
+
+function isProjectListItem(value: unknown): value is ProjectListItem {
+    return typeof value === 'object' && value !== null
+        && typeof (value as { id?: unknown }).id === 'string'
+        && typeof (value as { name?: unknown }).name === 'string'
+}
+
 // Check if a push is overdue
 const isPushOverdue = (push: PushStats) => {
     if (!push.endDate) return false
@@ -299,7 +311,7 @@ export function ProjectActivityTracker() {
                 const projectsData = await projectsRes.json()
 
                 if (projectsRes.ok && Array.isArray(projectsData)) {
-                    const transformed = projectsData.map((p: any) => ({
+                    const transformed = projectsData.filter(isProjectListItem).map((p) => ({
                         id: p.id,
                         name: p.name,
                         color: p.color || '#6b7280',

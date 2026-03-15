@@ -3,16 +3,8 @@
 import prisma from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/auth"
 import { joinWorkspaceByCode } from "@/lib/workspaceInvites"
-
-const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-
-function generateCode() {
-    let result = ''
-    for (let i = 0; i < 6; i++) {
-        result += ALPHABET.charAt(Math.floor(Math.random() * ALPHABET.length))
-    }
-    return result
-}
+import { getErrorMessage } from "@/lib/errors"
+import { createWorkspaceForUser } from "@/lib/workspaces"
 
 export async function createWorkspace(formData: FormData) {
     const user = await getCurrentUser()
@@ -22,56 +14,17 @@ export async function createWorkspace(formData: FormData) {
     if (!name || name.trim().length === 0) return { error: "Workspace name is required" }
 
     try {
-        const userId = user.id
-
-        let workspace = null
-        let retries = 0
-        const MAX_RETRIES = 10
-
-        while (!workspace && retries < MAX_RETRIES) {
-            const code = generateCode()
-            try {
-                workspace = await prisma.workspace.create({
-                    data: {
-                        name,
-                        inviteCode: code,
-                        ownerId: userId
-                    }
-                })
-            } catch (e: any) {
-                if (e.code === 'P2002') { // Unique constraint
-                    retries++
-                    continue
-                }
-                throw e
-            }
-        }
-
-        if (!workspace) throw new Error("Failed to create workspace. Could not generate unique code.")
-
-        // Create Member
-        await prisma.workspaceMember.create({
-            data: {
-                userId: userId,
-                workspaceId: workspace.id,
-                role: 'Admin',
-                name: user.name
-            }
-        })
-
-        // Update user to be Admin of this workspace
-        await prisma.user.update({
-            where: { id: userId },
-            data: {
-                workspaceId: workspace.id
-            }
+        const workspace = await createWorkspaceForUser({
+            userId: user.id,
+            userName: user.name,
+            workspaceName: name,
         })
 
         return { success: true, workspaceId: workspace.id }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Create workspace error:", error)
-        return { error: `Failed to create workspace: ${error.message || error}` }
+        return { error: `Failed to create workspace: ${getErrorMessage(error)}` }
     }
 }
 

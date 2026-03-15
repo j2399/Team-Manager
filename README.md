@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CuPI Platform
 
-## Getting Started
+CuPI is a Next.js workspace platform for project planning, Kanban execution, workload analytics, notifications, and team collaboration.
 
-First, run the development server:
+## What It Includes
+
+- Multi-workspace onboarding with invite codes and workspace switching
+- Project divisions, pushes, Kanban boards, approvals, comments, and attachments
+- Leadership dashboards for workload, activity, and delivery health
+- Discord login plus optional Google Drive-backed storage
+- Prisma-backed persistence and server actions for core mutations
+
+## Stack
+
+- Next.js App Router
+- React 19
+- Prisma
+- Tailwind CSS
+- TypeScript
+
+## Required Environment Variables
+
+Core:
+
+- `DATABASE_URL`
+- `APP_URL` or `NEXT_PUBLIC_APP_URL`
+
+Discord auth:
+
+- `DISCORD_CLIENT_ID`
+- `DISCORD_CLIENT_SECRET`
+- `DISCORD_REDIRECT_URI`
+
+Google Drive integration:
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REDIRECT_URI` (optional if `APP_URL` is set)
+- `GOOGLE_DRIVE_TOKEN_SECRET` (recommended; falls back to OAuth client secrets if omitted)
+
+Optional:
+
+- `NEXT_PUBLIC_GIPHY_API_KEY`
+- `ENABLE_DEMO_MODE`
+- `VERCEL_URL`
+
+## Local Setup
 
 ```bash
+npm install
+npx prisma generate
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `npm run dev` - start the app locally
+- `npm run lint` - run ESLint
+- `npm run typecheck` - run TypeScript without emitting files
+- `npm run test` - run the automated unit test suite
+- `npm run build` - generate Prisma client and build the app
 
-## Learn More
+If you want to compile without applying migrations first:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+SKIP_MIGRATIONS=1 npm run build
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Notes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- New Prisma migrations are checked into `prisma/migrations/`.
+- Google Drive tokens are stored encrypted before persistence.
+- Attachment access is proxied through authenticated routes instead of exposing direct links.
+- CI runs lint, typecheck, and tests on every push and pull request.

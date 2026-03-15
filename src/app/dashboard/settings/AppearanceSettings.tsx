@@ -29,13 +29,13 @@ export function AppearanceSettings({ userId }: { userId: string }) {
         try {
             const pref = (window.localStorage.getItem(userKey) || window.localStorage.getItem(rootKey) || "system") as ThemePreference
             if (pref === "system" || pref === "light" || pref === "dark") {
+                // eslint-disable-next-line react-hooks/set-state-in-effect -- sync stored preference when the scoped user changes
                 setPreference(pref)
                 applyThemePreference(pref)
             }
         } catch {
             // ignore
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [userId])
 
     const setAndPersist = (next: ThemePreference) => {
@@ -87,4 +87,3 @@ export function AppearanceSettings({ userId }: { userId: string }) {
         </div>
     )
 }
-

@@ -60,6 +60,7 @@ export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogPr
     // Reset dates when dialog opens or push changes
     useEffect(() => {
         if (open) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- reset local dialog state from props on open
             setName(push?.name || "")
             setStartDate(push?.startDate ? new Date(push.startDate).toISOString().split('T')[0] : getDefaultStartDate())
             setEndDate(push?.endDate ? new Date(push.endDate).toISOString().split('T')[0] : "")
@@ -220,7 +221,7 @@ export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogPr
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete Project</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Are you sure you want to delete "{push?.name}"? Tasks will be moved to backlog.
+                            Are you sure you want to delete &quot;{push?.name}&quot;? Tasks will be moved to backlog.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

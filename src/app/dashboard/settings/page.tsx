@@ -3,6 +3,7 @@ import { redirect } from "next/navigation"
 import prisma from "@/lib/prisma"
 import { driveConfigTableExists } from "@/lib/googleDrive"
 import { appUrl } from "@/lib/appUrl"
+import { getErrorCode } from "@/lib/errors"
 import { headers } from "next/headers"
 import { SettingsShell } from "./SettingsShell"
 import { GeneralTab } from "./GeneralTab"
@@ -13,14 +14,11 @@ import { DangerTab } from "./DangerTab"
 export const dynamic = "force-dynamic"
 
 async function fetchDriveConfig(workspaceId: string) {
-    const driveDelegate = (prisma as { workspaceDriveConfig?: { findUnique?: Function } }).workspaceDriveConfig
-    if (!driveDelegate?.findUnique) return null
-
     const hasTable = await driveConfigTableExists()
     if (!hasTable) return null
 
     try {
-        return await driveDelegate.findUnique({
+        return await prisma.workspaceDriveConfig.findUnique({
             where: { workspaceId },
             select: {
                 refreshToken: true,
@@ -29,8 +27,9 @@ async function fetchDriveConfig(workspaceId: string) {
                 connectedByName: true,
             },
         })
-    } catch (error: any) {
-        if (error?.code === "P2021") return null
+    } catch (error: unknown) {
+        const code = getErrorCode(error)
+        if (code === "P2021" || code === "P2022") return null
         throw error
     }
 }

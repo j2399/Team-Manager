@@ -10,6 +10,7 @@ import {
     useSensor,
     PointerSensor,
     DragEndEvent,
+    DragOverEvent,
     DragStartEvent,
     useDroppable,
     useDraggable,
@@ -100,6 +101,13 @@ function getDueInfo(dueDate: string | null): { text: string; isOverdue: boolean;
     return { text: `${diffDays}d`, isOverdue: false, isUrgent: false }
 }
 
+function getPendingReviewText(submittedAt: string | null) {
+    if (!submittedAt) return null
+
+    const days = Math.floor((new Date().getTime() - new Date(submittedAt).getTime()) / (1000 * 60 * 60 * 24))
+    return days === 0 ? 'Pending today' : `Pending ${days}d`
+}
+
 // Draggable Task Card Component
 function DraggableTaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -127,8 +135,8 @@ function DraggableTaskCard({ task, onClick }: { task: Task; onClick: () => void 
 function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }) {
     const isDone = task.columnName === 'Done'
     const isReview = task.columnName === 'Review'
-    const isOverdue = isDone ? false : (task.dueDate ? new Date(task.dueDate).getTime() < Date.now() : false)
-    const daysLeft = isDone ? null : (task.dueDate ? Math.ceil((new Date(task.dueDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null)
+    const dueInfo = isDone ? null : getDueInfo(task.dueDate)
+    const reviewPendingText = isReview ? getPendingReviewText(task.submittedAt) : null
 
     // Done column variant
     if (isDone) {
@@ -180,7 +188,7 @@ function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }
                 <div className="flex items-center gap-1.5 min-w-0">
                     {isReview ? (
                         // Show pending review time for Review cards
-                        task.submittedAt && (
+                        reviewPendingText && (
                             <div
                                 className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium border bg-muted text-muted-foreground border-transparent truncate tag-shimmer"
                                 style={{
@@ -188,20 +196,15 @@ function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }
                                 } as React.CSSProperties}
                             >
                                 <Clock className="w-3 h-3 shrink-0" />
-                                <span className="truncate">
-                                    {(() => {
-                                        const days = Math.floor((Date.now() - new Date(task.submittedAt).getTime()) / (1000 * 60 * 60 * 24))
-                                        return days === 0 ? 'Pending today' : `Pending ${days}d`
-                                    })()}
-                                </span>
+                                <span className="truncate">{reviewPendingText}</span>
                             </div>
                         )
                     ) : (
                         // Show due date for other cards
-                        daysLeft !== null && (
+                        dueInfo && (
                             <div
                                 className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-sm font-medium border truncate tag-shimmer"
-                                style={isOverdue ? {
+                                style={dueInfo.isOverdue ? {
                                     background: 'linear-gradient(to right, rgba(239, 68, 68, 0.15), transparent)',
                                     borderColor: 'rgba(239, 68, 68, 0.3)',
                                     color: 'rgb(220, 38, 38)',
@@ -214,9 +217,7 @@ function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }
                                 } as React.CSSProperties}
                             >
                                 <Clock className="w-3 h-3 shrink-0" />
-                                <span className="truncate">
-                                    {isOverdue ? `${Math.abs(daysLeft)}d overdue` : daysLeft === 0 ? "Today" : `${daysLeft}d`}
-                                </span>
+                                <span className="truncate">{dueInfo.text}</span>
                             </div>
                         )
                     )}
@@ -390,9 +391,9 @@ export function PersonalKanban({ columns: initialColumns, projects, userName }: 
         }
     }, [])
 
-    const handleDragOver = useCallback((event: any) => {
+    const handleDragOver = useCallback((event: DragOverEvent) => {
         const { over } = event
-        setOverColumnId(over?.id ?? null)
+        setOverColumnId(typeof over?.id === 'string' ? over.id : null)
     }, [])
 
     const handleDragEnd = useCallback(async (event: DragEndEvent) => {
@@ -502,7 +503,7 @@ export function PersonalKanban({ columns: initialColumns, projects, userName }: 
                 <div className="shrink-0 border-b bg-background p-4">
                     <div className="flex items-center justify-between gap-4">
                         <div>
-                            <h1 className="text-lg font-semibold">{userName}'s Board</h1>
+                            <h1 className="text-lg font-semibold">{`${userName}'s Board`}</h1>
                             <p className="text-xs text-muted-foreground mt-0.5">
                                 {filteredTotalTasks} tasks across {projects.length} divisions
                             </p>

@@ -1,5 +1,6 @@
 'use server'
 
+import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 
@@ -36,7 +37,7 @@ export async function createProject(formData: FormData) {
         }
 
         // Use interactive transaction to ensure all parts are created or none
-        const project = await prisma.$transaction(async (tx: any) => {
+        const project = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
             const p = await tx.project.create({
                 data: {
                     name,

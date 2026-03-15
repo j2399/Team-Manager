@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { getWorkspaceUserIds } from '@/lib/access'
+import { getErrorCode, getErrorMessage } from '@/lib/errors'
 
 const PROJECT_COLORS = [
     "#ef4444", // red
@@ -144,7 +145,7 @@ export async function POST(request: Request) {
             })
 
             // Ensure lead is added as a member
-            let uniqueMemberIds = new Set(validMemberIds)
+            const uniqueMemberIds = new Set(validMemberIds)
             if (leadId) {
                 uniqueMemberIds.add(leadId)
             }
@@ -205,7 +206,7 @@ export async function POST(request: Request) {
                         if (realId && dependsOnRealId) {
                             await tx.push.update({
                                 where: { id: realId },
-                                data: { dependsOnId: dependsOnRealId } as any
+                                data: { dependsOnId: dependsOnRealId }
                             })
                         }
                     }
@@ -216,14 +217,14 @@ export async function POST(request: Request) {
         })
 
         return NextResponse.json(project, { status: 201 })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('[API] Failed to create division:', error)
-        if (error.code) console.error('[API] Error Code:', error.code)
-        if (error.meta) console.error('[API] Error Meta:', error.meta)
+        const code = getErrorCode(error)
+        if (code) console.error('[API] Error Code:', code)
 
         return NextResponse.json({
-            error: error.message || 'Failed to create division',
-            details: error.meta || error.code || undefined
+            error: getErrorMessage(error, 'Failed to create division'),
+            details: code || undefined
         }, { status: 500 })
     }
 }

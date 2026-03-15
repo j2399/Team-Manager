@@ -1,8 +1,17 @@
 import { google } from "googleapis"
 import prisma from "@/lib/prisma"
 import { appUrl } from "@/lib/appUrl"
+import { getErrorCode } from "@/lib/errors"
+import { decryptGoogleToken, encryptGoogleToken } from "@/lib/googleDriveTokens"
 
 type DriveConfig = {
+    workspaceId: string
+    accessToken: string | null
+    refreshToken: string | null
+    tokenExpiry: Date | null
+}
+
+type StoredDriveConfig = {
     workspaceId: string
     accessToken: string | null
     refreshToken: string | null
@@ -34,6 +43,15 @@ export function getGoogleOAuthClient() {
     return new google.auth.OAuth2(clientId, clientSecret, redirectUri)
 }
 
+function decodeDriveConfig(config: StoredDriveConfig): DriveConfig {
+    return {
+        workspaceId: config.workspaceId,
+        accessToken: decryptGoogleToken(config.accessToken),
+        refreshToken: decryptGoogleToken(config.refreshToken),
+        tokenExpiry: config.tokenExpiry,
+    }
+}
+
 async function refreshAccessToken(config: DriveConfig) {
     const oauthClient = getGoogleOAuthClient()
     oauthClient.setCredentials({
@@ -50,7 +68,7 @@ async function refreshAccessToken(config: DriveConfig) {
         await prisma.workspaceDriveConfig.update({
             where: { workspaceId: config.workspaceId },
             data: {
-                accessToken,
+                accessToken: encryptGoogleToken(accessToken),
                 tokenExpiry: expiryDate ? new Date(expiryDate) : null,
             },
         })
@@ -74,7 +92,7 @@ export async function getDriveClientForWorkspace(workspaceId: string) {
         throw new Error("Google Drive not connected")
     }
 
-    const oauthClient = await refreshAccessToken(config)
+    const oauthClient = await refreshAccessToken(decodeDriveConfig(config))
 
     return google.drive({
         version: "v3",
@@ -161,8 +179,8 @@ export async function refreshDriveFolderCache(workspaceId: string) {
                 folderTreeUpdatedAt: new Date(),
             },
         })
-    } catch (error: any) {
-        if (error?.code === "P2022") {
+    } catch (error: unknown) {
+        if (getErrorCode(error) === "P2022") {
             return folders
         }
         throw error
@@ -182,8 +200,8 @@ export async function getDriveFolderCache(workspaceId: string) {
                 folderTreeUpdatedAt: true,
             },
         })
-    } catch (error: any) {
-        if (error?.code === "P2022") {
+    } catch (error: unknown) {
+        if (getErrorCode(error) === "P2022") {
             try {
                 const drive = await getDriveClientForWorkspace(workspaceId)
                 return await listAllFolders(drive)
@@ -202,8 +220,8 @@ export async function getDriveFolderCache(workspaceId: string) {
     if (!config?.folderTree || isStale) {
         try {
             return await refreshDriveFolderCache(workspaceId)
-        } catch (error: any) {
-            if (error?.code === "P2022") {
+        } catch (error: unknown) {
+            if (getErrorCode(error) === "P2022") {
                 try {
                     const drive = await getDriveClientForWorkspace(workspaceId)
                     return await listAllFolders(drive)

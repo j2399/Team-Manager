@@ -48,6 +48,7 @@ export function TimelineManagerDialog({
     // Sync initial pushes to local state when dialog opens
     useEffect(() => {
         if (open) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- reset editable push draft when dialog opens
             setPushes(initialPushes.map(p => ({
                 tempId: p.id, // Using real ID as tempId for existing pushes
                 name: p.name,

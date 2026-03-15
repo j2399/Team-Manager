@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/tooltip"
 import { TaskDialog } from "@/features/kanban/TaskDialog"
 
-type Task = {
+export type HeatmapTask = {
     id: string
     title: string
     columnName: string
@@ -40,7 +40,7 @@ type Task = {
     isUnassigned: boolean
 }
 
-type UserStat = {
+export type HeatmapUserStat = {
     id: string
     name: string
     avatar: string | null
@@ -55,23 +55,23 @@ type UserStat = {
     helpRequestTasks: number
     workloadScore: number
     status: 'struggling' | 'available' | 'on-track'
-    tasks: Task[]
+    tasks: HeatmapTask[]
 }
 
-type CriticalIssue = {
+export type HeatmapCriticalIssue = {
     type: string
     severity: 'critical' | 'warning' | 'info'
     message: string
     count: number
-    tasks: Task[]
+    tasks: HeatmapTask[]
 }
 
-type DashboardHeatmapProps = {
-    userStats: UserStat[]
-    criticalIssues: CriticalIssue[]
+export type DashboardHeatmapProps = {
+    userStats: HeatmapUserStat[]
+    criticalIssues: HeatmapCriticalIssue[]
     overloadedUsers: string[]
     idleUsers: string[]
-    allTasks: Task[]
+    allTasks: HeatmapTask[]
     projects: {
         id: string
         name: string
@@ -147,17 +147,15 @@ function WorkloadSparkline({ history }: { history: WorkloadHistory[] }) {
     const chartHeight = height - padding.top - padding.bottom
 
     // Calculate cumulative values
-    let cumSubmitted = 0
-    let cumApproved = 0
-    const data = history.map(h => {
-        cumSubmitted += h.submitted
-        cumApproved += h.approved
-        return {
-            date: new Date(h.date),
-            submitted: cumSubmitted,
-            approved: cumApproved
-        }
-    })
+    const data = history.reduce<Array<{ date: Date; submitted: number; approved: number }>>((acc, entry) => {
+        const previous = acc[acc.length - 1]
+        acc.push({
+            date: new Date(entry.date),
+            submitted: (previous?.submitted || 0) + entry.submitted,
+            approved: (previous?.approved || 0) + entry.approved,
+        })
+        return acc
+    }, [])
 
     const maxValue = Math.max(...data.map(d => Math.max(d.submitted, d.approved)), 1)
     const minDate = data[0].date.getTime()
@@ -222,18 +220,18 @@ function UserDetailDialog({
 }: {
     open: boolean
     onOpenChange: (open: boolean) => void
-    user: UserStat | null
-    unassignedTasks: Task[]
+    user: HeatmapUserStat | null
+    unassignedTasks: HeatmapTask[]
     onAssignClick: () => void
     onAssignTasks: (taskIds: string[], userId: string) => Promise<void>
-    onAddTask: (user: UserStat) => void
+    onAddTask: (user: HeatmapUserStat) => void
     onBack?: () => void
 }) {
     const router = useRouter()
 
     if (!user) return null
 
-    const handleTaskClick = (task: Task) => {
+    const handleTaskClick = (task: HeatmapTask) => {
         let url = `/dashboard/projects/${task.projectId}?highlight=${task.id}`
         if (task.pushId) url += `&push=${task.pushId}`
         router.push(url)
@@ -247,7 +245,7 @@ function UserDetailDialog({
     const doneTasks = user.tasks.filter(t => t.columnName === 'Done')
 
     // Task card component
-    const TaskCard = ({ task }: { task: Task }) => (
+    const TaskCard = ({ task }: { task: HeatmapTask }) => (
         <button
             onClick={() => handleTaskClick(task)}
             className="w-full text-left p-2 rounded-lg border bg-card hover:bg-muted/50 hover:border-primary/20 transition-all"
@@ -464,8 +462,8 @@ function AssignTasksDialog({
 }: {
     open: boolean
     onOpenChange: (open: boolean) => void
-    user: UserStat | null
-    unassignedTasks: Task[]
+    user: HeatmapUserStat | null
+    unassignedTasks: HeatmapTask[]
     onAssign: (taskIds: string[], userId: string) => Promise<void>
 }) {
     const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
@@ -576,7 +574,7 @@ function QuickAddTaskDialog({
 }: {
     open: boolean
     onOpenChange: (open: boolean) => void
-    user: UserStat | null
+    user: HeatmapUserStat | null
     projects: DashboardHeatmapProps['projects']
     onContinue: (projectId: string, pushId: string) => void
     requireManualContinue: boolean
@@ -608,12 +606,15 @@ function QuickAddTaskDialog({
                 ? initialPushId
                 : ''
 
+        /* eslint-disable react-hooks/set-state-in-effect -- reset selection when dialog opens */
         setSelectedProjectId(nextProjectId)
         setSelectedPushId(nextPushId)
+        /* eslint-enable react-hooks/set-state-in-effect */
     }, [open, user, projects, initialProjectId, initialPushId])
 
     useEffect(() => {
         if (selectedPushId && !activePushes.some((push) => push.id === selectedPushId)) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- clear invalid push when project changes
             setSelectedPushId('')
         }
     }, [selectedProjectId, selectedPushId, activePushes])
@@ -733,11 +734,11 @@ export function DashboardHeatmap({
     projects
 }: DashboardHeatmapProps) {
     const router = useRouter()
-    const [selectedUser, setSelectedUser] = useState<UserStat | null>(null)
-    const [assigningToUser, setAssigningToUser] = useState<UserStat | null>(null)
+    const [selectedUser, setSelectedUser] = useState<HeatmapUserStat | null>(null)
+    const [assigningToUser, setAssigningToUser] = useState<HeatmapUserStat | null>(null)
     const [issuePopup, setIssuePopup] = useState<'overdue' | 'stuck' | 'help' | null>(null)
     const [previousIssuePopup, setPreviousIssuePopup] = useState<'overdue' | 'stuck' | 'help' | null>(null)
-    const [quickAddTaskUser, setQuickAddTaskUser] = useState<UserStat | null>(null)
+    const [quickAddTaskUser, setQuickAddTaskUser] = useState<HeatmapUserStat | null>(null)
     const [quickAddSelection, setQuickAddSelection] = useState<{ projectId: string; pushId: string } | null>(null)
     const [quickAddRequireManualContinue, setQuickAddRequireManualContinue] = useState(false)
     const [localTaskDialog, setLocalTaskDialog] = useState<{

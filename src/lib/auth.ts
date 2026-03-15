@@ -1,6 +1,32 @@
 import { cookies } from 'next/headers'
 import { SESSION_COOKIE_NAME, getSession } from './session'
 
+export type CurrentUserRole = 'Admin' | 'Team Lead' | 'Member'
+
+export type CurrentUser = {
+    id: string
+    name: string
+    email: string
+    avatar: string | null
+    role: CurrentUserRole
+    workspaceId: string | null
+    workspaceName: string | undefined
+    workspace: NonNullable<Awaited<ReturnType<typeof getSession>>>['user']['workspace']
+    memberships: NonNullable<Awaited<ReturnType<typeof getSession>>>['user']['memberships']
+    discordId: string | null
+    hasOnboarded: boolean
+    skills: string[]
+    interests: string | null
+}
+
+function resolveCurrentUserRole(workspaceId: string | null, membershipRole: string | null, fallbackRole: string): CurrentUserRole {
+    if (!workspaceId) {
+        return fallbackRole === 'Admin' || fallbackRole === 'Team Lead' ? fallbackRole : 'Member'
+    }
+
+    return membershipRole === 'Admin' || membershipRole === 'Team Lead' ? membershipRole : 'Member'
+}
+
 export async function getCurrentUser() {
     try {
         const cookieStore = await cookies()
@@ -18,26 +44,25 @@ export async function getCurrentUser() {
             const membershipRole = workspaceId
                 ? dbUser.memberships?.find((membership) => membership.workspaceId === workspaceId)?.role
                 : null
-            const resolvedRole = (membershipRole || (!workspaceId ? dbUser.role : 'Member')) as
-                | 'Admin'
-                | 'Team Lead'
-                | 'Member'
+            const resolvedRole = resolveCurrentUserRole(workspaceId, membershipRole ?? null, dbUser.role)
 
-            return {
+            const currentUser: CurrentUser = {
                 id: dbUser.id,
                 name: dbUser.name,
                 email: dbUser.email,
-                avatar: dbUser.avatar,
+                avatar: dbUser.avatar || null,
                 role: resolvedRole,
-                workspaceId,
+                workspaceId: workspaceId || null,
                 workspaceName: dbUser.workspace?.name,
                 workspace: dbUser.workspace,
                 memberships: dbUser.memberships,
-                discordId: dbUser.discordId,
+                discordId: dbUser.discordId || null,
                 hasOnboarded: dbUser.hasOnboarded,
                 skills: dbUser.skills,
                 interests: dbUser.interests
             }
+
+            return currentUser
         }
 
         // No session - return null

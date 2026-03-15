@@ -1,4 +1,5 @@
 import prisma from "@/lib/prisma"
+import type { Prisma } from '@prisma/client'
 import { getCurrentUser } from '@/lib/auth'
 import { AlertCircle, Users, CheckCircle2, Circle, Loader2, Clock, Layout, ChevronRight } from "lucide-react"
 import Link from "next/link"
@@ -11,6 +12,7 @@ import { DashboardHeatmapLoader } from "./DashboardHeatmapLoader"
 import { ProjectActivityTracker } from "./ProjectActivityTracker"
 import { DriveUploadWidget } from "./DriveUploadWidget"
 import { driveConfigTableExists } from "@/lib/googleDrive"
+import { getErrorCode } from "@/lib/errors"
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +39,7 @@ export default async function DashboardPage() {
 
     // Parallel data fetching
     const fetchMyTasks = async () => {
-        let where: any = {
+        const where: Prisma.TaskWhereInput = {
             OR: [
                 { assigneeId: dbUser.id },
                 { assignees: { some: { userId: dbUser.id } } }
@@ -193,14 +195,11 @@ export default async function DashboardPage() {
     const fetchDriveConfig = async () => {
         if (!isLeadership) return null
 
-        const driveDelegate = (prisma as { workspaceDriveConfig?: { findUnique?: Function } }).workspaceDriveConfig
-        if (!driveDelegate?.findUnique) return null
-
         const hasTable = await driveConfigTableExists()
         if (!hasTable) return null
 
         try {
-            return await driveDelegate.findUnique({
+            return await prisma.workspaceDriveConfig.findUnique({
                 where: { workspaceId },
                 select: {
                     refreshToken: true,
@@ -209,8 +208,9 @@ export default async function DashboardPage() {
                     connectedByName: true
                 }
             })
-        } catch (error: any) {
-            if (error?.code === "P2021") {
+        } catch (error: unknown) {
+            const code = getErrorCode(error)
+            if (code === "P2021" || code === "P2022") {
                 return null
             }
             throw error
@@ -264,7 +264,7 @@ export default async function DashboardPage() {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div className="flex items-center gap-3 flex-wrap">
-                        <h1 className="text-xl font-semibold">{user.name?.split(' ')[0]}'s Dashboard</h1>
+                        <h1 className="text-xl font-semibold">{`${user.name?.split(' ')[0] || 'User'}'s Dashboard`}</h1>
                     </div>
                 </div>
 

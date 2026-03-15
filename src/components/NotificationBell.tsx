@@ -84,7 +84,11 @@ export function NotificationBell() {
 
     // Initial fetch
     useEffect(() => {
-        fetchAllNotifications()
+        const timeoutId = window.setTimeout(() => {
+            void fetchAllNotifications()
+        }, 0)
+
+        return () => window.clearTimeout(timeoutId)
     }, [])
 
     // Smart polling - lightweight check every 5 seconds
@@ -163,7 +167,7 @@ export function NotificationBell() {
             markAsRead(notification.id)
         }
         if (notification.link) {
-            window.location.href = notification.link
+            window.location.assign(notification.link)
         }
         setOpen(false)
     }

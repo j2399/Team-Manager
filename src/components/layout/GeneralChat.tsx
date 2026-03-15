@@ -56,6 +56,9 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
     const [mentionIndex, setMentionIndex] = React.useState<number>(-1)
     const [mentionsOpen, setMentionsOpen] = React.useState(false)
     const [selectedMentionIndex, setSelectedMentionIndex] = React.useState(0)
+    const setScrollViewportRef = React.useCallback((node: HTMLDivElement | null) => {
+        scrollRef.current = node
+    }, [])
 
     // Derived mentions list
     const mentions = React.useMemo(() => {
@@ -258,7 +261,7 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
         if (!content.trim()) return
 
         // Optimistic update
-        const tempId = `temp-${Date.now()}`
+        const tempId = crypto.randomUUID()
         const optimisticMsg: Message = {
             id: tempId,
             content,
@@ -325,7 +328,7 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
         }
     }
 
-    const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const val = e.target.value
         setInputValue(val)
 
@@ -454,7 +457,7 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
 
             {/* Messages Area */}
             <ScrollAreaPrimitive.Root className="flex-1 bg-background px-1 h-0 relative overflow-hidden pt-14">
-                <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] overscroll-contain" ref={scrollRef as any}>
+                <ScrollAreaPrimitive.Viewport className="h-full w-full rounded-[inherit] overscroll-contain" ref={setScrollViewportRef}>
                     <div className="flex flex-col justify-end min-h-full py-2 pl-3 pr-4">
                         {messages.map((msg, i) => {
                             const previousMsg = messages[i - 1]
@@ -659,9 +662,7 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
                         {/* Actual Input (Transparent Text) */}
                         <textarea
                             value={inputValue}
-                            onChange={(e) => {
-                                handleInput(e as any)
-                            }}
+                            onChange={handleInput}
                             onKeyDown={handleKeyDown}
                             placeholder={inputValue ? "" : "Message..."}
                             className="col-start-1 row-start-1 w-full h-full resize-none overflow-hidden bg-transparent border-0 p-0 px-0 text-xs font-sans leading-5 text-transparent caret-foreground focus:outline-none focus:ring-0 placeholder:text-muted-foreground/30 z-10"

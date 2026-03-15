@@ -117,7 +117,11 @@ type ApprovalRowProps = {
 
 export function ApprovalRow({ task, onApproved, onDenied }: ApprovalRowProps) {
     const router = useRouter()
-    const [ApprovalPreviewButton, setApprovalPreviewButton] = useState<React.ComponentType<any> | null>(null)
+    const [ApprovalPreviewButton, setApprovalPreviewButton] = useState<React.ComponentType<{
+        task: ApprovalRowProps['task']
+        onApproved?: () => void
+        onDenied?: () => void
+    }> | null>(null)
 
     // Dynamically import the preview button to avoid SSR issues
     useEffect(() => {

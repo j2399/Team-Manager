@@ -174,7 +174,7 @@ export function HelpRequest({ taskId, taskTitle, currentUserId, userRole }: Help
 
                 {helpRequest.message && (
                     <p className="text-xs text-muted-foreground bg-background/50 rounded p-2">
-                        "{helpRequest.message}"
+                        &quot;{helpRequest.message}&quot;
                     </p>
                 )}
 

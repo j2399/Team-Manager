@@ -1,5 +1,6 @@
 
 import { NextResponse } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
         const limit = Math.min(Math.max(1, rawLimit), 200) // Clamp between 1 and 200
         const since = searchParams.get('since') // ISO timestamp for incremental updates
 
-        const where: any = {
+        const where: Prisma.GeneralChatMessageWhereInput = {
             workspaceId: user.workspaceId
         }
 

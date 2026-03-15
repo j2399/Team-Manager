@@ -137,11 +137,11 @@ const SortableProjectRow = React.memo(({
     const isActive = pathname === `/dashboard/projects/${project.id}`
     const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: project.id })
     const projectColor = project.color || "#3b82f6"
-    const style: React.CSSProperties = {
+    const style: React.CSSProperties & { '--project-active-bg': string } = {
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.6 : 1,
-        ["--project-active-bg" as any]: hexToRgba(projectColor, 0.22),
+        '--project-active-bg': hexToRgba(projectColor, 0.22),
     }
 
     return (
@@ -420,7 +420,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
             }
         }
 
-        const idle = (window as any).requestIdleCallback
+        const idle = window.requestIdleCallback?.bind(window)
         if (idle) {
             idle(start, { timeout: 2000 })
         } else {
@@ -514,14 +514,14 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 console.error("Division creation failed. Status:", res.status, res.statusText)
                 console.error("Raw response body:", text)
 
-                let errorData = {}
+                let errorData: { error?: string } = {}
                 try {
-                    errorData = JSON.parse(text)
+                    errorData = JSON.parse(text) as { error?: string }
                 } catch (e) {
                     errorData = { error: `Response not JSON: ${text.substring(0, 50)}...` }
                 }
 
-                alert(`Error (${res.status}): ${(errorData as any).error || text || 'Unknown error'}`)
+                alert(`Error (${res.status}): ${errorData.error || text || 'Unknown error'}`)
             }
         } catch (err) {
             console.error(err)

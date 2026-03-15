@@ -10,11 +10,7 @@ const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClientSingleton | undefined
 }
 
-const existingClient = globalForPrisma.prisma
-const hasDriveConfig = !!(existingClient as { workspaceDriveConfig?: { findUnique?: unknown } })?.workspaceDriveConfig?.findUnique
-const prisma = existingClient && hasDriveConfig
-    ? existingClient
-    : prismaClientSingleton()
+const prisma = globalForPrisma.prisma ?? prismaClientSingleton()
 
 export default prisma
 

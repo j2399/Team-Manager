@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useRef, useEffect } from "react"
+import { useCallback, useRef, useEffect, useState } from "react"
 
 type ConfettiType = 'review' | 'done'
 
@@ -40,6 +40,21 @@ function generateColors(projectColor?: string): string[] {
     const tint = `#${tintR.toString(16).padStart(2, '0')}${tintG.toString(16).padStart(2, '0')}${tintB.toString(16).padStart(2, '0')}`
 
     return [white, projectColor, tint]
+}
+
+function buildBurstPieces(type: ConfettiType) {
+    const colors = type === 'review' ? REVIEW_COLORS : DONE_COLORS
+    const count = type === 'done' ? 40 : 25
+
+    return Array.from({ length: count }, (_, index) => ({
+        key: index,
+        color: colors[index % colors.length],
+        left: 40 + Math.random() * 20,
+        delay: Math.random() * 0.3,
+        duration: 1.2 + Math.random() * 0.8,
+        xOffset: (Math.random() - 0.5) * 300,
+        rotation: Math.random() * 720 - 360,
+    }))
 }
 
 export function useConfetti() {
@@ -83,7 +98,7 @@ export function useConfetti() {
         }
     }, [])
 
-    const animate = useCallback(() => {
+    const animate = useCallback(function animateFrame() {
         const canvas = canvasRef.current
         if (!canvas) return
 
@@ -116,7 +131,7 @@ export function useConfetti() {
         })
 
         if (particles.current.length > 0) {
-            animationFrame.current = requestAnimationFrame(animate)
+            animationFrame.current = requestAnimationFrame(animateFrame)
         }
     }, [])
 
@@ -164,8 +179,7 @@ export function useConfetti() {
 
 // Alternative: Simple CSS-based confetti burst (no canvas)
 export function ConfettiBurst({ type, onComplete }: { type: ConfettiType; onComplete: () => void }) {
-    const colors = type === 'review' ? REVIEW_COLORS : DONE_COLORS
-    const count = type === 'done' ? 40 : 25
+    const [pieces] = useState(() => buildBurstPieces(type))
 
     useEffect(() => {
         const timer = setTimeout(onComplete, 2000)
@@ -174,29 +188,20 @@ export function ConfettiBurst({ type, onComplete }: { type: ConfettiType; onComp
 
     return (
         <div className="fixed inset-0 pointer-events-none z-[9999] overflow-hidden">
-            {Array.from({ length: count }).map((_, i) => {
-                const color = colors[i % colors.length]
-                const left = 40 + Math.random() * 20
-                const delay = Math.random() * 0.3
-                const duration = 1.2 + Math.random() * 0.8
-                const xOffset = (Math.random() - 0.5) * 300
-                const rotation = Math.random() * 720 - 360
-
-                return (
-                    <div
-                        key={i}
-                        className="absolute w-3 h-2 rounded-sm"
-                        style={{
-                            backgroundColor: color,
-                            left: `${left}%`,
-                            top: '30%',
-                            animation: `confetti-fall ${duration}s ease-out ${delay}s forwards`,
-                            transform: `translateX(${xOffset}px) rotate(${rotation}deg)`,
-                            opacity: 0,
-                        }}
-                    />
-                )
-            })}
+            {pieces.map((piece) => (
+                <div
+                    key={piece.key}
+                    className="absolute w-3 h-2 rounded-sm"
+                    style={{
+                        backgroundColor: piece.color,
+                        left: `${piece.left}%`,
+                        top: '30%',
+                        animation: `confetti-fall ${piece.duration}s ease-out ${piece.delay}s forwards`,
+                        transform: `translateX(${piece.xOffset}px) rotate(${piece.rotation}deg)`,
+                        opacity: 0,
+                    }}
+                />
+            ))}
             <style jsx>{`
                 @keyframes confetti-fall {
                     0% {

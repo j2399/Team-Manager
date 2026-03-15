@@ -3,6 +3,7 @@ import { put, del } from '@vercel/blob'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 import { getTaskContext } from '@/lib/access'
+import { getErrorMessage } from '@/lib/errors'
 
 export async function GET(
     request: Request,
@@ -127,13 +128,14 @@ export async function POST(
             url: blob.url,
             name: file.name
         }, { status: 201 })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Failed to upload instructions:', error)
-        const message = error?.message || 'Unknown error'
+        const message = getErrorMessage(error)
+        const stack = error instanceof Error ? error.stack : undefined
         return NextResponse.json({
             error: `Failed to upload instructions: ${message}`,
             details: process.env.NODE_ENV === 'development' ? String(error) : undefined,
-            stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+            stack: process.env.NODE_ENV === 'development' ? stack : undefined
         }, { status: 500 })
     }
 }

@@ -9,6 +9,7 @@ import { MemberActions } from "./MemberActions"
 import { MemberTaskList } from "./MemberTaskList"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { CheckCircle2, Clock, Circle, TrendingUp, AlertCircle, Activity } from "lucide-react"
+import { getErrorCode } from "@/lib/errors"
 
 export const dynamic = 'force-dynamic'
 
@@ -97,8 +98,8 @@ export default async function MembersPage() {
             push: { select: { name: true, color: true } }
         },
         orderBy: { updatedAt: 'desc' }
-    }).catch((error: any) => {
-        if (error?.code === 'P2021') {
+    }).catch((error: unknown) => {
+        if (getErrorCode(error) === 'P2021') {
             console.warn('[MembersPage] Task query failed due to missing table. Returning empty task list.')
             return []
         }
@@ -140,8 +141,8 @@ export default async function MembersPage() {
             details: true,
             changedBy: true
         }
-    }).catch((error: any) => {
-        if (error?.code === 'P2021') {
+    }).catch((error: unknown) => {
+        if (getErrorCode(error) === 'P2021') {
             console.warn('[MembersPage] Activity log query failed due to missing table. Returning empty activity list.')
             return []
         }

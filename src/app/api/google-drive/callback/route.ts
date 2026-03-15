@@ -3,6 +3,7 @@ import { cookies } from "next/headers"
 import prisma from "@/lib/prisma"
 import { getCurrentUser } from "@/lib/auth"
 import { driveConfigTableExists, getGoogleOAuthClient } from "@/lib/googleDrive"
+import { encryptGoogleToken } from "@/lib/googleDriveTokens"
 
 export const runtime = "nodejs"
 
@@ -63,15 +64,15 @@ export async function GET(request: Request) {
             where: { workspaceId: user.workspaceId },
             create: {
                 workspaceId: user.workspaceId,
-                refreshToken,
-                accessToken: tokens.access_token || null,
+                refreshToken: encryptGoogleToken(refreshToken),
+                accessToken: encryptGoogleToken(tokens.access_token || null),
                 tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
                 connectedById: user.id,
                 connectedByName: user.name,
             },
             update: {
-                refreshToken,
-                accessToken: tokens.access_token || existing?.accessToken || null,
+                refreshToken: encryptGoogleToken(refreshToken),
+                accessToken: encryptGoogleToken(tokens.access_token || existing?.accessToken || null),
                 tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
                 connectedById: user.id,
                 connectedByName: user.name,

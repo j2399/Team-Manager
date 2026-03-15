@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
 
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
         const since = searchParams.get('since') // ISO timestamp for incremental updates
         const countOnly = searchParams.get('countOnly') === 'true' // Just check for new ones
 
-        const where: any = {
+        const where: Prisma.NotificationWhereInput = {
             workspaceId: user.workspaceId,
             OR: [
                 { userId: user.id },
@@ -24,9 +25,26 @@ export async function GET(request: Request) {
 
         // If countOnly, just check if there are unread notifications
         if (countOnly) {
-            const unreadCount = await prisma.notification.count({
-                where: { ...where, read: false }
-            })
+            const [directUnreadCount, broadcastUnreadCount] = await Promise.all([
+                prisma.notification.count({
+                    where: {
+                        workspaceId: user.workspaceId,
+                        userId: user.id,
+                        read: false,
+                    }
+                }),
+                prisma.notification.count({
+                    where: {
+                        workspaceId: user.workspaceId,
+                        userId: null,
+                        reads: {
+                            none: { userId: user.id }
+                        }
+                    }
+                })
+            ])
+
+            const unreadCount = directUnreadCount + broadcastUnreadCount
             return NextResponse.json({ unreadCount, hasNew: unreadCount > 0 })
         }
 
@@ -37,13 +55,25 @@ export async function GET(request: Request) {
 
         const notifications = await prisma.notification.findMany({
             where,
+            include: {
+                reads: {
+                    where: { userId: user.id },
+                    select: { id: true }
+                }
+            },
             orderBy: { createdAt: 'desc' },
             take: 20
         })
 
+        const serializedNotifications = notifications.map((notification) => ({
+            ...notification,
+            read: notification.userId === null ? notification.reads.length > 0 : notification.read,
+            reads: undefined
+        }))
+
         return NextResponse.json({
-            notifications,
-            hasNew: notifications.length > 0,
+            notifications: serializedNotifications,
+            hasNew: serializedNotifications.length > 0,
             lastCheck: new Date().toISOString()
         })
     } catch (error) {
@@ -63,34 +93,62 @@ export async function PATCH(request: Request) {
         const { notificationId, markAllRead } = await request.json()
 
         if (markAllRead) {
-            // Mark all notifications for this user as read
-            await prisma.notification.updateMany({
+            const broadcastNotifications = await prisma.notification.findMany({
                 where: {
                     workspaceId: user.workspaceId,
-                    OR: [
-                        { userId: user.id },
-                        { userId: null }
-                    ],
-                    read: false
+                    userId: null,
+                    reads: {
+                        none: { userId: user.id }
+                    }
                 },
-                data: { read: true }
+                select: { id: true }
             })
+
+            await prisma.$transaction([
+                prisma.notification.updateMany({
+                    where: {
+                        workspaceId: user.workspaceId,
+                        userId: user.id,
+                        read: false
+                    },
+                    data: { read: true }
+                }),
+                ...(broadcastNotifications.length > 0
+                    ? [
+                        prisma.notificationRead.createMany({
+                            data: broadcastNotifications.map((notification) => ({
+                                notificationId: notification.id,
+                                userId: user.id,
+                            })),
+                            skipDuplicates: true,
+                        })
+                    ]
+                    : [])
+            ])
         } else if (notificationId) {
-            // Mark single notification as read
-            const updated = await prisma.notification.updateMany({
+            const notification = await prisma.notification.findFirst({
                 where: {
                     id: notificationId,
                     workspaceId: user.workspaceId,
-                    OR: [
-                        { userId: user.id },
-                        { userId: null }
-                    ]
+                    OR: [{ userId: user.id }, { userId: null }]
                 },
-                data: { read: true }
+                select: { id: true, userId: true }
             })
 
-            if (updated.count === 0) {
+            if (!notification) {
                 return NextResponse.json({ error: 'Notification not found' }, { status: 404 })
+            }
+
+            if (notification.userId === null) {
+                await prisma.notificationRead.createMany({
+                    data: [{ notificationId: notification.id, userId: user.id }],
+                    skipDuplicates: true,
+                })
+            } else {
+                await prisma.notification.update({
+                    where: { id: notification.id },
+                    data: { read: true }
+                })
             }
         }
 

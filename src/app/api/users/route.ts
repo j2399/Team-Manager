@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/auth'
+import { getErrorCode } from '@/lib/errors'
 
 export async function GET(request: Request) {
     try {
@@ -52,8 +53,20 @@ export async function GET(request: Request) {
         const [memberships, total] = await Promise.all([
             prisma.workspaceMember.findMany({
                 where,
-                include: {
-                    user: { include: { subteams: true } }
+                select: {
+                    role: true,
+                    name: true,
+                    user: {
+                        select: {
+                            id: true,
+                            name: true,
+                            email: true,
+                            avatar: true,
+                            skills: true,
+                            interests: true,
+                            hasOnboarded: true,
+                        }
+                    }
                 },
                 orderBy: { name: 'asc' },
                 ...(page && limit ? { skip: (page - 1) * limit, take: limit } : {})
@@ -144,9 +157,9 @@ export async function POST(request: Request) {
             return created
         })
         return NextResponse.json(user)
-    } catch (error: any) {
+    } catch (error: unknown) {
         // Handle unique constraint violation
-        if (error?.code === 'P2002') {
+        if (getErrorCode(error) === 'P2002') {
             return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 })
         }
         console.error('[POST /api/users] Error:', error)
