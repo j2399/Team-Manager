@@ -72,6 +72,9 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
         opacity: isDragging ? 0 : 1,
         position: 'relative' as const,
         zIndex: 10, // Ensure card renders above confetti (z-index: 1)
+        touchAction: isDragDisabled ? 'auto' : 'none',
+        WebkitUserSelect: 'none' as const,
+        userSelect: 'none' as const,
     }
 
     // Calculate due date status

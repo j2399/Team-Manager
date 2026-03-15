@@ -131,7 +131,7 @@ export default async function MyBoardPage() {
     ).values()]
 
     return (
-        <div className="h-full flex flex-col">
+        <div className="flex min-h-full flex-col bg-background md:bg-transparent">
             <PersonalKanban
                 columns={columns}
                 projects={projects}

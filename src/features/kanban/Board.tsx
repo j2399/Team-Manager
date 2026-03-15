@@ -160,6 +160,12 @@ export function Board({
     )
     const [pushStatusOverrides, setPushStatusOverrides] = useState<Record<string, 'Active' | 'Completed'>>({})
     const { toast } = useToast()
+    const dragScrollLockRef = useRef<{
+        bodyOverflow: string
+        htmlOverflow: string
+        bodyOverscrollBehavior: string
+        htmlOverscrollBehavior: string
+    } | null>(null)
 
     // Dialog States
     const [reviewDialog, setReviewDialog] = useState<{
@@ -227,6 +233,39 @@ export function Board({
     useEffect(() => {
         setColumns(board.columns)
     }, [board.columns])
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return
+
+        const restoreScroll = () => {
+            if (!dragScrollLockRef.current) return
+            document.body.style.overflow = dragScrollLockRef.current.bodyOverflow
+            document.documentElement.style.overflow = dragScrollLockRef.current.htmlOverflow
+            document.body.style.overscrollBehavior = dragScrollLockRef.current.bodyOverscrollBehavior
+            document.documentElement.style.overscrollBehavior = dragScrollLockRef.current.htmlOverscrollBehavior
+            dragScrollLockRef.current = null
+        }
+
+        if (isDragging) {
+            if (!dragScrollLockRef.current) {
+                dragScrollLockRef.current = {
+                    bodyOverflow: document.body.style.overflow,
+                    htmlOverflow: document.documentElement.style.overflow,
+                    bodyOverscrollBehavior: document.body.style.overscrollBehavior,
+                    htmlOverscrollBehavior: document.documentElement.style.overscrollBehavior,
+                }
+            }
+
+            document.body.style.overflow = 'hidden'
+            document.documentElement.style.overflow = 'hidden'
+            document.body.style.overscrollBehavior = 'none'
+            document.documentElement.style.overscrollBehavior = 'none'
+        } else {
+            restoreScroll()
+        }
+
+        return restoreScroll
+    }, [isDragging])
 
     const processedHighlightRef = useRef<string | null>(null)
 
@@ -1087,7 +1126,10 @@ export function Board({
     }
 
     return (
-        <DndContext sensors={sensors} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd}>
+        <DndContext sensors={sensors} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={() => {
+            setIsDragging(false)
+            setActiveTask(null)
+        }}>
             <div
                 className="flex flex-col min-w-0"
             >

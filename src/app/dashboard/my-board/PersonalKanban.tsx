@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { createPortal } from "react-dom"
 import {
@@ -115,9 +115,14 @@ function DraggableTaskCard({ task, onClick }: { task: Task; onClick: () => void 
         data: { task }
     })
 
-    const style = transform ? {
-        transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-    } : undefined
+    const style = {
+        ...(transform ? {
+            transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+        } : {}),
+        touchAction: 'none',
+        WebkitUserSelect: 'none' as const,
+        userSelect: 'none' as const,
+    }
 
     return (
         <div
@@ -144,7 +149,7 @@ function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }
             <button
                 onClick={onClick}
                 className={cn(
-                    "w-full text-left group relative flex flex-col gap-1.5 p-3 rounded-lg border transition-all duration-200 overflow-hidden cursor-grab active:cursor-grabbing",
+                    "w-full touch-none text-left group relative flex flex-col gap-1.5 p-3 rounded-lg border transition-all duration-200 overflow-hidden cursor-grab active:cursor-grabbing",
                     "bg-emerald-50/40 border-emerald-100/50 hover:border-emerald-200 hover:shadow-sm dark:bg-emerald-900/10 dark:border-emerald-900/30 dark:hover:border-emerald-800/50"
                 )}
             >
@@ -171,7 +176,7 @@ function PersonalTaskCard({ task, onClick }: { task: Task; onClick: () => void }
         <button
             onClick={onClick}
             className={cn(
-                "w-full text-left group relative flex flex-col rounded-lg border bg-card p-3 shadow-sm transition-all duration-200 overflow-hidden cursor-grab active:cursor-grabbing",
+                "w-full touch-none text-left group relative flex flex-col rounded-lg border bg-card p-3 shadow-sm transition-all duration-200 overflow-hidden cursor-grab active:cursor-grabbing",
                 "hover:shadow-md hover:border-primary/20",
                 "border-border",
                 task.hasHelpRequest && "ring-1 ring-amber-300/50"
@@ -323,11 +328,50 @@ export function PersonalKanban({ columns: initialColumns, projects, userName }: 
     const [activeTask, setActiveTask] = useState<Task | null>(null)
     const [overColumnId, setOverColumnId] = useState<string | null>(null)
     const [mounted, setMounted] = useState(false)
+    const dragScrollLockRef = useRef<{
+        bodyOverflow: string
+        htmlOverflow: string
+        bodyOverscrollBehavior: string
+        htmlOverscrollBehavior: string
+    } | null>(null)
 
     // For portal
     useState(() => {
         setMounted(true)
     })
+
+    useEffect(() => {
+        if (typeof document === 'undefined') return
+
+        const restoreScroll = () => {
+            if (!dragScrollLockRef.current) return
+            document.body.style.overflow = dragScrollLockRef.current.bodyOverflow
+            document.documentElement.style.overflow = dragScrollLockRef.current.htmlOverflow
+            document.body.style.overscrollBehavior = dragScrollLockRef.current.bodyOverscrollBehavior
+            document.documentElement.style.overscrollBehavior = dragScrollLockRef.current.htmlOverscrollBehavior
+            dragScrollLockRef.current = null
+        }
+
+        if (activeTask) {
+            if (!dragScrollLockRef.current) {
+                dragScrollLockRef.current = {
+                    bodyOverflow: document.body.style.overflow,
+                    htmlOverflow: document.documentElement.style.overflow,
+                    bodyOverscrollBehavior: document.body.style.overscrollBehavior,
+                    htmlOverscrollBehavior: document.documentElement.style.overscrollBehavior,
+                }
+            }
+
+            document.body.style.overflow = 'hidden'
+            document.documentElement.style.overflow = 'hidden'
+            document.body.style.overscrollBehavior = 'none'
+            document.documentElement.style.overscrollBehavior = 'none'
+        } else {
+            restoreScroll()
+        }
+
+        return restoreScroll
+    }, [activeTask])
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -497,8 +541,12 @@ export function PersonalKanban({ columns: initialColumns, projects, userName }: 
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
+            onDragCancel={() => {
+                setActiveTask(null)
+                setOverColumnId(null)
+            }}
         >
-            <div className="h-full flex flex-col">
+            <div className="flex min-h-full flex-col bg-background md:bg-transparent">
                 {/* Header */}
                 <div className="shrink-0 border-b bg-background p-4">
                     <div className="flex items-center justify-between gap-4">

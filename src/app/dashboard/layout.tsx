@@ -28,7 +28,7 @@ export default async function DashboardLayout({
     if (!user.workspaceId) redirect('/workspaces')
 
     return (
-        <div className="flex min-h-screen w-full bg-background">
+        <div className="flex min-h-[100svh] w-full bg-background">
             <div className="hidden md:block fixed inset-y-0 left-0 z-10 w-64 bg-background">
                 <Sidebar initialUserData={{ id: user.id, name: user.name, role: user.role, workspaceName: user.workspaceName, avatar: user.avatar }} />
             </div>
@@ -57,7 +57,7 @@ export default async function DashboardLayout({
                     <NotificationBell />
                 </header>
 
-                <main className="flex-1 overflow-y-auto overflow-x-hidden bg-muted/30" style={{ scrollbarGutter: "stable" }}>
+                <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background md:bg-muted/30" style={{ scrollbarGutter: "stable" }}>
                     <ThemeClient userId={user.id} />
                     {children}
                 </main>
