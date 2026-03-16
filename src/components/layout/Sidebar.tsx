@@ -13,7 +13,6 @@ import { SpinningDots } from "@/components/ui/spinning-dots"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
     closestCenter,
     DndContext,
@@ -669,7 +668,10 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 "transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] overflow-hidden",
                 chatState === 'large' ? "flex-[0.001] opacity-0" : chatState === 'hidden' ? "flex-1 opacity-100" : "flex-1 opacity-100"
             )}>
-                <ScrollArea type="always" scrollbarForceMount className="h-full w-full min-w-0">
+                <div
+                    className="h-full w-full min-w-0 overflow-x-hidden overflow-y-scroll overscroll-contain custom-scrollbar"
+                    style={{ scrollbarGutter: "stable" }}
+                >
                     <nav className="w-full min-w-0 p-3">
                         {/* Dashboard Link */}
                         <Link
@@ -790,7 +792,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                             </Link>
                         )}
                     </nav>
-                </ScrollArea>
+                </div>
             </div>
 
             <div className={cn(
