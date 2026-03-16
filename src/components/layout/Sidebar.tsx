@@ -669,8 +669,8 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 "transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] overflow-hidden",
                 chatState === 'large' ? "flex-[0.001] opacity-0" : chatState === 'hidden' ? "flex-1 opacity-100" : "flex-1 opacity-100"
             )}>
-                <ScrollArea className="h-full w-full min-w-0 [&_[data-slot=scroll-area-viewport]]:[scrollbar-gutter:stable]">
-                    <nav className="w-full min-w-0 p-3">
+                <ScrollArea className="h-full w-full min-w-0">
+                    <nav className="w-full min-w-0 p-3 pr-[22px]">
                         {/* Dashboard Link */}
                         <Link
                             href="/dashboard"
