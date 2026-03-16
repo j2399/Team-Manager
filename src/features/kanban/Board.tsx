@@ -1224,6 +1224,9 @@ export function Board({
                         const isCollapsed = collapsedPushes.has(push.id)
                         const isOpen = !isCollapsed
                         const contentId = `push-${push.id}-content`
+                        const completionPercent = push.taskCount > 0 ? (push.completedCount / push.taskCount) * 100 : 0
+                        const showMarkCompleteAction = isAdmin && (isComplete || allTasksDone)
+                        const pushDateLabel = `${new Date(push.startDate).toLocaleDateString([], { month: 'short', day: 'numeric' })} - ${push.endDate ? new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Ongoing'}`
 
                         return (
                             <div key={push.id} className="relative group/push-container">
@@ -1257,41 +1260,6 @@ export function Board({
                                                 )}>
                                                     {push.name}
                                                 </span>
-                                                {isAdmin && (isComplete || allTasksDone) && (
-                                                    <TooltipProvider delayDuration={100}>
-                                                        <Tooltip>
-                                                            <TooltipTrigger asChild>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation()
-                                                                        setPushStatus(push.id, isComplete ? 'Active' : 'Completed')
-                                                                    }}
-                                                                    className={cn(
-                                                                        "h-7 inline-flex items-center overflow-hidden rounded-md border text-xs font-medium transition-[max-width,padding,border-color,background-color] duration-200 ease-out",
-                                                                        isComplete
-                                                                            ? "max-w-7 px-0 gap-0 border-transparent bg-transparent text-green-600 justify-center"
-                                                                            : "max-w-[140px] px-2 gap-1 border-green-200 bg-green-50 text-green-600 hover:bg-green-100"
-                                                                    )}
-                                                                    title={isComplete ? "Mark as not complete" : "Mark this push complete"}
-                                                                >
-                                                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                                                    <span
-                                                                        className={cn(
-                                                                            "hidden sm:inline whitespace-nowrap transition-all duration-200",
-                                                                            isComplete ? "opacity-0 w-0 translate-x-1" : "opacity-100"
-                                                                        )}
-                                                                    >
-                                                                        Mark Complete
-                                                                    </span>
-                                                                </button>
-                                                            </TooltipTrigger>
-                                                            <TooltipContent side="top" className="text-xs">
-                                                                {isComplete ? "Click to unmark complete" : "Mark this project complete"}
-                                                            </TooltipContent>
-                                                        </Tooltip>
-                                                    </TooltipProvider>
-                                                )}
                                             </div>
 
                                             {isLocked && !isComplete && (
@@ -1336,40 +1304,69 @@ export function Board({
                                         </div>
 
                                         <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
-                                            <div
-                                                className={cn(
-                                                    "hidden md:flex items-center overflow-hidden transition-all duration-200 ease-out",
-                                                    !isComplete && push.taskCount > 0
-                                                        ? "max-w-28 opacity-100"
-                                                        : "max-w-0 opacity-0 pointer-events-none"
+                                            <div className="flex items-center justify-end md:w-28 md:shrink-0">
+                                                {showMarkCompleteAction ? (
+                                                    <TooltipProvider delayDuration={100}>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation()
+                                                                        setPushStatus(push.id, isComplete ? 'Active' : 'Completed')
+                                                                    }}
+                                                                    className={cn(
+                                                                        "h-7 w-7 md:w-full inline-flex items-center justify-center gap-1 overflow-hidden rounded-md border px-0 md:px-2 text-xs font-medium transition-colors",
+                                                                        isComplete
+                                                                            ? "border-green-200/80 bg-green-50/80 text-green-700 hover:bg-green-100"
+                                                                            : "border-green-200 bg-green-50 text-green-600 hover:bg-green-100"
+                                                                    )}
+                                                                    title={isComplete ? "Mark as not complete" : "Mark this push complete"}
+                                                                >
+                                                                    <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                                                                    <span className="hidden md:inline whitespace-nowrap">
+                                                                        {isComplete ? "Completed" : "Mark Complete"}
+                                                                    </span>
+                                                                </button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent side="top" className="text-xs">
+                                                                {isComplete ? "Click to unmark complete" : "Mark this project complete"}
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                ) : (
+                                                    <div
+                                                        className={cn(
+                                                            "hidden h-7 items-center justify-center md:flex md:w-full",
+                                                            !isComplete && push.taskCount > 0 ? "opacity-100" : "opacity-0 pointer-events-none"
+                                                        )}
+                                                    >
+                                                        <TooltipProvider delayDuration={100}>
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden shrink-0">
+                                                                        <div
+                                                                            className="h-full bg-primary/60 rounded-full transition-all duration-300"
+                                                                            style={{ width: `${completionPercent}%` }}
+                                                                        />
+                                                                    </div>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent side="top" className="text-xs">
+                                                                    {push.completedCount}/{push.taskCount} tasks completed
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </TooltipProvider>
+                                                    </div>
                                                 )}
-                                            >
-                                                <TooltipProvider delayDuration={100}>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <div className="w-20 md:w-24 h-2 bg-muted rounded-full overflow-hidden shrink-0">
-                                                                <div
-                                                                    className="h-full bg-primary/60 rounded-full transition-all duration-300"
-                                                                    style={{ width: `${(push.completedCount / push.taskCount) * 100}%` }}
-                                                                />
-                                                            </div>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent side="top" className="text-xs">
-                                                            {push.completedCount}/{push.taskCount} tasks completed
-                                                        </TooltipContent>
-                                                    </Tooltip>
-                                                </TooltipProvider>
                                             </div>
                                             <div
                                                 className={cn(
-                                                    "hidden md:flex items-center overflow-hidden transition-all duration-200 ease-out",
-                                                    !isComplete
-                                                        ? "max-w-[260px] opacity-100"
-                                                        : "max-w-0 opacity-0 pointer-events-none"
+                                                    "hidden md:flex md:w-[150px] md:shrink-0 md:justify-center transition-opacity duration-200 ease-out",
+                                                    !isComplete ? "opacity-100" : "opacity-0 pointer-events-none"
                                                 )}
                                             >
-                                                <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded whitespace-nowrap">
-                                                    {new Date(push.startDate).toLocaleDateString([], { month: 'short', day: 'numeric' })} - {push.endDate ? new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Ongoing'}
+                                                <span className="inline-flex w-full items-center justify-center rounded bg-muted/50 px-2 py-0.5 text-xs tabular-nums text-muted-foreground whitespace-nowrap">
+                                                    {pushDateLabel}
                                                 </span>
                                             </div>
                                             {isAdmin && (
