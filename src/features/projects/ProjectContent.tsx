@@ -1,12 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import dynamic from "next/dynamic"
-import { Button } from "@/components/ui/button"
-import { LayoutGrid, Calendar, Plus, Pencil } from "lucide-react"
+import { Suspense, lazy, useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
+import { LayoutGrid, Calendar, Plus } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { readLeanTaskCache, writeLeanTaskCache } from "@/lib/project-prefetch"
+import { loadBoardModule } from "@/lib/board-module"
 import { TaskDialog } from "@/features/kanban/TaskDialog"
 import { TaskPreview } from "@/features/kanban/TaskPreview"
 import { ProjectGanttChart } from "@/features/timeline/ProjectGanttChart"
@@ -28,11 +26,7 @@ function hexToRgba(hex: string, alpha: number) {
     return `rgba(${r}, ${g}, ${b}, ${clampedAlpha})`
 }
 
-// Dynamically import Board to prevent SSR hydration issues
-const Board = dynamic(() => import("@/features/kanban/Board").then(mod => ({ default: mod.Board })), {
-    ssr: false,
-    loading: () => <div className="flex items-center justify-center h-full">Loading board...</div>
-})
+const Board = lazy(loadBoardModule)
 
 type PushType = {
     id: string
@@ -95,8 +89,100 @@ type ProjectContentProps = {
     pushes?: PushType[]
 }
 
+function PreviewColumns({
+    columns,
+    accentColor,
+}: {
+    columns: NonNullable<ProjectContentProps["board"]>["columns"]
+    accentColor: string
+}) {
+    return (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {columns
+                .slice()
+                .sort((a, b) => a.order - b.order)
+                .map((column) => (
+                    <div key={column.id} className="rounded-lg border bg-muted/20 p-3">
+                        <div className="mb-3 flex items-center gap-2">
+                            <h3 className="text-sm font-medium">{column.name}</h3>
+                            <span className="text-xs text-muted-foreground">{column.tasks.length}</span>
+                        </div>
+                        <div className="space-y-2">
+                            {column.tasks.slice(0, 8).map((task) => (
+                                <div
+                                    key={task.id}
+                                    className="rounded-md border bg-card p-3 shadow-sm"
+                                    style={{ borderColor: `${accentColor}22` }}
+                                >
+                                    <div className="line-clamp-2 text-sm font-medium leading-snug">{task.title}</div>
+                                    {task.assignees && task.assignees.length > 0 && (
+                                        <div className="mt-2 text-xs text-muted-foreground">
+                                            {task.assignees.slice(0, 2).map((assignee) => assignee.user.name).join(", ")}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            {column.tasks.length > 8 && (
+                                <div className="px-1 text-xs text-muted-foreground">
+                                    +{column.tasks.length - 8} more
+                                </div>
+                            )}
+                            {column.tasks.length === 0 && (
+                                <div className="px-1 py-4 text-center text-xs text-muted-foreground">No tasks</div>
+                            )}
+                        </div>
+                    </div>
+                ))}
+        </div>
+    )
+}
+
+function BoardPreview({
+    board,
+    pushes,
+    projectColor,
+}: {
+    board: NonNullable<ProjectContentProps["board"]>
+    pushes: PushType[]
+    projectColor: string
+}) {
+    const getColumnsForPush = (pushId: string | null) =>
+        board.columns.map((column) => ({
+            ...column,
+            tasks: column.tasks.filter((task) => pushId === null ? !task.push : task.push?.id === pushId),
+        }))
+
+    const backlogColumns = getColumnsForPush(null)
+    const showBacklog = pushes.length === 0 || backlogColumns.some((column) => column.tasks.length > 0)
+
+    return (
+        <div className="p-4 space-y-4">
+            {showBacklog && (
+                <section className="space-y-3">
+                    {pushes.length > 0 && (
+                        <div className="flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: projectColor }} />
+                            <h2 className="text-sm font-semibold">Backlog</h2>
+                        </div>
+                    )}
+                    <PreviewColumns columns={backlogColumns} accentColor={projectColor} />
+                </section>
+            )}
+
+            {pushes.map((push) => (
+                <section key={push.id} className="space-y-3">
+                    <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: push.color }} />
+                        <h2 className="text-sm font-semibold">{push.name}</h2>
+                    </div>
+                    <PreviewColumns columns={getColumnsForPush(push.id)} accentColor={push.color} />
+                </section>
+            ))}
+        </div>
+    )
+}
+
 export function ProjectContent({ project, board, users, pushes = [] }: ProjectContentProps) {
-    const router = useRouter()
     const searchParams = useSearchParams()
     const taskIdFromUrl = searchParams.get('task')
     const highlightTaskId = searchParams.get('highlight')
@@ -107,37 +193,7 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
     const [editTask, setEditTask] = useState<TaskType | null>(null)
     const [showPushDialog, setShowPushDialog] = useState(false)
     const [showTimelineDialog, setShowTimelineDialog] = useState(false)
-    const [userRole, setUserRole] = useState<string>('Member')
-    const [loadingTasks, setLoadingTasks] = useState(false)
-
-    const [boardState, setBoardState] = useState(() => {
-        if (!board) return board
-        const cachedTasks = readLeanTaskCache<TaskType>(project.id)
-        if (!cachedTasks) return board
-
-        const byColumn = new Map<string, TaskType[]>()
-        cachedTasks.forEach((task) => {
-            if (!task.columnId) return
-            const list = byColumn.get(task.columnId) || []
-            list.push(task)
-            byColumn.set(task.columnId, list)
-        })
-        byColumn.forEach((list) =>
-            list.sort((a, b) => {
-                const at = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
-                const bt = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
-                return bt - at
-            })
-        )
-
-        return {
-            ...board,
-            columns: board.columns.map((col) => ({
-                ...col,
-                tasks: byColumn.get(col.id) || []
-            }))
-        }
-    })
+    const [boardState, setBoardState] = useState(board)
 
     // Handle view change
     const handleViewChange = (newView: 'kanban' | 'gantt') => {
@@ -145,17 +201,12 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
         setView(newView)
     }
 
-    // Fetch user role
-    useEffect(() => {
-        fetch('/api/auth/role')
-            .then(res => res.json())
-            .then(data => setUserRole(data.role || 'Member'))
-            .catch(() => setUserRole('Member'))
-    }, [])
-
-    const canManagePushes = userRole === 'Admin' || userRole === 'Team Lead'
     const projectColor = project.color || "#3b82f6"
     const leadNames = project.leads.map((lead) => lead.name)
+
+    useEffect(() => {
+        setBoardState(board)
+    }, [board])
 
     // Get all tasks for Gantt chart with column and push info
     const allTasks = boardState?.columns.flatMap(col =>
@@ -214,97 +265,6 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
             query ? `/dashboard/projects/${project.id}?${query}` : `/dashboard/projects/${project.id}`
         )
     }
-
-    const applyTasksToBoard = useCallback((tasks: TaskType[]) => {
-        setBoardState((prev) => {
-            if (!prev) return prev
-            const byColumn = new Map<string, TaskType[]>()
-            tasks.forEach((task) => {
-                if (!task.columnId) return
-                const list = byColumn.get(task.columnId) || []
-                list.push(task)
-                byColumn.set(task.columnId, list)
-            })
-            byColumn.forEach((list) =>
-                list.sort((a, b) => {
-                    const at = a.updatedAt ? new Date(a.updatedAt).getTime() : 0
-                    const bt = b.updatedAt ? new Date(b.updatedAt).getTime() : 0
-                    return bt - at
-                })
-            )
-            return {
-                ...prev,
-                columns: prev.columns.map((col) => ({
-                    ...col,
-                    tasks: byColumn.get(col.id) || []
-                }))
-            }
-        })
-    }, [])
-
-    const mergeFullTasks = useCallback((tasks: TaskType[]) => {
-        const fullMap = new Map(tasks.map((t) => [t.id, t]))
-        setBoardState((prev) => {
-            if (!prev) return prev
-            return {
-                ...prev,
-                columns: prev.columns.map((col) => ({
-                    ...col,
-                    tasks: col.tasks.map((task) => ({
-                        ...task,
-                        ...(fullMap.get(task.id) || {})
-                    }))
-                }))
-            }
-        })
-    }, [])
-
-    useEffect(() => {
-        if (!board) return
-        let cancelled = false
-
-        const fetchLeanTasks = async () => {
-            setLoadingTasks(true)
-            try {
-                const res = await fetch(`/api/projects/${project.id}/tasks?lean=true`)
-                const data = await res.json()
-                if (!res.ok) throw new Error(data?.error || "Failed to load tasks")
-                const tasks: TaskType[] = Array.isArray(data?.tasks) ? data.tasks : []
-                if (!cancelled) {
-                    applyTasksToBoard(tasks)
-                    writeLeanTaskCache(project.id, tasks)
-                }
-            } catch {
-                // ignore
-            } finally {
-                if (!cancelled) setLoadingTasks(false)
-            }
-        }
-
-        const fetchFullTasks = async () => {
-            try {
-                const res = await fetch(`/api/projects/${project.id}/tasks`)
-                const data = await res.json()
-                if (!res.ok) return
-                const tasks: TaskType[] = Array.isArray(data?.tasks) ? data.tasks : []
-                if (!cancelled && tasks.length > 0) {
-                    mergeFullTasks(tasks)
-                }
-            } catch {
-                // ignore
-            }
-        }
-
-        fetchLeanTasks().then(() => {
-            window.setTimeout(() => {
-                if (!cancelled) fetchFullTasks()
-            }, 300)
-        })
-
-        return () => {
-            cancelled = true
-        }
-    }, [board, project.id, applyTasksToBoard, mergeFullTasks])
 
     return (
         <div className="flex min-h-full flex-col bg-background animate-fade-in-up md:bg-transparent">
@@ -383,23 +343,20 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
             <div className="flex-1 min-h-0">
                 {view === 'kanban' ? (
                     boardState ? (
-                        <>
-                            {loadingTasks && boardState.columns.every(col => col.tasks.length === 0) && (
-                                <div className="px-4 py-2 text-xs text-muted-foreground">Loading tasks…</div>
-                            )}
+                        <Suspense fallback={<BoardPreview board={boardState} pushes={pushes} projectColor={projectColor} />}>
                             <Board
                                 board={boardState}
-                            projectId={project.id}
-                            projectColor={projectColor}
-                            users={users}
-                            pushes={pushes}
-                            highlightTaskId={highlightTaskId}
-                            expandPushId={pushIdFromUrl}
-                            initialNewTask={searchParams.get('newTask') === 'true'}
-                            initialAssigneeId={searchParams.get('assigneeId')}
-                            initialPushId={pushIdFromUrl}
+                                projectId={project.id}
+                                projectColor={projectColor}
+                                users={users}
+                                pushes={pushes}
+                                highlightTaskId={highlightTaskId}
+                                expandPushId={pushIdFromUrl}
+                                initialNewTask={searchParams.get('newTask') === 'true'}
+                                initialAssigneeId={searchParams.get('assigneeId')}
+                                initialPushId={pushIdFromUrl}
                             />
-                        </>
+                        </Suspense>
                     ) : (
                         <div className="p-10 text-center text-muted-foreground">
                             No Kanban board found for this division.

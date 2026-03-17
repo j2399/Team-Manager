@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import { ProjectContent } from "@/features/projects/ProjectContent"
 import { getCurrentUser } from "@/lib/auth"
+import { getLeanProjectTasks } from "@/lib/project-tasks"
 
 interface ProjectPageProps {
     params: Promise<{ id: string }>
@@ -50,7 +51,16 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         orderBy: { startDate: "asc" }
     })
 
-    const [project, projectPushes] = await Promise.all([projectPromise, pushesPromise])
+    const leanTasksPromise = getLeanProjectTasks({
+        column: {
+            board: {
+                projectId: id,
+                project: { workspaceId: currentUser.workspaceId }
+            }
+        }
+    })
+
+    const [project, projectPushes, leanTasks] = await Promise.all([projectPromise, pushesPromise, leanTasksPromise])
 
     if (!project) {
         notFound()
@@ -61,12 +71,20 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     }
 
     const boardData = project.boards[0] || null
+    const tasksByColumnId = new Map<string, typeof leanTasks>()
+
+    for (const task of leanTasks) {
+        if (!task.columnId) continue
+        const tasks = tasksByColumnId.get(task.columnId) || []
+        tasks.push(task)
+        tasksByColumnId.set(task.columnId, tasks)
+    }
 
     const board = boardData ? {
         ...boardData,
         columns: boardData.columns.map((col) => ({
             ...col,
-            tasks: []
+            tasks: tasksByColumnId.get(col.id) || []
         }))
     } : null
 

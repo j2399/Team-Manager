@@ -57,7 +57,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { GeneralChat } from "@/components/layout/GeneralChat"
 import { CreateProjectWizard } from "@/features/projects/CreateProjectWizard"
-import { prefetchLeanTasks, prefetchProjectRoute } from "@/lib/project-prefetch"
+import { preloadBoardModule } from "@/lib/board-module"
 import { subscribeSidebarSync } from "@/lib/sidebar-sync"
 
 type Project = {
@@ -121,16 +121,13 @@ const PROJECT_COLOR_OPTIONS = [
     "#ec4899", // pink
 ] as const
 
-const STARTUP_PREFETCH_CONCURRENCY = 3
-const STARTUP_PREFETCH_DELAY_MS = 150
-const STARTUP_PREFETCH_PAUSE_MS = 75
-
 type ProjectRowProps = {
     project: Project
     pathname: string
     navigatingTo: string | null
     isAdmin: boolean
     setNavigatingTo: (path: string) => void
+    onPrefetchProject: (projectId: string) => void
     setEditingProject: (project: Project) => void
     setDeleteConfirm: (project: Project) => void
     onToggleArchive: (project: Project) => void
@@ -142,6 +139,7 @@ function ProjectRowInner({
     navigatingTo,
     isAdmin,
     setNavigatingTo,
+    onPrefetchProject,
     setEditingProject,
     setDeleteConfirm,
     onToggleArchive,
@@ -180,10 +178,11 @@ function ProjectRowInner({
             {dragHandle ?? <div className="h-6 w-6 shrink-0" />}
             <Link
                 href={`/dashboard/projects/${project.id}`}
+                prefetch={false}
                 onClick={() => !isActive && setNavigatingTo(`/dashboard/projects/${project.id}`)}
-                onMouseEnter={() => prefetchLeanTasks(project.id)}
-                onFocus={() => prefetchLeanTasks(project.id)}
-                onTouchStart={() => prefetchLeanTasks(project.id)}
+                onMouseEnter={() => onPrefetchProject(project.id)}
+                onFocus={() => onPrefetchProject(project.id)}
+                onTouchStart={() => onPrefetchProject(project.id)}
                 className={cn(
                     "relative z-10 rounded-md pl-2 py-1.5 text-sm transition-colors flex-1 min-w-0",
                     isActive
@@ -352,6 +351,10 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     )
 
     const isAdmin = userData.role === 'Admin' || userData.role === 'Team Lead'
+    const prefetchProject = React.useCallback((projectId: string) => {
+        preloadBoardModule()
+        router.prefetch(`/dashboard/projects/${projectId}`)
+    }, [router])
 
     // Fetch user data
     const fetchUserData = React.useCallback(() => {
@@ -476,38 +479,14 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     }, [refreshSidebarData])
 
     React.useEffect(() => {
-        const orderedProjectIds = Array.from(new Set([
-            ...projects.map((project) => project.id),
-            ...archivedProjects.map((project) => project.id),
-        ]))
-
-        if (orderedProjectIds.length === 0) return
-
-        let cancelled = false
-
         const timer = window.setTimeout(() => {
-            const warmProjects = async () => {
-                for (let index = 0; index < orderedProjectIds.length; index += STARTUP_PREFETCH_CONCURRENCY) {
-                    if (cancelled) return
-
-                    const batch = orderedProjectIds.slice(index, index + STARTUP_PREFETCH_CONCURRENCY)
-                    batch.forEach((projectId) => prefetchProjectRoute(projectId, router))
-                    await Promise.all(batch.map((projectId) => prefetchLeanTasks(projectId)))
-
-                    if (index + STARTUP_PREFETCH_CONCURRENCY < orderedProjectIds.length) {
-                        await new Promise((resolve) => window.setTimeout(resolve, STARTUP_PREFETCH_PAUSE_MS))
-                    }
-                }
-            }
-
-            void warmProjects()
-        }, STARTUP_PREFETCH_DELAY_MS)
+            preloadBoardModule()
+        }, 250)
 
         return () => {
-            cancelled = true
             window.clearTimeout(timer)
         }
-    }, [archivedProjects, projects, router])
+    }, [])
 
     // When editing division changes, update the lead id state
     React.useEffect(() => {
@@ -741,6 +720,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                                         navigatingTo={navigatingTo}
                                                         isAdmin={isAdmin}
                                                         setNavigatingTo={setNavigatingTo}
+                                                        onPrefetchProject={prefetchProject}
                                                         setEditingProject={setEditingProject}
                                                         setDeleteConfirm={setDeleteConfirm}
                                                         onToggleArchive={handleToggleArchive}
@@ -767,6 +747,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                                     navigatingTo={navigatingTo}
                                                     isAdmin={isAdmin}
                                                     setNavigatingTo={setNavigatingTo}
+                                                    onPrefetchProject={prefetchProject}
                                                     setEditingProject={setEditingProject}
                                                     setDeleteConfirm={setDeleteConfirm}
                                                     onToggleArchive={handleToggleArchive}
