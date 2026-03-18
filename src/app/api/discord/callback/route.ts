@@ -4,11 +4,17 @@ import { api, createLegacyId, fetchMutation, fetchQuery } from '@/lib/convex/ser
 import { createSession, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS } from '@/lib/session'
 import { joinWorkspaceByCode } from '@/lib/workspaceInvites'
 import { createWorkspaceForUser } from '@/lib/workspaces'
+import { appendInviteNotice, type InviteNotice } from '@/lib/invite-status'
 
 type PendingWorkspaceFlow = {
     mode: 'create' | 'join'
     value: string
     username: string
+}
+
+type PendingWorkspaceFlowResult = {
+    redirectToDashboard: boolean
+    inviteNotice: InviteNotice | null
 }
 
 function getPendingWorkspaceFlow(cookieStore: Awaited<ReturnType<typeof cookies>>): PendingWorkspaceFlow | null {
@@ -54,7 +60,7 @@ async function applyPendingWorkspaceFlow({
     userId: string
     currentName: string
     shouldSyncName: boolean
-}) {
+}): Promise<PendingWorkspaceFlowResult> {
     const pendingInvite = cookieStore.get('pending_invite')?.value?.trim()
     if (pendingInvite) {
         const result = await joinWorkspaceByCode({
@@ -63,12 +69,25 @@ async function applyPendingWorkspaceFlow({
             code: pendingInvite,
         })
         cookieStore.delete('pending_invite')
-        return { redirectToDashboard: !result.error }
+        if (result.error) {
+            return {
+                redirectToDashboard: false,
+                inviteNotice: { status: 'invalid' },
+            }
+        }
+
+        return {
+            redirectToDashboard: true,
+            inviteNotice: {
+                status: result.alreadyMember ? 'already-member' : 'joined',
+                workspaceName: result.workspaceName,
+            },
+        }
     }
 
     const pendingFlow = getPendingWorkspaceFlow(cookieStore)
     if (!pendingFlow) {
-        return { redirectToDashboard: false }
+        return { redirectToDashboard: false, inviteNotice: null }
     }
 
     const effectiveName = await syncPendingUserName(
@@ -85,7 +104,7 @@ async function applyPendingWorkspaceFlow({
                 userName: effectiveName,
                 workspaceName: pendingFlow.value,
             })
-            return { redirectToDashboard: true }
+            return { redirectToDashboard: true, inviteNotice: null }
         }
 
         const result = await joinWorkspaceByCode({
@@ -93,7 +112,20 @@ async function applyPendingWorkspaceFlow({
             userName: effectiveName,
             code: pendingFlow.value,
         })
-        return { redirectToDashboard: !result.error }
+        if (result.error) {
+            return {
+                redirectToDashboard: false,
+                inviteNotice: { status: 'invalid' },
+            }
+        }
+
+        return {
+            redirectToDashboard: true,
+            inviteNotice: {
+                status: result.alreadyMember ? 'already-member' : 'joined',
+                workspaceName: result.workspaceName,
+            },
+        }
     } finally {
         clearPendingWorkspaceFlow(cookieStore)
     }
@@ -249,7 +281,13 @@ export async function GET(request: Request) {
 
             // Redirect to Workspaces or Dashboard if invite processed
             const response = NextResponse.redirect(
-                new URL(pendingFlow.redirectToDashboard ? '/dashboard' : '/workspaces', request.url)
+                new URL(
+                    appendInviteNotice(
+                        pendingFlow.redirectToDashboard ? '/dashboard' : '/workspaces',
+                        pendingFlow.inviteNotice
+                    ),
+                    request.url
+                )
             )
 
             // Set session cookie on the response
@@ -285,14 +323,16 @@ export async function GET(request: Request) {
 
         console.log(`[Auth] Created new user ${newUser.id} with role ${role}.`)
 
-        await applyPendingWorkspaceFlow({
+        const pendingFlow = await applyPendingWorkspaceFlow({
             cookieStore,
             userId: newUser.id,
             currentName: newUser.name,
             shouldSyncName: true,
         })
 
-        const response = NextResponse.redirect(new URL('/onboarding', request.url))
+        const response = NextResponse.redirect(
+            new URL(appendInviteNotice('/onboarding', pendingFlow.inviteNotice), request.url)
+        )
 
         const session = await createSession(newUser.id)
 

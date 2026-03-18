@@ -10,11 +10,20 @@ import { TaskRow, ApprovalRow } from "./TaskRow"
 import { DashboardHeatmapLoader } from "./DashboardHeatmapLoader"
 import { ProjectActivityTracker } from "./ProjectActivityTracker"
 import { DriveUploadWidget } from "./DriveUploadWidget"
+import { InviteNoticeCard } from "@/components/InviteNoticeCard"
+import { readInviteNotice } from "@/lib/invite-status"
 
 export const dynamic = 'force-dynamic'
 
-export default async function DashboardPage() {
+type SearchParams = Record<string, string | string[] | undefined>
+
+export default async function DashboardPage({
+    searchParams,
+}: {
+    searchParams?: Promise<SearchParams>
+}) {
     const user = await getCurrentUser()
+    const inviteNotice = readInviteNotice(searchParams ? await searchParams : null)
 
     if (!user || !user.id || user.id === 'pending') {
         return <div className="p-6 text-muted-foreground">Please complete your profile setup.</div>
@@ -70,6 +79,10 @@ export default async function DashboardPage() {
     return (
         <div className="h-full overflow-y-auto">
             <div className="p-4 md:p-6 space-y-5 animate-fade-in-up">
+                {inviteNotice && (
+                    <InviteNoticeCard notice={inviteNotice} />
+                )}
+
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div className="flex items-center gap-3 flex-wrap">

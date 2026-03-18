@@ -3,6 +3,8 @@ import { api, createLegacyId, fetchMutation } from "@/lib/convex/server"
 type JoinWorkspaceResult = {
     success?: true
     workspaceId?: string
+    workspaceName?: string
+    alreadyMember?: boolean
     message?: string
     error?: string
 }

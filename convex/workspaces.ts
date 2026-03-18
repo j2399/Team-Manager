@@ -111,34 +111,34 @@ export const joinWorkspaceByCode = mutation({
 
         let workspace = await getWorkspaceByInviteCode(ctx.db, normalized)
         let membershipRole = "Member"
+        let matchedInvite: Awaited<ReturnType<typeof getInviteByToken>> = null
 
         if (!workspace) {
             workspace = await getWorkspaceByInviteCode(ctx.db, normalized.toUpperCase())
         }
 
         if (!workspace) {
-            const invite = await getInviteByToken(ctx.db, normalized)
-            if (!invite) {
+            matchedInvite = await getInviteByToken(ctx.db, normalized)
+            if (!matchedInvite) {
                 return { error: "Invalid invite code" }
             }
 
-            if (!invite.workspaceId) {
+            if (!matchedInvite.workspaceId) {
                 return { error: "This invite is no longer attached to a workspace" }
             }
 
-            const expired = invite.expiresAt !== undefined && invite.expiresAt < args.now
-            const exhausted = invite.maxUses > 0 && invite.uses >= invite.maxUses
+            const expired = matchedInvite.expiresAt !== undefined && matchedInvite.expiresAt < args.now
+            const exhausted = matchedInvite.maxUses > 0 && matchedInvite.uses >= matchedInvite.maxUses
             if (expired || exhausted) {
                 return { error: "This invite code has expired or reached maximum uses" }
             }
 
-            workspace = await getWorkspaceByLegacyId(ctx.db, invite.workspaceId)
+            workspace = await getWorkspaceByLegacyId(ctx.db, matchedInvite.workspaceId)
             if (!workspace) {
                 return { error: "This invite is no longer attached to a workspace" }
             }
 
-            membershipRole = invite.role || "Member"
-            await ctx.db.patch(invite._id, { uses: invite.uses + 1 })
+            membershipRole = matchedInvite.role || "Member"
         }
 
         const existingMember = await getWorkspaceMemberByUserAndWorkspace(ctx.db, args.userId, workspace.id)
@@ -146,6 +146,10 @@ export const joinWorkspaceByCode = mutation({
         if (!existingMember) {
             if (!args.membershipId) {
                 throw new Error("membershipId is required when adding a new member")
+            }
+
+            if (matchedInvite) {
+                await ctx.db.patch(matchedInvite._id, { uses: matchedInvite.uses + 1 })
             }
 
             await ctx.db.insert("workspaceMembers", {
@@ -184,6 +188,8 @@ export const joinWorkspaceByCode = mutation({
         return {
             success: true as const,
             workspaceId: workspace.id,
+            workspaceName: workspace.name,
+            alreadyMember: Boolean(existingMember),
             message: existingMember
                 ? `Welcome back! You are already a member of ${workspace.name}.`
                 : undefined,

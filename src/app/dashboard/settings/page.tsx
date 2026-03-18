@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import { appUrl } from "@/lib/appUrl"
+import { appUrl, getAppBaseUrl } from "@/lib/appUrl"
 import { getSettingsPageDataFromConvex } from "@/lib/convex/settings"
 import { headers } from "next/headers"
 import { SettingsShell } from "./SettingsShell"
@@ -23,6 +23,7 @@ export default async function SettingsPage() {
     const host = forwardedHost || headerList.get("host")
     const forwardedProto = headerList.get("x-forwarded-proto")
     const proto = forwardedProto || (host?.includes("localhost") ? "http" : "https")
+    const configuredBaseUrl = getAppBaseUrl()
 
     // Fetch data in parallel
     const settingsData = user.workspaceId
@@ -50,9 +51,11 @@ export default async function SettingsPage() {
                         inviteCode={workspace?.inviteCode || null}
                         inviteLink={
                             workspace?.inviteCode
-                                ? host
-                                    ? `${proto}://${host}/invite/${workspace.inviteCode}`
-                                    : appUrl(`/invite/${workspace.inviteCode}`)
+                                ? configuredBaseUrl
+                                    ? appUrl(`/invite/${workspace.inviteCode}`)
+                                    : host
+                                        ? `${proto}://${host}/invite/${workspace.inviteCode}`
+                                        : appUrl(`/invite/${workspace.inviteCode}`)
                                 : null
                         }
                     />
