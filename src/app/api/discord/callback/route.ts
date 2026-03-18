@@ -5,6 +5,7 @@ import { createSession, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS } from '@/lib/s
 import { joinWorkspaceByCode } from '@/lib/workspaceInvites'
 import { createWorkspaceForUser } from '@/lib/workspaces'
 import { appendInviteNotice, type InviteNotice } from '@/lib/invite-status'
+import { resolveAppBaseUrl } from '@/lib/appUrl'
 
 type PendingWorkspaceFlow = {
     mode: 'create' | 'join'
@@ -132,12 +133,15 @@ async function applyPendingWorkspaceFlow({
 }
 
 export async function GET(request: Request) {
-    const { searchParams } = new URL(request.url)
+    const requestUrl = new URL(request.url)
+    const appBaseUrl = resolveAppBaseUrl(request.url)
+    const { searchParams } = requestUrl
     const code = searchParams.get('code')
     const state = searchParams.get('state')
+    const redirectTo = (pathname: string) => NextResponse.redirect(new URL(pathname, appBaseUrl))
 
     if (!code) {
-        return NextResponse.redirect(new URL('/?error=no_code', request.url))
+        return redirectTo('/?error=no_code')
     }
 
     // SECURITY: Verify CSRF state parameter
@@ -145,20 +149,23 @@ export async function GET(request: Request) {
     const storedState = cookieStore.get('oauth_state')?.value
 
     if (!state || !storedState || state !== storedState) {
+        cookieStore.delete('oauth_state')
+        cookieStore.delete('oauth_redirect_uri')
         console.error('OAuth state mismatch - possible CSRF attack')
-        return NextResponse.redirect(new URL('/?error=invalid_state', request.url))
+        return redirectTo('/?error=invalid_state')
     }
 
     // Clear the state cookie after verification
     cookieStore.delete('oauth_state')
+    const redirectUri = cookieStore.get('oauth_redirect_uri')?.value
+        || new URL('/api/discord/callback', appBaseUrl).toString()
+    cookieStore.delete('oauth_redirect_uri')
 
     const clientId = process.env.DISCORD_CLIENT_ID
     const clientSecret = process.env.DISCORD_CLIENT_SECRET
-    const { origin } = new URL(request.url)
-    const redirectUri = `${origin}/api/discord/callback`
 
     if (!clientId || !clientSecret) {
-        return NextResponse.redirect(new URL('/?error=not_configured', request.url))
+        return redirectTo('/?error=not_configured')
     }
 
     try {
@@ -178,7 +185,7 @@ export async function GET(request: Request) {
         if (!tokenResponse.ok) {
             const error = await tokenResponse.text()
             console.error('Token exchange failed:', error)
-            return NextResponse.redirect(new URL('/?error=token_failed', request.url))
+            return redirectTo('/?error=token_failed')
         }
 
         const tokenData = await tokenResponse.json()
@@ -189,13 +196,11 @@ export async function GET(request: Request) {
         })
 
         if (!userResponse.ok) {
-            return NextResponse.redirect(new URL('/?error=user_failed', request.url))
+            return redirectTo('/?error=user_failed')
         }
 
         const discordUser = await userResponse.json()
 
-        // Store Discord info in cookie
-        const cookieStore = await cookies()
         const THIRTY_DAYS = 60 * 60 * 24 * 30
 
         cookieStore.set('discord_user', JSON.stringify({
@@ -286,7 +291,7 @@ export async function GET(request: Request) {
                         pendingFlow.redirectToDashboard ? '/dashboard' : '/workspaces',
                         pendingFlow.inviteNotice
                     ),
-                    request.url
+                    appBaseUrl
                 )
             )
 
@@ -331,7 +336,7 @@ export async function GET(request: Request) {
         })
 
         const response = NextResponse.redirect(
-            new URL(appendInviteNotice('/onboarding', pendingFlow.inviteNotice), request.url)
+            new URL(appendInviteNotice('/onboarding', pendingFlow.inviteNotice), appBaseUrl)
         )
 
         const session = await createSession(newUser.id)
@@ -348,6 +353,6 @@ export async function GET(request: Request) {
 
     } catch (error) {
         console.error('Discord OAuth error:', error)
-        return NextResponse.redirect(new URL('/?error=oauth_error', request.url))
+        return redirectTo('/?error=oauth_error')
     }
 }

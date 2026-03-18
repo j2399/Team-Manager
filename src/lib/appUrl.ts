@@ -13,9 +13,14 @@ export function getAppBaseUrl() {
     return "http://localhost:3000"
 }
 
+export function resolveAppBaseUrl(requestUrl: string) {
+    const base = getAppBaseUrl()
+    if (base) return base
+    return new URL(requestUrl).origin
+}
+
 export function appUrl(pathname: string) {
     const base = getAppBaseUrl()
     const path = pathname.startsWith("/") ? pathname : `/${pathname}`
     return base ? `${base}${path}` : path
 }
-

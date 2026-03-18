@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { appUrl, getAppBaseUrl } from '@/lib/appUrl'
+import { appUrl, getAppBaseUrl, resolveAppBaseUrl } from '@/lib/appUrl'
 
 const ORIGINAL_ENV = { ...process.env }
 
@@ -93,3 +93,37 @@ for (const testCase of appUrlCases) {
         )
     })
 }
+
+test('resolveAppBaseUrl prefers configured base over request origin', () => {
+    withEnv(
+        {
+            NEXT_PUBLIC_APP_URL: 'https://cupi.app',
+            APP_URL: undefined,
+            VERCEL_URL: undefined,
+            NODE_ENV: 'production',
+        },
+        () => {
+            assert.equal(
+                resolveAppBaseUrl('https://preview-cupi.vercel.app/invite/ABC123'),
+                'https://cupi.app'
+            )
+        }
+    )
+})
+
+test('resolveAppBaseUrl falls back to request origin when no configured base exists', () => {
+    withEnv(
+        {
+            NEXT_PUBLIC_APP_URL: undefined,
+            APP_URL: undefined,
+            VERCEL_URL: undefined,
+            NODE_ENV: 'production',
+        },
+        () => {
+            assert.equal(
+                resolveAppBaseUrl('https://preview-cupi.vercel.app/invite/ABC123'),
+                'https://preview-cupi.vercel.app'
+            )
+        }
+    )
+})
