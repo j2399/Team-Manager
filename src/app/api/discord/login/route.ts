@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import crypto from 'crypto'
 
-export async function GET() {
+export async function GET(request: Request) {
     const clientId = process.env.DISCORD_CLIENT_ID
-    const redirectUri = process.env.DISCORD_REDIRECT_URI || 'http://localhost:3000/api/discord/callback'
+    const { origin } = new URL(request.url)
+    const redirectUri = `${origin}/api/discord/callback`
 
     if (!clientId) {
         return NextResponse.json({ error: 'Discord Client ID not configured' }, { status: 500 })

@@ -122,7 +122,8 @@ export async function GET(request: Request) {
 
     const clientId = process.env.DISCORD_CLIENT_ID
     const clientSecret = process.env.DISCORD_CLIENT_SECRET
-    const redirectUri = process.env.DISCORD_REDIRECT_URI || 'http://localhost:3000/api/discord/callback'
+    const { origin } = new URL(request.url)
+    const redirectUri = `${origin}/api/discord/callback`
 
     if (!clientId || !clientSecret) {
         return NextResponse.redirect(new URL('/?error=not_configured', request.url))
