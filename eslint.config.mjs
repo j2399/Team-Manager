@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     "backup_db.js",
     "scripts/**/*.js",
     "lint_*.txt",
+    // Convex backend functions (not Next.js code)
+    "convex/**",
   ]),
   {
     rules: {
