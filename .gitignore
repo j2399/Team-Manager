@@ -48,4 +48,3 @@ lint_*.txt
 prisma/*.db
 prisma/prisma/*.db
 .convex-export/
-convex/_generated/
