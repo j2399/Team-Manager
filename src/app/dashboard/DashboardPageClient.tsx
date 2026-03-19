@@ -2,11 +2,9 @@
 
 import { useQuery } from "convex/react"
 import { api } from "@convex/_generated/api"
-import { Users, ChevronRight } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
-import { DashboardClient } from "./DashboardClient"
-import { TeamPopup } from "./TeamPopup"
 import { TaskRow, ApprovalRow } from "./TaskRow"
 import { DashboardHeatmapLoader } from "./DashboardHeatmapLoader"
 import { ProjectActivityTracker } from "./ProjectActivityTracker"
@@ -43,7 +41,7 @@ export function DashboardPageClient({
         return <DashboardRouteSkeleton />
     }
 
-    const { myTasks, pendingApproval, teamStats, recentActivity, driveConfig } =
+    const { myTasks, pendingApproval, driveConfig } =
         pageData
 
     const isAdmin = user.role === "Admin"
@@ -111,6 +109,8 @@ export function DashboardPageClient({
                         <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
                     </Link>
                 )}
+
+                {isLeadership && <ProjectActivityTracker workspaceId={user.workspaceId} />}
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     <div className="lg:col-span-2 space-y-4">
@@ -219,35 +219,10 @@ export function DashboardPageClient({
                         </div>
 
                         {isLeadership && <DashboardHeatmapLoader workspaceId={user.workspaceId} />}
-
-                        {isLeadership && recentActivity.length > 0 && (
-                            <section className="border border-border rounded-lg p-4">
-                                <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-sm font-medium">Recent Activity</h2>
-                                    {teamStats && (
-                                        <TeamPopup members={teamStats.users} totalTasks={teamStats.totalTasks}>
-                                            <button className="text-[10px] text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
-                                                <Users className="h-3 w-3" />
-                                                Team
-                                            </button>
-                                        </TeamPopup>
-                                    )}
-                                </div>
-                                <div className="space-y-1">
-                                    {recentActivity.map((log) => (
-                                        <DashboardClient key={log.id} activity={log} />
-                                    ))}
-                                </div>
-                            </section>
-                        )}
                     </div>
 
                     {isLeadership && (
                         <div className="flex flex-col gap-4 h-full">
-                            <div className="shrink-0">
-                                <ProjectActivityTracker workspaceId={user.workspaceId} />
-                            </div>
-
                             <DriveUploadWidget
                                 className="flex-1"
                                 initialConfig={{

@@ -6,6 +6,31 @@ export function DashboardRouteSkeleton() {
                     <div className="h-6 w-44 bg-muted rounded animate-pulse" />
                 </div>
 
+                <section className="rounded-lg p-4 bg-muted/30">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                        <div className="space-y-2">
+                            <div className="h-4 w-36 bg-muted rounded animate-pulse" />
+                            <div className="h-3 w-64 bg-muted rounded animate-pulse" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                            {[0, 1, 2, 3, 4].map((i) => (
+                                <div
+                                    key={i}
+                                    className="h-14 w-20 rounded-lg bg-muted animate-pulse"
+                                    style={{ animationDelay: `${i * 35}ms` }}
+                                />
+                            ))}
+                        </div>
+                    </div>
+                    <div className="grid gap-3 xl:grid-cols-[minmax(0,1.6fr)_320px]">
+                        <div className="h-56 rounded-lg bg-muted animate-pulse" />
+                        <div className="space-y-3">
+                            <div className="h-40 rounded-lg bg-muted animate-pulse" />
+                            <div className="h-48 rounded-lg bg-muted animate-pulse" />
+                        </div>
+                    </div>
+                </section>
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     <div className="lg:col-span-2 space-y-4">
                         <section className="rounded-lg p-4 bg-muted/30">

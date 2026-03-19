@@ -14,26 +14,37 @@ async function getActiveWorkspaceProjects(ctx: any, workspaceId: string) {
         .sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0) || a.name.localeCompare(b.name))
 }
 
+async function getProjectTaskSet(ctx: any, projectId: string) {
+    const taskMap = new Map<string, any>()
+
+    const columnTasks = await getProjectTasks(ctx, projectId)
+    for (const task of columnTasks) {
+        taskMap.set(task.id, task)
+    }
+
+    const pushes = await getPushesForProject(ctx, projectId)
+    for (const push of pushes) {
+        const pushTasks = await ctx.db
+            .query("tasks")
+            .withIndex("by_pushId", (q: any) => q.eq("pushId", push.id))
+            .collect()
+
+        for (const task of pushTasks) {
+            taskMap.set(task.id, task)
+        }
+    }
+
+    return Array.from(taskMap.values())
+}
+
 async function getWorkspaceProjectTaskSet(ctx: any, workspaceId: string) {
     const projects = await getActiveWorkspaceProjects(ctx, workspaceId)
     const taskMap = new Map<string, any>()
 
     for (const project of projects) {
-        const columnTasks = await getProjectTasks(ctx, project.id)
-        for (const task of columnTasks) {
+        const tasks = await getProjectTaskSet(ctx, project.id)
+        for (const task of tasks) {
             taskMap.set(task.id, task)
-        }
-
-        const pushes = await getPushesForProject(ctx, project.id)
-        for (const push of pushes) {
-            const pushTasks = await ctx.db
-                .query("tasks")
-                .withIndex("by_pushId", (q: any) => q.eq("pushId", push.id))
-                .collect()
-
-            for (const task of pushTasks) {
-                taskMap.set(task.id, task)
-            }
         }
     }
 
@@ -41,6 +52,204 @@ async function getWorkspaceProjectTaskSet(ctx: any, workspaceId: string) {
         projects,
         tasks: Array.from(taskMap.values()),
     }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+const MONITOR_WINDOW_DAYS = 42
+const STALE_TASK_DAYS = 7
+const REVIEW_STALE_DAYS = 3
+const REWORK_WINDOW_DAYS = 14
+const BEHIND_PLAN_PCT = 10
+
+function startOfUtcDay(timestamp: number) {
+    const date = new Date(timestamp)
+    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+}
+
+function clamp(value: number, min: number, max: number) {
+    return Math.min(max, Math.max(min, value))
+}
+
+function roundToTenths(value: number) {
+    return Math.round(value * 10) / 10
+}
+
+function isTaskDone(task: { columnId?: string | null; approvedAt?: number | null }, doneColumnIds: Set<string>) {
+    return Boolean((task.columnId && doneColumnIds.has(task.columnId)) || typeof task.approvedAt === "number")
+}
+
+function normalizeColumnName(name?: string | null) {
+    return (name ?? "").trim().toLowerCase()
+}
+
+function getStatusRank(name?: string | null) {
+    const normalized = normalizeColumnName(name)
+    if (normalized === "done") return 3
+    if (normalized === "review") return 2
+    if (normalized === "in progress") return 1
+    if (normalized === "to do" || normalized === "todo") return 0
+    return -1
+}
+
+function isBackwardStatusTransition(oldValue?: string | null, newValue?: string | null) {
+    const oldRank = getStatusRank(oldValue)
+    const newRank = getStatusRank(newValue)
+    return oldRank >= 0 && newRank >= 0 && newRank < oldRank
+}
+
+function severityRank(severity: "critical" | "warning" | "info") {
+    if (severity === "critical") return 3
+    if (severity === "warning") return 2
+    return 1
+}
+
+function buildCumulativeApprovalSeries(tasks: any[], windowStart: number, windowDays: number) {
+    const total = tasks.length
+    const dailyCounts = Array.from({ length: windowDays }, () => 0)
+
+    for (const task of tasks) {
+        if (typeof task.approvedAt !== "number") continue
+
+        const approvedDay = startOfUtcDay(task.approvedAt)
+        if (approvedDay <= windowStart) {
+            dailyCounts[0] += 1
+            continue
+        }
+
+        const index = Math.floor((approvedDay - windowStart) / DAY_MS)
+        if (index >= 0 && index < windowDays) {
+            dailyCounts[index] += 1
+        }
+    }
+
+    let cumulative = 0
+
+    return dailyCounts.map((count, index) => {
+        cumulative += count
+
+        return {
+            date: new Date(windowStart + index * DAY_MS).toISOString(),
+            completedPct: total > 0 ? roundToTenths((cumulative / total) * 100) : 0,
+        }
+    })
+}
+
+function buildExpectedSeries(
+    pushWeights: Array<{ startDate: number; endDate: number; taskCount: number }>,
+    windowStart: number,
+    windowDays: number
+) {
+    const totalWeightedTasks = pushWeights.reduce((sum, push) => sum + push.taskCount, 0)
+    if (totalWeightedTasks === 0) return []
+
+    return Array.from({ length: windowDays }, (_, index) => {
+        const dayEnd = windowStart + index * DAY_MS + DAY_MS - 1
+        let weightedCompletion = 0
+
+        for (const push of pushWeights) {
+            const duration = Math.max(push.endDate - push.startDate, DAY_MS)
+            const fraction = clamp((dayEnd - push.startDate) / duration, 0, 1)
+            weightedCompletion += push.taskCount * fraction
+        }
+
+        return {
+            date: new Date(windowStart + index * DAY_MS).toISOString(),
+            completedPct: roundToTenths((weightedCompletion / totalWeightedTasks) * 100),
+        }
+    })
+}
+
+function buildSignalFromLog(log: any, project: { id: string; name: string }) {
+    const createdAt = new Date(log.createdAt).toISOString()
+    const taskTitle = log.taskTitle ?? "Untitled task"
+
+    if (log.action === "help_requested") {
+        return {
+            id: `signal-${project.id}-${log.id}`,
+            kind: "help",
+            severity: "critical" as const,
+            headline: `${project.name}: help requested`,
+            detail: `${taskTitle} needs intervention.`,
+            createdAt,
+            projectId: project.id,
+            taskId: log.taskId ?? null,
+            taskTitle,
+        }
+    }
+
+    if (log.action === "help_acknowledged") {
+        return {
+            id: `signal-${project.id}-${log.id}`,
+            kind: "help_acknowledged",
+            severity: "info" as const,
+            headline: `${project.name}: help acknowledged`,
+            detail: `${taskTitle} now has an owner on the issue.`,
+            createdAt,
+            projectId: project.id,
+            taskId: log.taskId ?? null,
+            taskTitle,
+        }
+    }
+
+    if (log.action === "help_resolved") {
+        return {
+            id: `signal-${project.id}-${log.id}`,
+            kind: "help_resolved",
+            severity: "info" as const,
+            headline: `${project.name}: blocker resolved`,
+            detail: `${taskTitle} is no longer blocked by a help request.`,
+            createdAt,
+            projectId: project.id,
+            taskId: log.taskId ?? null,
+            taskTitle,
+        }
+    }
+
+    if (log.action === "deleted") {
+        return {
+            id: `signal-${project.id}-${log.id}`,
+            kind: "deleted",
+            severity: "warning" as const,
+            headline: `${project.name}: task deleted`,
+            detail: `${taskTitle} was removed from the flow.`,
+            createdAt,
+            projectId: project.id,
+            taskId: log.taskId ?? null,
+            taskTitle,
+        }
+    }
+
+    if (log.action === "moved" && log.field === "status") {
+        if (isBackwardStatusTransition(log.oldValue, log.newValue)) {
+            return {
+                id: `signal-${project.id}-${log.id}`,
+                kind: "rework",
+                severity: "warning" as const,
+                headline: `${project.name}: work moved backward`,
+                detail: `${taskTitle} moved from ${log.oldValue ?? "unknown"} to ${log.newValue ?? "unknown"}.`,
+                createdAt,
+                projectId: project.id,
+                taskId: log.taskId ?? null,
+                taskTitle,
+            }
+        }
+
+        if (normalizeColumnName(log.newValue) === "review") {
+            return {
+                id: `signal-${project.id}-${log.id}`,
+                kind: "review",
+                severity: "info" as const,
+                headline: `${project.name}: review queue changed`,
+                detail: `${taskTitle} entered review.`,
+                createdAt,
+                projectId: project.id,
+                taskId: log.taskId ?? null,
+                taskTitle,
+            }
+        }
+    }
+
+    return null
 }
 
 export const getSubteams = query({
@@ -346,87 +555,284 @@ export const getProjectActivity = query({
     },
     handler: async (ctx, args) => {
         const projects = await getActiveWorkspaceProjects(ctx, args.workspaceId)
+        const now = Date.now()
+        const windowStart = startOfUtcDay(now - (MONITOR_WINDOW_DAYS - 1) * DAY_MS)
+        const reworkCutoff = now - REWORK_WINDOW_DAYS * DAY_MS
+        const recentSignalCutoff = now - 21 * DAY_MS
 
-        return Promise.all(
+        const [recentLogs, openHelpRequests, acknowledgedHelpRequests] = await Promise.all([
+            ctx.db
+                .query("activityLogs")
+                .withIndex("by_createdAt")
+                .order("desc")
+                .take(2000),
+            ctx.db
+                .query("helpRequests")
+                .withIndex("by_status", (q) => q.eq("status", "open"))
+                .collect(),
+            ctx.db
+                .query("helpRequests")
+                .withIndex("by_status", (q) => q.eq("status", "acknowledged"))
+                .collect(),
+        ])
+
+        const activeHelpRequests = [...openHelpRequests, ...acknowledgedHelpRequests]
+
+        const divisions = await Promise.all(
             projects
                 .slice()
                 .sort((a: any, b: any) => a.name.localeCompare(b.name))
                 .map(async (project: any) => {
-                    const pushes = await getPushesForProject(ctx, project.id)
+                    const [board, pushes, tasks] = await Promise.all([
+                        getBoardForProject(ctx, project.id),
+                        getPushesForProject(ctx, project.id),
+                        getProjectTaskSet(ctx, project.id),
+                    ])
 
-                    const pushStats = await Promise.all(
+                    const columns = board ? await getColumnsForBoard(ctx, board.id) : []
+                    const doneColumnIds = new Set<string>()
+                    const reviewColumnIds = new Set<string>()
+                    const inProgressColumnIds = new Set<string>()
+                    const todoColumnIds = new Set<string>()
+
+                    for (const column of columns) {
+                        const name = normalizeColumnName(column.name)
+                        if (name === "done") doneColumnIds.add(column.id)
+                        else if (name === "review") reviewColumnIds.add(column.id)
+                        else if (name === "in progress") inProgressColumnIds.add(column.id)
+                        else if (name === "to do" || name === "todo") todoColumnIds.add(column.id)
+                    }
+
+                    const taskIdSet = new Set(tasks.map((task) => task.id))
+                    const divisionLogs = recentLogs
+                        .filter((log: any) => log.taskId && taskIdSet.has(log.taskId))
+                        .sort((a: any, b: any) => (b.createdAt ?? 0) - (a.createdAt ?? 0) || b.id.localeCompare(a.id))
+
+                    const divisionHelpRequests = activeHelpRequests.filter((request: any) => taskIdSet.has(request.taskId))
+                    const blockedTaskIds = new Set(divisionHelpRequests.map((request: any) => request.taskId))
+
+                    const totalTasks = tasks.length
+                    const completedTasks = tasks.filter((task) => isTaskDone(task, doneColumnIds)).length
+                    const inReviewCount = tasks.filter((task) => task.columnId && reviewColumnIds.has(task.columnId)).length
+                    const inProgressCount = tasks.filter((task) => task.columnId && inProgressColumnIds.has(task.columnId)).length
+                    const todoCount = tasks.filter((task) => task.columnId && todoColumnIds.has(task.columnId)).length
+                    const activeCount = totalTasks - completedTasks
+                    const completedLast7d = tasks.filter((task) => typeof task.approvedAt === "number" && task.approvedAt >= now - 7 * DAY_MS).length
+                    const overdueCount = tasks.filter((task) => {
+                        const isDone = isTaskDone(task, doneColumnIds)
+                        if (isDone) return false
+
+                        const dueAt = task.dueDate ?? task.endDate
+                        return typeof dueAt === "number" && dueAt < now
+                    }).length
+                    const staleCount = tasks.filter((task) => {
+                        const isDone = isTaskDone(task, doneColumnIds)
+                        if (isDone) return false
+
+                        const lastTouchedAt = task.updatedAt ?? task.submittedAt ?? task.createdAt ?? now
+                        return lastTouchedAt < now - STALE_TASK_DAYS * DAY_MS
+                    }).length
+                    const reviewAges = tasks
+                        .filter((task) => task.columnId && reviewColumnIds.has(task.columnId))
+                        .map((task) => {
+                            const enteredReviewAt = task.submittedAt ?? task.updatedAt ?? task.createdAt ?? now
+                            return Math.max(0, Math.floor((now - enteredReviewAt) / DAY_MS))
+                        })
+                    const oldestReviewDays = reviewAges.length > 0 ? Math.max(...reviewAges) : null
+                    const progressSeries = buildCumulativeApprovalSeries(tasks, windowStart, MONITOR_WINDOW_DAYS)
+
+                    const pushTaskCounts = new Map<string, number>()
+                    for (const task of tasks) {
+                        if (!task.pushId) continue
+                        pushTaskCounts.set(task.pushId, (pushTaskCounts.get(task.pushId) ?? 0) + 1)
+                    }
+
+                    const plannedPushWeights = pushes
+                        .map((push: any) => ({
+                            startDate: typeof push.startDate === "number" ? push.startDate : null,
+                            endDate: typeof push.endDate === "number" ? push.endDate : null,
+                            taskCount: pushTaskCounts.get(push.id) ?? 0,
+                        }))
+                        .filter((push) => Boolean(push.startDate && push.endDate && push.taskCount > 0))
+                        .map((push) => ({
+                            startDate: push.startDate as number,
+                            endDate: push.endDate as number,
+                            taskCount: push.taskCount,
+                        }))
+
+                    const expectedSeries = buildExpectedSeries(plannedPushWeights, windowStart, MONITOR_WINDOW_DAYS)
+                    const plannedPushIdSet = new Set(
                         pushes
-                            .slice()
-                            .sort((a, b) => (a.startDate ?? 0) - (b.startDate ?? 0) || a.id.localeCompare(b.id))
-                            .map(async (push) => {
-                                const tasks = await ctx.db
-                                    .query("tasks")
-                                    .withIndex("by_pushId", (q) => q.eq("pushId", push.id))
-                                    .collect()
-
-                                const timeline = tasks.flatMap((task) => {
-                                    const items: Array<{ date: string; type: "submitted" | "approved" }> = []
-                                    if (task.submittedAt) {
-                                        items.push({ date: new Date(task.submittedAt).toISOString(), type: "submitted" })
-                                    }
-                                    if (task.approvedAt) {
-                                        items.push({ date: new Date(task.approvedAt).toISOString(), type: "approved" })
-                                    }
-                                    return items
-                                }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-                                const doneColumnIds = new Set<string>()
-                                const reviewColumnIds = new Set<string>()
-                                const inProgressColumnIds = new Set<string>()
-                                const todoColumnIds = new Set<string>()
-                                const board = await getBoardForProject(ctx, project.id)
-                                if (board) {
-                                    const columns = await getColumnsForBoard(ctx, board.id)
-                                    for (const column of columns) {
-                                        const name = column.name.toLowerCase()
-                                        if (name === "done") doneColumnIds.add(column.id)
-                                        else if (name === "review") reviewColumnIds.add(column.id)
-                                        else if (name === "in progress") inProgressColumnIds.add(column.id)
-                                        else if (name === "to do" || name === "todo") todoColumnIds.add(column.id)
-                                    }
-                                }
-
-                                const completed = tasks.filter((task) => task.columnId && doneColumnIds.has(task.columnId)).length
-                                const inReview = tasks.filter((task) => task.columnId && reviewColumnIds.has(task.columnId)).length
-                                const inProgress = tasks.filter((task) => task.columnId && inProgressColumnIds.has(task.columnId)).length
-                                const todo = tasks.filter((task) => task.columnId && todoColumnIds.has(task.columnId)).length
-
-                                return {
-                                    id: push.id,
-                                    name: push.name,
-                                    startDate: new Date(push.startDate).toISOString(),
-                                    endDate: push.endDate ? new Date(push.endDate).toISOString() : null,
-                                    status: push.status,
-                                    total: tasks.length,
-                                    completed,
-                                    inReview,
-                                    inProgress,
-                                    todo,
-                                    timeline,
-                                }
+                            .filter((push: any) => {
+                                const taskCount = pushTaskCounts.get(push.id) ?? 0
+                                return typeof push.startDate === "number" && typeof push.endDate === "number" && taskCount > 0
                             })
+                            .map((push: any) => push.id)
+                    )
+                    const plannedTaskCount = plannedPushWeights.reduce((sum, push) => sum + push.taskCount, 0)
+                    const plannedDoneCount = tasks.filter(
+                        (task) => task.pushId && plannedPushIdSet.has(task.pushId) && isTaskDone(task, doneColumnIds)
+                    ).length
+                    const actualPlannedPct = plannedTaskCount > 0 ? roundToTenths((plannedDoneCount / plannedTaskCount) * 100) : null
+                    const expectedPlannedPct = expectedSeries.length > 0 ? expectedSeries[expectedSeries.length - 1].completedPct : null
+                    const scheduleDeltaPct = actualPlannedPct !== null && expectedPlannedPct !== null
+                        ? roundToTenths(actualPlannedPct - expectedPlannedPct)
+                        : null
+
+                    const reworkCount14d = divisionLogs.filter(
+                        (log: any) =>
+                            log.createdAt >= reworkCutoff &&
+                            log.action === "moved" &&
+                            log.field === "status" &&
+                            isBackwardStatusTransition(log.oldValue, log.newValue)
+                    ).length
+
+                    const lastActivityAt = Math.max(
+                        0,
+                        ...tasks.map((task) => task.updatedAt ?? task.createdAt ?? 0),
+                        ...divisionLogs.map((log: any) => log.createdAt ?? 0)
                     )
 
-                    const totalTasks = pushStats.reduce((sum, push) => sum + push.total, 0)
-                    const totalCompleted = pushStats.reduce((sum, push) => sum + push.completed, 0)
-                    const totalInReview = pushStats.reduce((sum, push) => sum + push.inReview, 0)
+                    const riskScore =
+                        overdueCount * 8 +
+                        blockedTaskIds.size * 6 +
+                        staleCount * 4 +
+                        reworkCount14d * 4 +
+                        (oldestReviewDays !== null && oldestReviewDays >= REVIEW_STALE_DAYS ? oldestReviewDays * 2 : 0) +
+                        (scheduleDeltaPct !== null && scheduleDeltaPct < 0 ? Math.abs(scheduleDeltaPct) : 0)
+
+                    const summarySignals = [
+                        scheduleDeltaPct !== null && scheduleDeltaPct <= -BEHIND_PLAN_PCT
+                            ? {
+                                id: `summary-behind-${project.id}`,
+                                kind: "pace",
+                                severity: "critical" as const,
+                                headline: `${project.name}: behind plan`,
+                                detail: `${Math.abs(scheduleDeltaPct)} percentage points behind the active push schedule.`,
+                                createdAt: new Date(lastActivityAt || now).toISOString(),
+                                projectId: project.id,
+                                taskId: null,
+                                taskTitle: null,
+                            }
+                            : null,
+                        overdueCount > 0
+                            ? {
+                                id: `summary-overdue-${project.id}`,
+                                kind: "overdue",
+                                severity: "critical" as const,
+                                headline: `${project.name}: overdue work`,
+                                detail: `${overdueCount} active task${overdueCount === 1 ? "" : "s"} past due.`,
+                                createdAt: new Date(lastActivityAt || now).toISOString(),
+                                projectId: project.id,
+                                taskId: null,
+                                taskTitle: null,
+                            }
+                            : null,
+                        oldestReviewDays !== null && oldestReviewDays >= REVIEW_STALE_DAYS
+                            ? {
+                                id: `summary-review-${project.id}`,
+                                kind: "review_stale",
+                                severity: "warning" as const,
+                                headline: `${project.name}: review queue aging`,
+                                detail: `${inReviewCount} task${inReviewCount === 1 ? "" : "s"} in review, oldest for ${oldestReviewDays}d.`,
+                                createdAt: new Date(lastActivityAt || now).toISOString(),
+                                projectId: project.id,
+                                taskId: null,
+                                taskTitle: null,
+                            }
+                            : null,
+                        blockedTaskIds.size > 0
+                            ? {
+                                id: `summary-blocked-${project.id}`,
+                                kind: "blocked",
+                                severity: "warning" as const,
+                                headline: `${project.name}: blocked work`,
+                                detail: `${blockedTaskIds.size} task${blockedTaskIds.size === 1 ? "" : "s"} waiting on help.`,
+                                createdAt: new Date(lastActivityAt || now).toISOString(),
+                                projectId: project.id,
+                                taskId: null,
+                                taskTitle: null,
+                            }
+                            : null,
+                        reworkCount14d > 0
+                            ? {
+                                id: `summary-rework-${project.id}`,
+                                kind: "rework",
+                                severity: "warning" as const,
+                                headline: `${project.name}: rework observed`,
+                                detail: `${reworkCount14d} backward status move${reworkCount14d === 1 ? "" : "s"} in the last ${REWORK_WINDOW_DAYS}d.`,
+                                createdAt: new Date(lastActivityAt || now).toISOString(),
+                                projectId: project.id,
+                                taskId: null,
+                                taskTitle: null,
+                            }
+                            : null,
+                    ].filter((signal): signal is NonNullable<typeof signal> => signal !== null)
+
+                    const eventSignals = divisionLogs
+                        .filter((log: any) => log.createdAt >= recentSignalCutoff)
+                        .map((log: any) => buildSignalFromLog(log, { id: project.id, name: project.name }))
+                        .filter((signal): signal is NonNullable<typeof signal> => signal !== null)
+
+                    const signals = [...summarySignals, ...eventSignals]
+                        .sort((left, right) => {
+                            const severityDelta = severityRank(right.severity) - severityRank(left.severity)
+                            if (severityDelta !== 0) return severityDelta
+                            return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+                        })
+                        .slice(0, 6)
 
                     return {
                         id: project.id,
                         name: project.name,
-                        color: project.color,
+                        color: project.color ?? "#64748b",
                         totalTasks,
-                        totalCompleted,
-                        totalInReview,
-                        completionRate: totalTasks > 0 ? Math.round((totalCompleted / totalTasks) * 100) : 0,
-                        pushes: pushStats,
+                        completedTasks,
+                        activeCount,
+                        inReviewCount,
+                        inProgressCount,
+                        todoCount,
+                        blockedCount: blockedTaskIds.size,
+                        overdueCount,
+                        staleCount,
+                        reworkCount14d,
+                        completedLast7d,
+                        oldestReviewDays,
+                        scheduleDeltaPct,
+                        actualPlannedPct,
+                        expectedPlannedPct,
+                        riskScore,
+                        lastActivityAt: lastActivityAt > 0 ? new Date(lastActivityAt).toISOString() : null,
+                        progressSeries,
+                        expectedSeries,
+                        signals,
                     }
                 })
         )
+
+        const signals = divisions
+            .flatMap((division) => division.signals)
+            .sort((left, right) => {
+                const severityDelta = severityRank(right.severity) - severityRank(left.severity)
+                if (severityDelta !== 0) return severityDelta
+                return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+            })
+            .slice(0, 10)
+
+        return {
+            generatedAt: new Date(now).toISOString(),
+            windowDays: MONITOR_WINDOW_DAYS,
+            summary: {
+                behindPlanCount: divisions.filter(
+                    (division) => division.scheduleDeltaPct !== null && division.scheduleDeltaPct <= -BEHIND_PLAN_PCT
+                ).length,
+                blockedTasks: divisions.reduce((sum, division) => sum + division.blockedCount, 0),
+                staleTasks: divisions.reduce((sum, division) => sum + division.staleCount, 0),
+                overdueTasks: divisions.reduce((sum, division) => sum + division.overdueCount, 0),
+                reworkEvents14d: divisions.reduce((sum, division) => sum + division.reworkCount14d, 0),
+            },
+            divisions,
+            signals,
+        }
     },
 })
