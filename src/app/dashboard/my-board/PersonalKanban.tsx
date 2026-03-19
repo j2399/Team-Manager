@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
 import { createPortal } from "react-dom"
 import {
     DndContext,
@@ -31,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useToast } from "@/components/ui/use-toast"
 import { updateTaskStatus } from "@/app/actions/kanban"
+import { useProjectRoute } from "@/features/projects/useProjectRoute"
 
 type Task = {
     id: string
@@ -319,7 +319,7 @@ function DroppableKanbanColumn({
 }
 
 export function PersonalKanban({ columns: initialColumns, projects, userName }: PersonalKanbanProps) {
-    const router = useRouter()
+    const { pushProjectRoute } = useProjectRoute()
     const { toast } = useToast()
     const [columns, setColumns] = useState<Column[]>(initialColumns)
     const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
@@ -424,8 +424,8 @@ export function PersonalKanban({ columns: initialColumns, projects, userName }: 
     const handleTaskClick = useCallback((task: Task) => {
         let url = `/dashboard/projects/${task.projectId}?highlight=${task.id}`
         if (task.pushId) url += `&push=${task.pushId}`
-        router.push(url)
-    }, [router])
+        pushProjectRoute(url, task.projectId)
+    }, [pushProjectRoute])
 
     const handleDragStart = useCallback((event: DragStartEvent) => {
         const { active } = event

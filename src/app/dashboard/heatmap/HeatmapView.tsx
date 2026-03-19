@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
     AlertTriangle, Clock, HelpCircle, Users, UserX, CheckCircle2,
@@ -16,6 +15,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
+import { useProjectRoute } from "@/features/projects/useProjectRoute"
 
 type Task = {
     id: string
@@ -121,14 +121,14 @@ function TaskListDialog({
     title: string
     tasks: Task[]
 }) {
-    const router = useRouter()
+    const { prefetchProjectRoute, pushProjectRoute } = useProjectRoute()
     const [navigating, setNavigating] = useState<string | null>(null)
 
     const handleClick = (task: Task) => {
         setNavigating(task.id)
         let url = `/dashboard/projects/${task.projectId}?task=${task.id}`
         if (task.pushId) url += `&push=${task.pushId}`
-        router.push(url)
+        pushProjectRoute(url, task.projectId)
     }
 
     return (
@@ -142,6 +142,9 @@ function TaskListDialog({
                         <button
                             key={task.id}
                             onClick={() => handleClick(task)}
+                            onMouseEnter={() => prefetchProjectRoute(task.projectId)}
+                            onFocus={() => prefetchProjectRoute(task.projectId)}
+                            onTouchStart={() => prefetchProjectRoute(task.projectId)}
                             disabled={navigating === task.id}
                             className="w-full flex items-center justify-between p-2 rounded-md border hover:bg-muted/50 transition-colors text-left"
                         >

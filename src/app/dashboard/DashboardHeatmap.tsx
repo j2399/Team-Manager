@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
     ChevronRight, Loader2, Plus, UserX, TrendingUp, TrendingDown,
@@ -25,6 +24,7 @@ import {
 } from "@/components/ui/tooltip"
 import { TaskDialog } from "@/features/kanban/TaskDialog"
 import { updateTaskDetails } from "@/app/actions/kanban"
+import { useProjectRoute } from "@/features/projects/useProjectRoute"
 
 export type HeatmapTask = {
     id: string
@@ -228,14 +228,14 @@ function UserDetailDialog({
     onAddTask: (user: HeatmapUserStat) => void
     onBack?: () => void
 }) {
-    const router = useRouter()
+    const { prefetchProjectRoute, pushProjectRoute } = useProjectRoute()
 
     if (!user) return null
 
     const handleTaskClick = (task: HeatmapTask) => {
         let url = `/dashboard/projects/${task.projectId}?highlight=${task.id}`
         if (task.pushId) url += `&push=${task.pushId}`
-        router.push(url)
+        pushProjectRoute(url, task.projectId)
         onOpenChange(false)
     }
 
@@ -249,6 +249,9 @@ function UserDetailDialog({
     const TaskCard = ({ task }: { task: HeatmapTask }) => (
         <button
             onClick={() => handleTaskClick(task)}
+            onMouseEnter={() => prefetchProjectRoute(task.projectId)}
+            onFocus={() => prefetchProjectRoute(task.projectId)}
+            onTouchStart={() => prefetchProjectRoute(task.projectId)}
             className="w-full text-left p-2 rounded-lg border bg-card hover:bg-muted/50 hover:border-primary/20 transition-all"
         >
             <div className="flex items-start justify-between gap-1">
@@ -734,7 +737,6 @@ export function DashboardHeatmap({
     allTasks,
     projects
 }: DashboardHeatmapProps) {
-    const router = useRouter()
     const [selectedUser, setSelectedUser] = useState<HeatmapUserStat | null>(null)
     const [assigningToUser, setAssigningToUser] = useState<HeatmapUserStat | null>(null)
     const [issuePopup, setIssuePopup] = useState<'overdue' | 'stuck' | 'help' | null>(null)
@@ -787,7 +789,6 @@ export function DashboardHeatmap({
         if (errors.length > 0) {
             console.error(`Failed to assign ${errors.length} task(s)`)
         }
-        router.refresh()
     }
 
     return (

@@ -1,7 +1,7 @@
 import { getCurrentUser } from '@/lib/auth'
 import { redirect } from "next/navigation"
-import { fetchDashboardMyBoardPageData } from "@/lib/convex/dashboard"
-import { PersonalKanban } from "./PersonalKanban"
+import { api, preloadQuery } from "@/lib/convex/server"
+import { MyBoardPageClient } from "./MyBoardPageClient"
 
 export const dynamic = 'force-dynamic'
 
@@ -16,18 +16,15 @@ export default async function MyBoardPage() {
         redirect("/workspaces")
     }
 
-    const { columns, projects } = await fetchDashboardMyBoardPageData({
+    const preloadedPageData = await preloadQuery(api.dashboard.getMyBoardPageData, {
         userId: user.id,
         workspaceId: user.workspaceId,
     })
 
     return (
-        <div className="flex min-h-full flex-col bg-background md:bg-transparent">
-            <PersonalKanban
-                columns={columns}
-                projects={projects}
-                userName={user.name?.split(' ')[0] || 'User'}
-            />
-        </div>
+        <MyBoardPageClient
+            userName={user.name?.split(' ')[0] || 'User'}
+            preloadedPageData={preloadedPageData}
+        />
     )
 }

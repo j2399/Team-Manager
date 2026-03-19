@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useTransition } from "react"
-import { useRouter } from "next/navigation"
 import {
     Dialog,
     DialogContent,
@@ -39,7 +38,6 @@ export function TimelineManagerDialog({
     onOpenChange,
     initialPushes
 }: TimelineManagerDialogProps) {
-    const router = useRouter()
     const { toast } = useToast()
     const [isPending, startTransition] = useTransition()
     const [pushes, setPushes] = useState<PushDraft[]>([])
@@ -124,7 +122,6 @@ export function TimelineManagerDialog({
                     title: "Success",
                     description: "Timeline saved successfully",
                 })
-                router.refresh()
                 onOpenChange(false)
             } catch (err) {
                 console.error("Failed to save timeline:", err)

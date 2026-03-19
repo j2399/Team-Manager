@@ -17,7 +17,6 @@ import { cn } from "@/lib/utils"
 import { createPortal } from "react-dom"
 import { Plus, ChevronDown, Check, Pencil, Lock } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useRouter } from "next/navigation"
 
 import { PushDialog } from "@/features/pushes/PushDialog"
 import { useToast } from "@/components/ui/use-toast"
@@ -86,23 +85,6 @@ type ColumnData = {
     tasks: Task[]
 }
 
-type SyncTask = Partial<Task> & {
-    id: string
-    title: string
-    columnId: string | null
-    hasAttachment?: boolean
-}
-
-type BoardDeltaResponse = {
-    tasks?: SyncTask[]
-    deletedTaskIds?: string[]
-    latestUpdate?: string | null
-    latestDeletion?: string | null
-    serverTime?: string | null
-    hasMore?: boolean
-    nextCursor?: string | null
-}
-
 type BoardProps = {
     board: {
         id: string
@@ -152,7 +134,6 @@ export function Board({
     initialAssigneeId,
     initialPushId
 }: BoardProps) {
-    const router = useRouter()
     const convex = useConvex()
     const dashboardUser = useDashboardUser()
     const [columns, setColumns] = useState<ColumnData[]>(board.columns)
@@ -388,8 +369,7 @@ export function Board({
 
     }, [columns, convex, highlightTaskId, loadPushTasks, mounted, projectId, workspaceId])
 
-    // Sync from props when board data actually changes (from router.refresh)
-    // This happens AFTER server operations complete
+    // Sync from props when board data changes from the live project page query.
     useEffect(() => {
         // Preserve any already-loaded tasks; server payload omits tasks while pushes are collapsed
         setColumns((prev) => {
@@ -424,173 +404,6 @@ export function Board({
             return changed ? next : prev
         })
     }, [board.columns, pushes, expandPushId, loadedPushes])
-
-    // Smart real-time sync - poll for changes every 1.5 seconds
-    const lastSyncTime = useRef<string>(new Date().toISOString())
-    const isTabVisible = useRef(true)
-
-    // Track tab visibility
-    useEffect(() => {
-        const handleVisibility = () => {
-            isTabVisible.current = document.visibilityState === 'visible'
-            // Reset sync time when tab becomes visible to catch up on changes
-            if (isTabVisible.current) {
-                lastSyncTime.current = new Date(Date.now() - 30000).toISOString() // Last 30 seconds
-            }
-        }
-        document.addEventListener('visibilitychange', handleVisibility)
-        return () => document.removeEventListener('visibilitychange', handleVisibility)
-    }, [])
-
-    // Smart polling - only fetch changes, update state directly
-    useEffect(() => {
-        const syncChanges = async () => {
-            // Skip if tab hidden or user is interacting
-            if (!isTabVisible.current || isDragging || reviewDialog || doneMoveDialog || editingTask || previewingTask) {
-                return
-            }
-
-            try {
-                const baseSince = lastSyncTime.current
-                let cursor: string | null = null
-                const allTasks: SyncTask[] = []
-                const deletedIds = new Set<string>()
-                let latestUpdate: string | null = null
-                let latestDeletion: string | null = null
-                let serverTime: string | null = null
-                let guard = 0
-
-                while (guard < 20) {
-                    const data = await convex.query(api.projects.getBoardDelta, {
-                        projectId,
-                        workspaceId: workspaceId ?? undefined,
-                        since: baseSince,
-                        cursor: cursor ?? undefined,
-                    }) as BoardDeltaResponse | null
-                    if (!data) return
-                    serverTime = data.serverTime || serverTime
-
-                    const pageTasks = Array.isArray(data.tasks) ? data.tasks : []
-                    if (pageTasks.length > 0) {
-                        allTasks.push(...pageTasks)
-                    }
-
-                    if (Array.isArray(data.deletedTaskIds)) {
-                        for (const id of data.deletedTaskIds) {
-                            if (typeof id === 'string') deletedIds.add(id)
-                        }
-                    }
-
-                    if (data.latestUpdate && (!latestUpdate || data.latestUpdate > latestUpdate)) {
-                        latestUpdate = data.latestUpdate
-                    }
-                    if (data.latestDeletion && (!latestDeletion || data.latestDeletion > latestDeletion)) {
-                        latestDeletion = data.latestDeletion
-                    }
-
-                    if (!data.hasMore || !data.nextCursor) break
-                    if (data.nextCursor === cursor) break
-                    cursor = data.nextCursor
-                    guard += 1
-                }
-
-                if (allTasks.length > 0 || deletedIds.size > 0) {
-                    const changedById = new Map<string, SyncTask>()
-                    for (const task of allTasks) {
-                        if (task?.id) {
-                            changedById.set(task.id, task)
-                        }
-                    }
-                    const changedTasks = Array.from(changedById.values())
-
-                    setColumns(prev => {
-                        const newColumns = prev.map(col => ({
-                            ...col,
-                            tasks: col.tasks
-                                .filter(task => !deletedIds.has(task.id))
-                                .map(task => {
-                                    const updated = changedById.get(task.id)
-                                    if (updated) {
-                                        return {
-                                            ...task,
-                                            ...updated,
-                                            description: updated.description !== undefined ? updated.description : task.description,
-                                            // Preserve full data that sync doesn't return
-                                            activityLogs: task.activityLogs,
-                                            comments: task.comments,
-                                            attachments: updated.hasAttachment ? task.attachments : []
-                                        }
-                                    }
-                                    return task
-                                })
-                        }))
-
-                        // Handle tasks that moved columns
-                        for (const changedTask of changedTasks) {
-                            if (deletedIds.has(changedTask.id)) continue
-                            const currentCol = newColumns.find(c =>
-                                c.tasks.some(t => t.id === changedTask.id)
-                            )
-
-                            if (currentCol && currentCol.id !== changedTask.columnId) {
-                                const task = currentCol.tasks.find(t => t.id === changedTask.id)
-                                if (task && changedTask.columnId) {
-                                    currentCol.tasks = currentCol.tasks.filter(t => t.id !== changedTask.id)
-                                    const targetCol = newColumns.find(c => c.id === changedTask.columnId)
-                                    if (targetCol) {
-                                        targetCol.tasks.push({ ...task, columnId: changedTask.columnId })
-                                    }
-                                }
-                            }
-                        }
-
-                        // Handle new tasks (not in any column yet)
-                        for (const changedTask of changedTasks) {
-                            if (deletedIds.has(changedTask.id)) continue
-                            const existsInAnyColumn = newColumns.some(c =>
-                                c.tasks.some(t => t.id === changedTask.id)
-                            )
-                            if (!existsInAnyColumn && changedTask.columnId) {
-                                const targetCol = newColumns.find(c => c.id === changedTask.columnId)
-                                if (targetCol) {
-                                        targetCol.tasks.push({
-                                            id: changedTask.id,
-                                            title: changedTask.title,
-                                            columnId: changedTask.columnId,
-                                            description: changedTask.description ?? null,
-                                            assignee: changedTask.assignee,
-                                            assignees: changedTask.assignees,
-                                            push: changedTask.push,
-                                            startDate: changedTask.startDate,
-                                            endDate: changedTask.endDate,
-                                            requireAttachment: changedTask.requireAttachment,
-                                            attachmentFolderId: changedTask.attachmentFolderId ?? null,
-                                            attachmentFolderName: changedTask.attachmentFolderName ?? null,
-                                            updatedAt: changedTask.updatedAt
-                                        })
-                                }
-                            }
-                        }
-
-                        return newColumns
-                    })
-                }
-
-                const timeCandidates = [latestUpdate, latestDeletion].filter(Boolean) as string[]
-                if (timeCandidates.length > 0) {
-                    const nextSync = timeCandidates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
-                    lastSyncTime.current = nextSync
-                } else if (serverTime) {
-                    lastSyncTime.current = serverTime
-                }
-            } catch (error) {
-                // Silent fail - will retry on next poll
-            }
-        }
-
-        const interval = setInterval(syncChanges, 1500) // Poll every 1.5 seconds
-        return () => clearInterval(interval)
-    }, [convex, doneMoveDialog, editingTask, isDragging, previewingTask, projectId, reviewDialog, workspaceId])
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -902,15 +715,12 @@ export function Board({
             setAttachmentWarningDialog({ taskTitle })
             setFlashingColumnId(reviewDialog.toColumnId)
             setTimeout(() => setFlashingColumnId(null), 500)
-            // Revert on error
-            router.refresh()
+            setColumns(board.columns)
         } else if (result.error) {
             toast({ title: "Error", description: result.error, variant: "destructive" })
-            // Revert on error
-            router.refresh()
+            setColumns(board.columns)
         } else {
             triggerConfetti('review', reviewDialog.dropPosition, projectColor)
-            // router.refresh() // Removed to prevent flicker
         }
         setReviewDialog(null)
         setIsDragging(false)
@@ -918,7 +728,7 @@ export function Board({
 
     const handleReviewCancel = () => {
         if (!reviewDialog) return
-        router.refresh()
+        setColumns(board.columns)
         setReviewDialog(null)
         setIsDragging(false)
     }
@@ -968,14 +778,13 @@ export function Board({
         }
 
         await saveToServer(doneMoveDialog.taskId, doneMoveDialog.toColumnId)
-        // router.refresh() // Removed to prevent flicker
         setDoneMoveDialog(null)
         setIsDragging(false)
     }
 
     const handleDoneMoveCancel = () => {
         if (!doneMoveDialog) return
-        router.refresh()
+        setColumns(board.columns)
         setDoneMoveDialog(null)
         setIsDragging(false)
     }

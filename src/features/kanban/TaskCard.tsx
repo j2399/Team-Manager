@@ -48,10 +48,7 @@ function getPendingReviewText(updatedAt?: Date | string | null) {
     return days === 0 ? 'Pending today' : `Pending ${days}d`
 }
 
-import { useRouter } from "next/navigation"
-
 export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn, isAdmin, isDragDisabled, isHighlighted, domId, currentUserId, projectId, validAssigneeUserIds = [] }: TaskCardProps) {
-    const router = useRouter()
     const {
         setNodeRef,
         attributes,

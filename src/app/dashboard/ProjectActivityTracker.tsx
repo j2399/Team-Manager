@@ -1,13 +1,13 @@
 "use client"
 
 import { useState, useMemo, useRef } from "react"
-import { useRouter } from "next/navigation"
 import { useQuery } from "convex/react"
 import { api } from "@convex/_generated/api"
 import { ChevronRight, TrendingUp, TrendingDown, Minus, CheckCircle2, Clock, Loader2, AlertTriangle, Calendar, Target, Activity, ArrowRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useProjectRoute } from "@/features/projects/useProjectRoute"
 
 type TimelineEvent = {
     date: string
@@ -255,7 +255,7 @@ export function ProjectActivityTracker({
 }: {
     workspaceId: string
 }) {
-    const router = useRouter()
+    const { prefetchProjectRoute, pushProjectRoute } = useProjectRoute()
     const [selectedProject, setSelectedProject] = useState<string | null>(null)
     const [hoveredPush, setHoveredPush] = useState<string | null>(null)
     const [openTooltipId, setOpenTooltipId] = useState<string | null>(null)
@@ -321,7 +321,7 @@ export function ProjectActivityTracker({
     }, [selectedProjectData])
 
     const navigateToProject = (projectId: string) => {
-        router.push(`/dashboard/projects/${projectId}`)
+        pushProjectRoute(`/dashboard/projects/${projectId}`, projectId)
     }
 
     if (projects === undefined) {
@@ -366,6 +366,7 @@ export function ProjectActivityTracker({
                                         <button
                                             onClick={() => handleProjectClick(project.id)}
                                             onMouseEnter={() => handleMouseEnter(project.id)}
+                                            onFocus={() => prefetchProjectRoute(project.id)}
                                             onMouseLeave={handleMouseLeave}
                                             className={cn(
                                                 "px-2.5 py-1.5 rounded text-[10px] font-medium whitespace-nowrap transition-colors shrink-0 relative",
@@ -481,7 +482,10 @@ export function ProjectActivityTracker({
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation()
-                                                            router.push(`/dashboard/projects/${selectedProjectData.id}?push=${push.id}`)
+                                                            pushProjectRoute(
+                                                                `/dashboard/projects/${selectedProjectData.id}?push=${push.id}`,
+                                                                selectedProjectData.id
+                                                            )
                                                         }}
                                                         className="p-1 rounded hover:bg-muted transition-colors"
                                                         title="Go to sprint"

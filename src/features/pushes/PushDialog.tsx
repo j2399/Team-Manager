@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useTransition, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import {
     Dialog,
     DialogContent,
@@ -47,8 +46,6 @@ const getDefaultStartDate = () => new Date().toISOString().split('T')[0]
 const getDefaultEndDate = () => new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
 export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogProps) {
-    const router = useRouter()
-
     const [name, setName] = useState(push?.name || "")
     const [startDate, setStartDate] = useState(push?.startDate ? new Date(push.startDate).toISOString().split('T')[0] : getDefaultStartDate())
     const [endDate, setEndDate] = useState(push?.endDate ? new Date(push.endDate).toISOString().split('T')[0] : "")
@@ -81,7 +78,6 @@ export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogPr
         } else {
             setShowDeleteConfirm(false)
             onOpenChange(false)
-            router.refresh()
         }
     }
 
@@ -132,7 +128,6 @@ export function PushDialog({ projectId, open, onOpenChange, push }: PushDialogPr
                 }
                 setError(null)
                 onOpenChange(false)
-                router.refresh()
             }
         })
     }

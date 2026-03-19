@@ -24,6 +24,7 @@ import { useQuery } from "convex/react"
 import { api } from "@convex/_generated/api"
 import { createTask, updateTaskDetails, deleteTask } from "@/app/actions/kanban"
 import { createChecklistItem } from "@/app/actions/checklist"
+import { deleteTaskInstructions, uploadTaskInstructions } from "@/app/actions/task-instructions"
 import { RemoveScroll } from "react-remove-scroll"
 import { useDashboardUser } from "@/components/DashboardUserProvider"
 
@@ -618,15 +619,10 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                     setIsUploadingInstructions(true)
                     const formData = new FormData()
                     formData.append('file', instructionsFile)
+                    const uploadResult = await uploadTaskInstructions(task.id, formData)
 
-                    const uploadRes = await fetch(`/api/tasks/${task.id}/instructions`, {
-                        method: 'POST',
-                        body: formData
-                    })
-
-                    if (!uploadRes.ok) {
-                        const err = await uploadRes.json().catch(() => ({}))
-                        setError(err.error || 'Failed to upload instructions file')
+                    if (uploadResult?.error) {
+                        setError(uploadResult.error)
                         setIsUploadingInstructions(false)
                         setIsLoading(false)
                         return
@@ -634,9 +630,12 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                     setIsUploadingInstructions(false)
                 } else if (!existingInstructionsFile && task.instructionsFileUrl) {
                     // User removed the instructions file
-                    await fetch(`/api/tasks/${task.id}/instructions`, {
-                        method: 'DELETE'
-                    })
+                    const deleteResult = await deleteTaskInstructions(task.id)
+                    if (deleteResult?.error) {
+                        setError(deleteResult.error)
+                        setIsLoading(false)
+                        return
+                    }
                 }
 
                 if (result.task && onTaskUpdated) {
@@ -692,14 +691,10 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                     setIsUploadingInstructions(true)
                     const formData = new FormData()
                     formData.append('file', instructionsFile)
+                    const uploadResult = await uploadTaskInstructions(result.task.id, formData)
 
-                    const uploadRes = await fetch(`/api/tasks/${result.task.id}/instructions`, {
-                        method: 'POST',
-                        body: formData
-                    })
-
-                    if (!uploadRes.ok) {
-                        console.error('Failed to upload instructions file')
+                    if (uploadResult?.error) {
+                        console.error('Failed to upload instructions file:', uploadResult.error)
                     }
                     setIsUploadingInstructions(false)
                 }

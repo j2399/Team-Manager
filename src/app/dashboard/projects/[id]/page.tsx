@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
-import { ProjectContent } from "@/features/projects/ProjectContent"
+import { ProjectPageClient } from "@/features/projects/ProjectPageClient"
 import { getCurrentUser } from "@/lib/auth"
-import { api, fetchQuery } from "@/lib/convex/server"
+import { api, preloadQuery, preloadedQueryResult } from "@/lib/convex/server"
 
 interface ProjectPageProps {
     params: Promise<{ id: string }>
@@ -15,21 +15,15 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
 
     const { id } = await params
 
-    const pageData = await fetchQuery(api.projects.getPageData, {
+    const preloadedPageData = await preloadQuery(api.projects.getPageData, {
         projectId: id,
         workspaceId: currentUser.workspaceId,
     })
+    const pageData = preloadedQueryResult(preloadedPageData)
 
     if (!pageData) {
         notFound()
     }
 
-    return (
-        <ProjectContent
-            project={pageData.project}
-            board={pageData.board}
-            users={pageData.users}
-            pushes={pageData.pushes}
-        />
-    )
+    return <ProjectPageClient preloadedPageData={preloadedPageData} />
 }

@@ -9,7 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Clock, User, FileText, ArrowRight } from "lucide-react"
-import Link from "next/link"
+import { ProjectRouteLink } from "@/features/projects/ProjectRouteLink"
 
 type ActivityLogDetailsProps = {
     open: boolean
@@ -161,15 +161,16 @@ export function ActivityLogDetails({ open, onOpenChange, activity }: ActivityLog
                     {/* Go to Task Button */}
                     {activity.task && activity.task.column?.board?.project && (
                         <div className="pt-4 border-t">
-                            <Link
+                            <ProjectRouteLink
                                 href={`/dashboard/projects/${activity.task.column.board.project.id}?task=${activity.task.id}`}
+                                projectId={activity.task.column.board.project.id}
                                 onClick={() => onOpenChange(false)}
                             >
                                 <Button className="w-full" variant="default">
                                     <ArrowRight className="h-4 w-4 mr-2" />
                                     Go to Task
                                 </Button>
-                            </Link>
+                            </ProjectRouteLink>
                         </div>
                     )}
                 </div>

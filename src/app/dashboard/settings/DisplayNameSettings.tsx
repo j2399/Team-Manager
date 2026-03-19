@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useTransition } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,7 +12,6 @@ type DisplayNameSettingsProps = {
 }
 
 export function DisplayNameSettings({ initialName }: DisplayNameSettingsProps) {
-    const router = useRouter()
     const [isPending, startTransition] = useTransition()
     const [isEditing, setIsEditing] = useState(false)
     const [name, setName] = useState(initialName)
@@ -39,7 +37,6 @@ export function DisplayNameSettings({ initialName }: DisplayNameSettingsProps) {
             } else {
                 setSavedName(name.trim())
                 setIsEditing(false)
-                router.refresh()
                 setSuccess(true)
                 setTimeout(() => setSuccess(false), 2000)
             }

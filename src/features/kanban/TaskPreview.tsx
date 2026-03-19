@@ -14,11 +14,14 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { acceptReviewTask, denyReviewTask } from "@/app/actions/kanban"
+import { createTaskComment, deleteTaskComment } from "@/app/actions/task-comments"
+import { deleteTaskAttachment, uploadTaskAttachment } from "@/app/actions/task-attachments"
 import {
     Pencil, Calendar, User, Clock,
     Send, FileText, Upload, Reply, X, Download, Maximize2, Trash2, CheckCircle, XCircle, ListChecks
 } from "lucide-react"
 import { getInitials } from "@/lib/utils"
+import { MAX_ATTACHMENT_SIZE } from "@/lib/attachments"
 import { TaskChecklist } from "@/components/TaskChecklist"
 import { HelpRequest } from "@/components/HelpRequest"
 import { useDashboardUser } from "@/components/DashboardUserProvider"
@@ -485,52 +488,18 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
         setCommentError(null)
 
         try {
-
-            const res = await fetch(`/api/tasks/${task.id}/comments`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    content: newComment,
-                    replyToId: replyingTo?.id || null
-                })
+            const result = await createTaskComment({
+                taskId: task.id,
+                content: newComment,
+                replyToId: replyingTo?.id || null,
             })
-
-
-
-            let responseText = ''
-            let data: Comment | { error?: string, message?: string, details?: string, id?: string } | null = null
-
-            try {
-                responseText = await res.text()
-
-                if (responseText) {
-                    data = JSON.parse(responseText)
-                } else {
-                    console.warn('Empty response body')
-                    data = {}
-                }
-            } catch (parseError: unknown) {
-                console.error('Failed to parse response:', parseError)
-                console.error('Response text that failed to parse:', responseText)
-                setCommentError(`Invalid response from server: ${(parseError as Error)?.message || 'Parse error'}`)
-                setIsSubmitting(false)
+            if (result?.success && result.comment) {
+                setNewComment("")
+                setReplyingTo(null)
+                setCommentError(null)
                 return
             }
-
-            if (res.ok) {
-                if (data && 'id' in data && typeof data.id === 'string') {
-                    setNewComment("")
-                    setReplyingTo(null)
-                    setCommentError(null)
-                    return // Success!
-                }
-            }
-
-            // More descriptive error for debugging
-            const errorData = data as { error?: string, message?: string, details?: string } | null
-            const errorMessage = errorData?.error || errorData?.message || errorData?.details || `Server error (${res?.status || 'unknown'} ${res?.statusText || ''})`
-            console.error('[COMMENT ERROR]', { status: res.status, data });
-            setCommentError(errorMessage)
+            setCommentError(result?.error || 'Failed to add comment')
         } catch (err: unknown) {
             console.error('Failed to add comment:', err)
             setCommentError((err as Error)?.message || 'Network error. Please try again.')
@@ -540,62 +509,29 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
     }
 
     const uploadFile = async (file: File) => {
-        if (file.size > 4.5 * 1024 * 1024) {
-            setCommentError(`File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds Vercel's 4.5MB free tier limit.`)
+        if (file.size > MAX_ATTACHMENT_SIZE) {
+            setCommentError(`File size (${(file.size / (1024 * 1024)).toFixed(1)}MB) exceeds the 50MB upload limit.`)
             return
         }
         setIsSubmitting(true)
         setCommentError(null)
-        setUploadProgress(0)
+        setUploadProgress(15)
         setUploadingFileName(file.name)
 
         try {
             const formData = new FormData()
             formData.append('file', file)
-
-            // Use XMLHttpRequest for progress tracking
-            const xhr = new XMLHttpRequest()
-
-            const uploadPromise = new Promise<Attachment>((resolve, reject) => {
-                xhr.upload.addEventListener('progress', (event) => {
-                    if (event.lengthComputable) {
-                        const progress = Math.round((event.loaded / event.total) * 100)
-                        setUploadProgress(progress)
-                    }
-                })
-
-                xhr.addEventListener('load', () => {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        try {
-                            const response = JSON.parse(xhr.responseText)
-                            resolve(response)
-                        } catch {
-                            reject(new Error('Failed to parse response'))
-                        }
-                    } else {
-                        try {
-                            const error = JSON.parse(xhr.responseText)
-                            reject(new Error(error.error || 'Failed to upload file'))
-                        } catch {
-                            reject(new Error('Failed to upload file'))
-                        }
-                    }
-                })
-
-                xhr.addEventListener('error', () => reject(new Error('Network error')))
-                xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')))
-
-                xhr.open('POST', `/api/tasks/${task.id}/attachments`)
-                xhr.send(formData)
-            })
-
-            await uploadPromise
+            const result = await uploadTaskAttachment(task.id, formData)
+            if (result?.error) {
+                throw new Error(result.error)
+            }
+            setUploadProgress(100)
         } catch (err: unknown) {
             console.error('Upload error:', err)
             setCommentError((err as Error).message || 'Failed to upload file. Please try again.')
         } finally {
+            window.setTimeout(() => setUploadProgress(null), 150)
             setIsSubmitting(false)
-            setUploadProgress(null)
             setUploadingFileName(null)
         }
     }
@@ -648,10 +584,8 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
             // Actual delete after delay
             setIsSubmitting(true)
             try {
-                const res = await fetch(`/api/tasks/${task.id}/attachments?attachmentId=${attachmentId}`, {
-                    method: 'DELETE'
-                })
-                if (res.ok) {
+                const result = await deleteTaskAttachment(task.id, attachmentId)
+                if (result?.success) {
                     // Remove from deleting set
                     setDeletingIds(prev => {
                         const next = new Set(prev)
@@ -659,8 +593,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                         return next
                     })
                 } else {
-                    const error = await res.json().catch(() => ({ error: 'Failed to delete file' }))
-                    setCommentError(error.error || 'Failed to delete file')
+                    setCommentError(result?.error || 'Failed to delete file')
                     // Revert deleting state
                     setDeletingIds(prev => {
                         const next = new Set(prev)
@@ -701,18 +634,16 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
 
 
     const handleDeleteComment = async (commentId: string) => {
-
-
         try {
-            const res = await fetch(`/api/tasks/${task.id}/comments?commentId=${commentId}`, {
-                method: 'DELETE'
-            })
-
-            if (res.ok) {
+            const result = await deleteTaskComment(task.id, commentId)
+            if (result?.success) {
                 setReplyingTo((current) => (current?.id === commentId ? null : current))
+            } else {
+                setCommentError(result?.error || 'Failed to delete comment')
             }
         } catch (err) {
             console.error('Failed to delete comment:', err)
+            setCommentError('Failed to delete comment')
         }
     }
 

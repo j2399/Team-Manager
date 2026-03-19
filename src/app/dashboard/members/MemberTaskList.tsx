@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { ChevronDown, ChevronUp, ExternalLink, Clock, CheckCircle2, Circle, AlertCircle, Calendar, History } from "lucide-react"
-import Link from "next/link"
+import { ProjectRouteLink } from "@/features/projects/ProjectRouteLink"
 
 type Task = {
     id: string
@@ -138,11 +138,14 @@ function TaskItem({ task }: { task: Task }) {
                     {status}
                 </Badge>
                 {project && (
-                    <Link href={`/dashboard/projects/${project.id}?task=${task.id}`}>
+                    <ProjectRouteLink
+                        href={`/dashboard/projects/${project.id}?task=${task.id}`}
+                        projectId={project.id}
+                    >
                         <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity">
                             <ExternalLink className="h-3.5 w-3.5" />
                         </Button>
-                    </Link>
+                    </ProjectRouteLink>
                 )}
             </div>
         </div>

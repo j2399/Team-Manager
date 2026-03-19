@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { useMutation } from "convex/react"
 import { api } from "@convex/_generated/api"
 import { cn } from "@/lib/utils"
@@ -27,6 +26,7 @@ import { RemoveScroll } from "react-remove-scroll"
 import { ChevronDown, ChevronLeft, ChevronRight, Loader2, Sparkles } from "lucide-react"
 import { WizardStepIndicator } from "./WizardStepIndicator"
 import { TimelineEditor, type PushDraft } from "@/features/timeline-editor"
+import { useProjectRoute } from "@/features/projects/useProjectRoute"
 import { useDashboardUser } from "@/components/DashboardUserProvider"
 
 type User = {
@@ -39,7 +39,6 @@ type CreateProjectWizardProps = {
     onOpenChange: (open: boolean) => void
     leadCandidates: User[]
     allUsers: User[]
-    onProjectCreated?: () => void
 }
 
 type ProjectData = {
@@ -58,10 +57,9 @@ export function CreateProjectWizard({
     open,
     onOpenChange,
     leadCandidates,
-    allUsers,
-    onProjectCreated
+    allUsers
 }: CreateProjectWizardProps) {
-    const router = useRouter()
+    const { pushProjectRoute } = useProjectRoute()
     const dashboardUser = useDashboardUser()
     const dialogRef = useRef<HTMLDivElement>(null)
     const [currentStep, setCurrentStep] = useState(0)
@@ -160,9 +158,7 @@ export function CreateProjectWizard({
             }
 
             onOpenChange(false)
-            onProjectCreated?.()
-            router.push(`/dashboard/projects/${response.project.id}`)
-            router.refresh()
+            pushProjectRoute(`/dashboard/projects/${response.project.id}`, response.project.id)
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An error occurred')
         } finally {

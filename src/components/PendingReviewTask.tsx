@@ -1,11 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { User, Eye, Clock, ArrowUpRight } from "lucide-react"
-import Link from "next/link"
 import { TaskPreview } from "@/features/kanban/TaskPreview"
+import { ProjectRouteLink } from "@/features/projects/ProjectRouteLink"
 
 type PendingReviewTaskProps = {
     task: {
@@ -51,7 +50,6 @@ function formatWaitTime(date: Date | string | null): string {
 }
 
 export function PendingReviewTask({ task }: PendingReviewTaskProps) {
-    const router = useRouter()
     const [showTaskPreview, setShowTaskPreview] = useState(false)
 
     return (
@@ -113,11 +111,12 @@ export function PendingReviewTask({ task }: PendingReviewTaskProps) {
                             className="h-7 w-7 p-0 shrink-0 text-muted-foreground hover:text-foreground"
                             title="Go to Tasks Board"
                         >
-                            <Link
+                            <ProjectRouteLink
                                 href={`/dashboard/projects/${task.column.board.project.id}?highlight=${task.id}`}
+                                projectId={task.column.board.project.id}
                             >
                                 <ArrowUpRight className="h-3.5 w-3.5" />
-                            </Link>
+                            </ProjectRouteLink>
                         </Button>
                     )}
                 </div>
@@ -141,9 +140,6 @@ export function PendingReviewTask({ task }: PendingReviewTaskProps) {
                     open={showTaskPreview}
                     onOpenChange={(open) => {
                         setShowTaskPreview(open)
-                        if (!open) {
-                            router.refresh()
-                        }
                     }}
                     onEdit={() => { }}
                     projectId={task.column?.board?.project?.id || ''}

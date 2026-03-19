@@ -141,7 +141,6 @@ export function WorkspaceSelector({ user }: { user: CurrentUser }) {
             }
 
             setDisplayName(editName.trim())
-            router.refresh()
             setProfileOpen(false)
             setNotification({
                 title: "Profile Updated",

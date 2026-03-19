@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { ChevronRight, ChevronDown, Clock } from "lucide-react"
-import Link from "next/link"
+import { ProjectRouteLink } from "@/features/projects/ProjectRouteLink"
 
 type TeamMember = {
     id: string
@@ -104,9 +104,10 @@ export function TeamPopup({ members, totalTasks, children }: TeamPopupProps) {
                                             {activeTasks.slice(0, 10).map(task => {
                                                 const { text: dueText, isOverdue } = formatDueDate(task.dueDate)
                                                 return (
-                                                    <Link
+                                                    <ProjectRouteLink
                                                         key={task.id}
                                                         href={`/dashboard/projects/${task.projectId}?task=${task.id}`}
+                                                        projectId={task.projectId}
                                                         onClick={() => setOpen(false)}
                                                         className="flex items-center justify-between p-2 rounded hover:bg-background transition-colors group"
                                                     >
@@ -128,7 +129,7 @@ export function TeamPopup({ members, totalTasks, children }: TeamPopupProps) {
                                                             </span>
                                                             <ChevronRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                                                         </div>
-                                                    </Link>
+                                                    </ProjectRouteLink>
                                                 )
                                             })}
                                             {activeTasks.length > 10 && (

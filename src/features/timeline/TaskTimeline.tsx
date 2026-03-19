@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import { ProjectRouteLink } from "@/features/projects/ProjectRouteLink"
 
 type Task = {
     id: string
@@ -71,11 +71,13 @@ export function TaskTimeline({ tasks }: TaskTimelineProps) {
                     const right = getPosition(new Date(task.endDate!))
                     const width = Math.max(right - left, 2)
                     const divisionName = task.column?.board?.project?.name || 'Unknown Division'
+                    const projectId = task.column?.board?.project?.id
 
                     return (
-                        <Link
+                        <ProjectRouteLink
                             key={task.id}
-                            href={`/dashboard/projects/${task.column?.board?.project?.id}?task=${task.id}`}
+                            href={`/dashboard/projects/${projectId}?task=${task.id}`}
+                            projectId={projectId}
                             className="relative h-7 flex items-center group"
                         >
                             <div className="w-20 pr-1 text-xs font-medium text-right truncate shrink-0">
@@ -93,13 +95,10 @@ export function TaskTimeline({ tasks }: TaskTimelineProps) {
                                     </span>
                                 </div>
                             </div>
-                        </Link>
+                        </ProjectRouteLink>
                     )
                 })}
             </div>
         </div>
     )
 }
-
-
-

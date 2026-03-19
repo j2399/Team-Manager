@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useProjectRoute } from "@/features/projects/useProjectRoute"
 
 type TaskRowProps = {
     task: {
@@ -33,17 +33,20 @@ const getInitials = (name: string) => {
 }
 
 export function TaskRow({ task }: TaskRowProps) {
-    const router = useRouter()
+    const { prefetchProjectRoute, pushProjectRoute } = useProjectRoute()
 
     const handleClick = () => {
         let url = `/dashboard/projects/${task.projectId}?highlight=${task.id}`
         if (task.pushId) url += `&push=${task.pushId}`
-        router.push(url)
+        pushProjectRoute(url, task.projectId)
     }
 
     return (
         <button
             onClick={handleClick}
+            onMouseEnter={() => prefetchProjectRoute(task.projectId)}
+            onFocus={() => prefetchProjectRoute(task.projectId)}
+            onTouchStart={() => prefetchProjectRoute(task.projectId)}
             className={cn(
                 "w-full text-left group relative flex flex-col rounded-lg border bg-card p-3 shadow-sm transition-all duration-200 overflow-hidden",
                 "hover:shadow-md hover:border-primary/20 border-border"
@@ -116,7 +119,7 @@ type ApprovalRowProps = {
 }
 
 export function ApprovalRow({ task, onApproved, onDenied }: ApprovalRowProps) {
-    const router = useRouter()
+    const { prefetchProjectRoute, pushProjectRoute } = useProjectRoute()
     const [ApprovalPreviewButton, setApprovalPreviewButton] = useState<React.ComponentType<{
         task: ApprovalRowProps['task']
         onApproved?: () => void
@@ -133,7 +136,7 @@ export function ApprovalRow({ task, onApproved, onDenied }: ApprovalRowProps) {
     const handleClick = () => {
         let url = `/dashboard/projects/${task.projectId}?highlight=${task.id}`
         if (task.pushId) url += `&push=${task.pushId}`
-        router.push(url)
+        pushProjectRoute(url, task.projectId)
     }
 
     const maxVisible = 2
@@ -149,6 +152,8 @@ export function ApprovalRow({ task, onApproved, onDenied }: ApprovalRowProps) {
     return (
         <div
             onClick={handleClick}
+            onMouseEnter={() => prefetchProjectRoute(task.projectId)}
+            onTouchStart={() => prefetchProjectRoute(task.projectId)}
             className={cn(
                 "w-full text-left group relative flex flex-col rounded-lg border bg-card p-3 shadow-sm transition-all duration-200 overflow-hidden min-h-[88px] cursor-pointer",
                 "hover:shadow-md hover:border-primary/20 border-border"

@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useMutation, useQuery } from "convex/react"
+import { useConvex, useMutation, useQuery } from "convex/react"
 import { api } from "@convex/_generated/api"
 import {
     LayoutDashboard, Users, LogOut, Settings, ChevronDown,
@@ -182,7 +182,11 @@ function ProjectRowInner({
             <Link
                 href={`/dashboard/projects/${project.id}`}
                 prefetch={false}
-                onClick={() => !isActive && setNavigatingTo(`/dashboard/projects/${project.id}`)}
+                onClick={() => {
+                    if (isActive) return
+                    onPrefetchProject(project.id)
+                    setNavigatingTo(`/dashboard/projects/${project.id}`)
+                }}
                 onMouseEnter={() => onPrefetchProject(project.id)}
                 onFocus={() => onPrefetchProject(project.id)}
                 onTouchStart={() => onPrefetchProject(project.id)}
@@ -388,10 +392,67 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     }))
 
     const isAdmin = userData.role === 'Admin' || userData.role === 'Team Lead'
+    const convex = useConvex()
+    const prefetchDashboardHome = React.useCallback(() => {
+        if (!initialUserId || !initialWorkspaceId) return
+        router.prefetch("/dashboard")
+        convex.prewarmQuery({
+            query: api.dashboard.getDashboardPageData,
+            args: {
+                userId: initialUserId,
+                workspaceId: initialWorkspaceId,
+                role: userData.role,
+            },
+            extendSubscriptionFor: 15_000,
+        })
+        if (isAdmin) {
+            convex.prewarmQuery({
+                query: api.dashboard.getHeatmapWidgetData,
+                args: { workspaceId: initialWorkspaceId },
+                extendSubscriptionFor: 15_000,
+            })
+            convex.prewarmQuery({
+                query: api.settings.getProjectActivity,
+                args: { workspaceId: initialWorkspaceId },
+                extendSubscriptionFor: 15_000,
+            })
+        }
+    }, [convex, initialUserId, initialWorkspaceId, isAdmin, router, userData.role])
+    const prefetchMyBoard = React.useCallback(() => {
+        if (!initialUserId || !initialWorkspaceId) return
+        router.prefetch("/dashboard/my-board")
+        convex.prewarmQuery({
+            query: api.dashboard.getMyBoardPageData,
+            args: {
+                userId: initialUserId,
+                workspaceId: initialWorkspaceId,
+            },
+            extendSubscriptionFor: 15_000,
+        })
+    }, [convex, initialUserId, initialWorkspaceId, router])
+    const prefetchSettings = React.useCallback(() => {
+        if (!initialWorkspaceId) return
+        router.prefetch("/dashboard/settings")
+        convex.prewarmQuery({
+            query: api.settings.getPageData,
+            args: { workspaceId: initialWorkspaceId },
+            extendSubscriptionFor: 15_000,
+        })
+    }, [convex, initialWorkspaceId, router])
     const prefetchProject = React.useCallback((projectId: string) => {
         preloadBoardModule()
         router.prefetch(`/dashboard/projects/${projectId}`)
-    }, [router])
+        if (initialWorkspaceId) {
+            convex.prewarmQuery({
+                query: api.projects.getPageData,
+                args: {
+                    projectId,
+                    workspaceId: initialWorkspaceId,
+                },
+                extendSubscriptionFor: 15_000,
+            })
+        }
+    }, [convex, initialWorkspaceId, router])
 
     React.useEffect(() => {
         if (!projectListResult) return
@@ -452,15 +513,13 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 alert(result.error || `Failed to ${nextArchived ? 'archive' : 'restore'} division`)
                 return
             }
-
-            router.refresh()
         } catch (error) {
             console.error(error)
             alert(`Failed to ${project.archivedAt ? 'restore' : 'archive'} division`)
         } finally {
             setIsSubmitting(false)
         }
-    }, [router])
+    }, [])
 
     React.useEffect(() => {
         const timer = window.setTimeout(() => {
@@ -541,7 +600,6 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
             })
             if (!result?.error) {
                 setEditingProject(null)
-                router.refresh()
             } else {
                 setEditError(result.error || "Failed to rename division")
             }
@@ -566,7 +624,6 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 setDeleteConfirm(null)
                 setDeleteConfirmName("")
                 router.push('/dashboard')
-                router.refresh()
             } else {
                 alert(result.error || 'Failed to delete division')
             }
@@ -594,8 +651,11 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                         )}
                         aria-label="Workspace settings"
                         title="Settings"
+                        onMouseEnter={prefetchSettings}
+                        onFocus={prefetchSettings}
                         onClick={(e) => {
                             e.preventDefault()
+                            prefetchSettings()
                             setSettingsSpinNonce((n) => n + 1)
                             if (pathname === '/dashboard/settings') {
                                 // Toggle back to previous page
@@ -629,7 +689,14 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                         {/* Dashboard Link */}
                         <Link
                             href="/dashboard"
-                            onClick={() => pathname !== "/dashboard" && setNavigatingTo("/dashboard")}
+                            onClick={() => {
+                                if (pathname === "/dashboard") return
+                                prefetchDashboardHome()
+                                setNavigatingTo("/dashboard")
+                            }}
+                            onMouseEnter={prefetchDashboardHome}
+                            onFocus={prefetchDashboardHome}
+                            onTouchStart={prefetchDashboardHome}
                             className={cn(
                                 "flex items-center gap-3 rounded-md px-3 py-2 transition-all hover:translate-x-0.5 text-sm",
                                 pathname === "/dashboard" ? "bg-muted font-medium" : "text-muted-foreground"
@@ -643,7 +710,14 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                         {/* My Board Link */}
                         <Link
                             href="/dashboard/my-board"
-                            onClick={() => pathname !== "/dashboard/my-board" && setNavigatingTo("/dashboard/my-board")}
+                            onClick={() => {
+                                if (pathname === "/dashboard/my-board") return
+                                prefetchMyBoard()
+                                setNavigatingTo("/dashboard/my-board")
+                            }}
+                            onMouseEnter={prefetchMyBoard}
+                            onFocus={prefetchMyBoard}
+                            onTouchStart={prefetchMyBoard}
                             className={cn(
                                 "flex items-center gap-3 rounded-md px-3 py-2 transition-all hover:translate-x-0.5 text-sm",
                                 pathname === "/dashboard/my-board" ? "bg-muted font-medium" : "text-muted-foreground"
@@ -735,7 +809,14 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                         {isMobileSheet && (
                             <Link
                                 href="/dashboard/settings"
-                                onClick={() => pathname !== "/dashboard/settings" && setNavigatingTo("/dashboard/settings")}
+                                onClick={() => {
+                                    if (pathname === "/dashboard/settings") return
+                                    prefetchSettings()
+                                    setNavigatingTo("/dashboard/settings")
+                                }}
+                                onMouseEnter={prefetchSettings}
+                                onFocus={prefetchSettings}
+                                onTouchStart={prefetchSettings}
                                 className={cn(
                                     "flex items-center gap-3 rounded-md px-3 py-2 transition-all hover:translate-x-0.5 text-sm mt-2",
                                     pathname === "/dashboard/settings" ? "bg-muted font-medium" : "text-muted-foreground"
@@ -805,7 +886,6 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 onOpenChange={setCreateDialogOpen}
                 leadCandidates={leadCandidates}
                 allUsers={allUsers}
-                onProjectCreated={() => router.refresh()}
             />
 
             {/* Edit Dialog */}

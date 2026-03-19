@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { LogOut, Trash2 } from "lucide-react"
 import { removeUserFromWorkspace } from "@/app/actions/users"
 import { useToast } from "@/components/ui/use-toast"
-import { useRouter } from "next/navigation"
 import {
     AlertDialog,
     AlertDialogAction,
@@ -26,7 +25,6 @@ type MemberActionsProps = {
 
 export function MemberActions({ userId, isCurrentUser, canRemove, onRemoved }: MemberActionsProps) {
     const { toast } = useToast()
-    const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
 
@@ -56,7 +54,6 @@ export function MemberActions({ userId, isCurrentUser, canRemove, onRemoved }: M
                     window.location.href = '/' // Redirect to home/login if leaving
                 } else {
                     onRemoved?.(userId)
-                    router.refresh()
                 }
             }
         } catch (error) {
