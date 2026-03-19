@@ -124,6 +124,8 @@ const PROJECT_COLOR_OPTIONS = [
     "#ec4899", // pink
 ] as const
 
+const ARCHIVED_PROJECT_DOT_COLOR = "#9ca3af"
+
 type ProjectWarmState = "idle" | "warming" | "ready"
 
 type ProjectWarmEntry = {
@@ -204,8 +206,12 @@ function ProjectRowInner({
     rowRef?: React.Ref<HTMLDivElement>
     style?: React.CSSProperties & { '--project-active-bg'?: string }
 }) {
-    const isActive = pathname === `/dashboard/projects/${project.id}`
-    const projectColor = project.color || "#3b82f6"
+    const href = `/dashboard/projects/${project.id}`
+    const isPending = navigatingTo === href
+    const isActive = pathname === href || isPending
+    const projectColor = project.archivedAt
+        ? ARCHIVED_PROJECT_DOT_COLOR
+        : project.color || "#3b82f6"
 
     return (
         <div
@@ -238,7 +244,7 @@ function ProjectRowInner({
                 </div>
             )}
             <Link
-                href={`/dashboard/projects/${project.id}`}
+                href={href}
                 prefetch={false}
                 onClick={(event) => {
                     if (isActive) return
@@ -386,9 +392,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     const previousPathRef = React.useRef<string>('/dashboard')
     const shellWarmStartedRef = React.useRef(false)
     const projectWarmEntriesRef = React.useRef<Map<string, ProjectWarmEntry>>(new Map())
-    const pendingProjectNavigationIdRef = React.useRef(0)
     const shellWarmEntriesRef = React.useRef<Map<ShellWarmKey, ProjectWarmEntry>>(new Map())
-    const pendingShellNavigationIdRef = React.useRef(0)
 
     // Track previous path for settings toggle
     React.useEffect(() => {
@@ -845,75 +849,26 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
         const href = `/dashboard/projects/${projectId}`
         if (pathname === href) return
 
-        const navigationId = pendingProjectNavigationIdRef.current + 1
-        pendingProjectNavigationIdRef.current = navigationId
         setNavigatingTo(href)
-
-        if (projectWarmStates[projectId] === "ready") {
-            router.push(href)
-            return
-        }
-
-        void Promise.race([
-            prefetchProject(projectId, { subscriptionMs: 180_000 }),
-            new Promise<void>((resolve) => {
-                window.setTimeout(resolve, 1500)
-            }),
-        ]).finally(() => {
-            if (pendingProjectNavigationIdRef.current !== navigationId) {
-                return
-            }
-            router.push(href)
-        })
-    }, [pathname, prefetchProject, projectWarmStates, router])
+        void prefetchProject(projectId, { subscriptionMs: 180_000 })
+        router.push(href)
+    }, [pathname, prefetchProject, router])
     const openDashboardHome = React.useCallback(() => {
         const href = "/dashboard"
         if (pathname === href) return
 
-        const navigationId = pendingShellNavigationIdRef.current + 1
-        pendingShellNavigationIdRef.current = navigationId
-
-        if (shellWarmStates.dashboard === "ready") {
-            router.push(href)
-            return
-        }
-
-        void Promise.race([
-            prefetchDashboardHome({ subscriptionMs: 180_000 }),
-            new Promise<void>((resolve) => {
-                window.setTimeout(resolve, 1500)
-            }),
-        ]).finally(() => {
-            if (pendingShellNavigationIdRef.current !== navigationId) {
-                return
-            }
-            router.push(href)
-        })
-    }, [pathname, prefetchDashboardHome, router, shellWarmStates.dashboard])
+        setNavigatingTo(href)
+        void prefetchDashboardHome({ subscriptionMs: 180_000 })
+        router.push(href)
+    }, [pathname, prefetchDashboardHome, router])
     const openMyBoard = React.useCallback(() => {
         const href = "/dashboard/my-board"
         if (pathname === href) return
 
-        const navigationId = pendingShellNavigationIdRef.current + 1
-        pendingShellNavigationIdRef.current = navigationId
-
-        if (shellWarmStates.myBoard === "ready") {
-            router.push(href)
-            return
-        }
-
-        void Promise.race([
-            prefetchMyBoard({ subscriptionMs: 180_000 }),
-            new Promise<void>((resolve) => {
-                window.setTimeout(resolve, 1500)
-            }),
-        ]).finally(() => {
-            if (pendingShellNavigationIdRef.current !== navigationId) {
-                return
-            }
-            router.push(href)
-        })
-    }, [pathname, prefetchMyBoard, router, shellWarmStates.myBoard])
+        setNavigatingTo(href)
+        void prefetchMyBoard({ subscriptionMs: 180_000 })
+        router.push(href)
+    }, [pathname, prefetchMyBoard, router])
 
     React.useEffect(() => {
         if (!projectListResult) return
@@ -1134,6 +1089,11 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
         setIsSubmitting(false)
     }
 
+    const dashboardHref = "/dashboard"
+    const isDashboardActive = pathname === dashboardHref || navigatingTo === dashboardHref
+    const myBoardHref = "/dashboard/my-board"
+    const isMyBoardActive = pathname === myBoardHref || navigatingTo === myBoardHref
+
     return (
         <div className="flex h-full w-64 min-w-64 shrink-0 flex-col overflow-hidden border-r bg-background">
             <div className={cn(
@@ -1189,9 +1149,9 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                     <nav className="w-full min-w-0 p-3">
                         {/* Dashboard Link */}
                         <Link
-                            href="/dashboard"
+                            href={dashboardHref}
                             onClick={(event) => {
-                                if (pathname === "/dashboard") return
+                                if (isDashboardActive) return
                                 event.preventDefault()
                                 openDashboardHome()
                             }}
@@ -1206,7 +1166,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                             }}
                             className={cn(
                                 "flex items-center gap-3 rounded-md px-3 py-2 transition-all hover:translate-x-0.5 text-sm",
-                                pathname === "/dashboard" ? "bg-muted font-medium" : "text-muted-foreground"
+                                isDashboardActive ? "bg-muted font-medium" : "text-muted-foreground"
                             )}
                         >
                             <LayoutDashboard className="h-5 w-5" />
@@ -1215,9 +1175,9 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
 
                         {/* My Board Link */}
                         <Link
-                            href="/dashboard/my-board"
+                            href={myBoardHref}
                             onClick={(event) => {
-                                if (pathname === "/dashboard/my-board") return
+                                if (isMyBoardActive) return
                                 event.preventDefault()
                                 openMyBoard()
                             }}
@@ -1232,7 +1192,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                             }}
                             className={cn(
                                 "flex items-center gap-3 rounded-md px-3 py-2 transition-all hover:translate-x-0.5 text-sm",
-                                pathname === "/dashboard/my-board" ? "bg-muted font-medium" : "text-muted-foreground"
+                                isMyBoardActive ? "bg-muted font-medium" : "text-muted-foreground"
                             )}
                         >
                             <Kanban className="h-5 w-5" />
