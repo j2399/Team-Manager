@@ -267,7 +267,7 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
     }
 
     return (
-        <div className="flex min-h-full flex-col bg-background animate-fade-in-up md:bg-transparent">
+        <div className="flex min-h-full flex-col bg-background md:bg-transparent">
             <div className="shrink-0 border-b bg-background relative overflow-hidden">
                 <div className="relative flex items-center justify-between gap-2 p-3">
                     <div className="flex items-center gap-2 md:gap-3 min-w-0">

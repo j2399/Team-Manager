@@ -61,7 +61,7 @@ export function DashboardPageClient({
 
     return (
         <div className="h-full overflow-y-auto">
-            <div className="p-4 md:p-6 space-y-5 animate-fade-in-up">
+            <div className="p-4 md:p-6 space-y-5">
                 {inviteNotice && <InviteNoticeCard notice={inviteNotice} />}
 
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">

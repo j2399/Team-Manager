@@ -313,8 +313,6 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     const previousPathRef = React.useRef<string>('/dashboard')
     const shellWarmStartedRef = React.useRef(false)
     const warmedProjectIdsRef = React.useRef<Set<string>>(new Set())
-    const shellWarmTimersRef = React.useRef<number[]>([])
-    const projectWarmTimersRef = React.useRef<number[]>([])
 
     // Track previous path for settings toggle
     React.useEffect(() => {
@@ -326,9 +324,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     // Clear navigation loading state only when we've reached the destination
     React.useEffect(() => {
         if (navigatingTo && (pathname === navigatingTo || pathname.startsWith(navigatingTo.replace(/\/$/, '') + '/'))) {
-            // Add a small delay to allow the actual page content to render
-            const timer = setTimeout(() => setNavigatingTo(null), 300)
-            return () => clearTimeout(timer)
+            setNavigatingTo(null)
         }
     }, [pathname, navigatingTo])
 
@@ -560,38 +556,20 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     }, [])
 
     React.useEffect(() => {
-        return () => {
-            shellWarmTimersRef.current.forEach((timerId) => window.clearTimeout(timerId))
-            projectWarmTimersRef.current.forEach((timerId) => window.clearTimeout(timerId))
-        }
-    }, [])
-
-    React.useEffect(() => {
         if (isMobileSheet || shellWarmStartedRef.current || !initialUserId || !initialWorkspaceId) {
             return
         }
 
         shellWarmStartedRef.current = true
         const longWarmMs = 180_000
-        const warmTasks: Array<() => void> = [
-            () => prefetchDashboardHome({ subscriptionMs: longWarmMs }),
-            () => prefetchMyBoard({ subscriptionMs: longWarmMs }),
-            () => prefetchSettings({ subscriptionMs: longWarmMs }),
-        ]
+        prefetchDashboardHome({ subscriptionMs: longWarmMs })
+        prefetchMyBoard({ subscriptionMs: longWarmMs })
+        prefetchSettings({ subscriptionMs: longWarmMs })
 
         if (isAdmin) {
-            warmTasks.push(
-                () => prefetchMembers({ subscriptionMs: longWarmMs }),
-                () => prefetchHeatmapPage({ subscriptionMs: longWarmMs })
-            )
+            prefetchMembers({ subscriptionMs: longWarmMs })
+            prefetchHeatmapPage({ subscriptionMs: longWarmMs })
         }
-
-        warmTasks.forEach((warmTask, index) => {
-            const timerId = window.setTimeout(() => {
-                warmTask()
-            }, 150 + index * 120)
-            shellWarmTimersRef.current.push(timerId)
-        })
     }, [
         initialUserId,
         initialWorkspaceId,
@@ -607,9 +585,6 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     React.useEffect(() => {
         if (isMobileSheet) return
 
-        projectWarmTimersRef.current.forEach((timerId) => window.clearTimeout(timerId))
-        projectWarmTimersRef.current = []
-
         const activeQueue = projects.filter((project) => !warmedProjectIdsRef.current.has(project.id))
         const archivedQueue = archivedProjects.filter((project) => !warmedProjectIdsRef.current.has(project.id))
         const queue = [...activeQueue, ...archivedQueue]
@@ -617,18 +592,10 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
         if (queue.length === 0) return
 
         const longWarmMs = 180_000
-        queue.forEach((project, index) => {
-            const timerId = window.setTimeout(() => {
-                warmedProjectIdsRef.current.add(project.id)
-                prefetchProject(project.id, { subscriptionMs: longWarmMs })
-            }, 700 + index * 140)
-            projectWarmTimersRef.current.push(timerId)
+        queue.forEach((project) => {
+            warmedProjectIdsRef.current.add(project.id)
+            prefetchProject(project.id, { subscriptionMs: longWarmMs })
         })
-
-        return () => {
-            projectWarmTimersRef.current.forEach((timerId) => window.clearTimeout(timerId))
-            projectWarmTimersRef.current = []
-        }
     }, [archivedProjects, isMobileSheet, prefetchProject, projects])
 
     // When editing division changes, update the lead id state
