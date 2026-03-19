@@ -329,7 +329,7 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
                 }
                 .custom-scrollbar::-webkit-scrollbar-thumb {
                     background: #e2e8f0;
-                    border-radius: 4px;
+                    border-radius: 2px;
                 }
                 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
                     background: #1e293b;

@@ -60,6 +60,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { GeneralChat } from "@/components/layout/GeneralChat"
 import { CreateProjectWizard } from "@/features/projects/CreateProjectWizard"
 import { preloadBoardModule } from "@/lib/board-module"
+import { preloadDashboardHomeModule, preloadMyBoardModule } from "@/lib/dashboard-route-modules"
 import { deleteProject, updateProjectDetails } from "@/app/actions/projects"
 
 type Project = {
@@ -599,6 +600,16 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
         const extendSubscriptionFor = options?.subscriptionMs ?? 15_000
         const existingEntry = shellWarmEntriesRef.current.get("dashboard")
 
+        preloadDashboardHomeModule()
+
+        convex.prewarmQuery({
+            query: api.admin.getManagedUser,
+            args: {
+                workspaceId: initialWorkspaceId,
+                userId: initialUserId,
+            },
+            extendSubscriptionFor,
+        })
         convex.prewarmQuery({
             query: api.dashboard.getDashboardPageData,
             args: {
@@ -682,6 +693,17 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     const prefetchMyBoard = React.useCallback((options?: { subscriptionMs?: number }) => {
         if (!initialUserId || !initialWorkspaceId) return
         const extendSubscriptionFor = options?.subscriptionMs ?? 15_000
+
+        preloadMyBoardModule()
+
+        convex.prewarmQuery({
+            query: api.admin.getManagedUser,
+            args: {
+                workspaceId: initialWorkspaceId,
+                userId: initialUserId,
+            },
+            extendSubscriptionFor,
+        })
         convex.prewarmQuery({
             query: api.dashboard.getMyBoardPageData,
             args: {
