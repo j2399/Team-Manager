@@ -563,6 +563,7 @@ export function ProjectActivityTracker({
 
     const pointCount = divisions[0]?.progressSeries.length ?? 0
     const activeIndex = hoverIndex ?? Math.max(pointCount - 1, 0)
+    const detailDivision = sortedDivisions.find((division) => division.id === hoveredDivisionId) ?? sortedDivisions[0] ?? null
 
     const openDivision = React.useCallback((divisionId: string) => {
         pushProjectRoute(`/dashboard/projects/${divisionId}`, divisionId)
@@ -587,11 +588,13 @@ export function ProjectActivityTracker({
     }
 
     return (
-        <section className="border border-border rounded-lg bg-card/60 p-3 lg:h-[440px]">
-            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "graph" | "stack")} className="flex h-full min-h-0 flex-col">
+        <section className="flex flex-col border border-border rounded-lg bg-card/60 p-3 lg:h-[440px]">
+            <div className="mb-3 text-xs font-medium">Project Monitor</div>
+
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "graph" | "stack")} className="flex min-h-0 flex-1 flex-col">
                 <TabsList className="grid h-8 w-full grid-cols-2">
-                            <TabsTrigger value="graph" className="text-xs">Graph</TabsTrigger>
-                            <TabsTrigger value="stack" className="text-xs">Stack</TabsTrigger>
+                    <TabsTrigger value="graph" className="text-xs">Graph</TabsTrigger>
+                    <TabsTrigger value="stack" className="text-xs">Stack</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="graph" className="mt-3 min-h-0 flex-1">
@@ -645,6 +648,17 @@ export function ProjectActivityTracker({
                     </div>
                 </TabsContent>
             </Tabs>
+
+            {detailDivision && (
+                <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg border bg-background/80 px-2.5 py-2 text-[10px] text-muted-foreground">
+                    <div className="truncate font-medium text-foreground">{detailDivision.name}</div>
+                    <div>{detailDivision.completedTasks}/{detailDivision.totalTasks} done</div>
+                    <div>{detailDivision.inReviewCount} review</div>
+                    <div>{detailDivision.overdueCount} overdue</div>
+                    <div>{detailDivision.completedLast7d} in 7d</div>
+                    <div>{formatDelta(detailDivision.scheduleDeltaPct)}</div>
+                </div>
+            )}
         </section>
     )
 }
