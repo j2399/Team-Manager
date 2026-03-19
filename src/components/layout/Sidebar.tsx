@@ -7,7 +7,7 @@ import { useConvex, useMutation, useQuery } from "convex/react"
 import { api } from "@convex/_generated/api"
 import {
     LayoutDashboard, Users, LogOut, Settings, ChevronDown,
-    Plus, MoreHorizontal, FolderKanban, Pencil, Trash2, User, GripVertical,
+    Plus, MoreHorizontal, FolderKanban, Pencil, Trash2, User,
     Kanban, Loader2, Smile, Archive, ArchiveRestore
 } from "lucide-react"
 import { DiscordIcon } from "@/components/icons/DiscordIcon"
@@ -124,16 +124,62 @@ const PROJECT_COLOR_OPTIONS = [
     "#ec4899", // pink
 ] as const
 
+type ProjectWarmState = "idle" | "warming" | "ready"
+
+type ProjectWarmEntry = {
+    cleanupTimer: number | null
+    readyPromise: Promise<void>
+    status: ProjectWarmState
+    unsubscribe: (() => void) | null
+}
+
 type ProjectRowProps = {
     project: Project
     pathname: string
     navigatingTo: string | null
     isAdmin: boolean
-    setNavigatingTo: (path: string) => void
-    onPrefetchProject: (projectId: string) => void
+    warmState: ProjectWarmState
+    warmPulseStep: number
+    onPrefetchProject: (projectId: string, options?: { subscriptionMs?: number }) => Promise<void>
+    onOpenProject: (projectId: string) => void
     setEditingProject: (project: Project) => void
     setDeleteConfirm: (project: Project) => void
     onToggleArchive: (project: Project) => void
+}
+
+function ProjectWarmDots({
+    projectColor,
+    warmState,
+    warmPulseStep,
+}: {
+    projectColor: string
+    warmState: ProjectWarmState
+    warmPulseStep: number
+}) {
+    const activeRows = warmState === "ready"
+        ? 3
+        : warmState === "warming"
+            ? warmPulseStep + 1
+            : 0
+
+    return (
+        <span className="grid shrink-0 grid-cols-2 grid-rows-3 gap-[2px]">
+            {[3, 3, 2, 2, 1, 1].map((requiredRows, index) => {
+                const isActive = activeRows >= requiredRows
+
+                return (
+                    <span
+                        key={index}
+                        className={cn(
+                            "h-[3px] w-[3px] rounded-full transition-colors duration-150",
+                            !isActive && "bg-muted-foreground/30"
+                        )}
+                        style={isActive ? { backgroundColor: projectColor } : undefined}
+                    />
+                )
+            })}
+        </span>
+    )
 }
 
 function ProjectRowInner({
@@ -141,8 +187,10 @@ function ProjectRowInner({
     pathname,
     navigatingTo,
     isAdmin,
-    setNavigatingTo,
+    warmState,
+    warmPulseStep,
     onPrefetchProject,
+    onOpenProject,
     setEditingProject,
     setDeleteConfirm,
     onToggleArchive,
@@ -155,41 +203,55 @@ function ProjectRowInner({
     style?: React.CSSProperties & { '--project-active-bg'?: string }
 }) {
     const isActive = pathname === `/dashboard/projects/${project.id}`
+    const projectColor = project.color || "#3b82f6"
 
     return (
         <div
             ref={rowRef}
             style={style}
             className={cn(
-                "group relative flex w-full min-w-0 items-center rounded-md transition-all duration-300",
+                "group relative flex w-full min-w-0 items-center rounded-md",
                 project.archivedAt && "opacity-60",
                 !isActive && (project.archivedAt ? "hover:bg-muted/30" : "hover:bg-muted/50")
             )}
         >
-            {/* Active gradient indicator - animates from right */}
             <div
                 className={cn(
-                    "absolute inset-0 rounded-md pointer-events-none transition-all duration-300",
+                    "absolute inset-0 rounded-md pointer-events-none",
                     isActive
-                        ? (project.archivedAt ? "bg-muted/50" : "animate-sidebar-gradient")
-                        : "scale-x-0 origin-right"
+                        ? (project.archivedAt ? "bg-muted/50" : "opacity-100")
+                        : "opacity-0"
                 )}
                 style={project.archivedAt ? undefined : {
                     background: "linear-gradient(to left, var(--project-active-bg, rgba(59, 130, 246, 0.22)), transparent 60%)",
                 }}
             />
-            {dragHandle ?? <div className="h-6 w-6 shrink-0" />}
+            {dragHandle ?? (
+                <div className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center">
+                    <ProjectWarmDots
+                        projectColor={projectColor}
+                        warmState={warmState}
+                        warmPulseStep={warmPulseStep}
+                    />
+                </div>
+            )}
             <Link
                 href={`/dashboard/projects/${project.id}`}
                 prefetch={false}
-                onClick={() => {
+                onClick={(event) => {
                     if (isActive) return
-                    onPrefetchProject(project.id)
-                    setNavigatingTo(`/dashboard/projects/${project.id}`)
+                    event.preventDefault()
+                    onOpenProject(project.id)
                 }}
-                onMouseEnter={() => onPrefetchProject(project.id)}
-                onFocus={() => onPrefetchProject(project.id)}
-                onTouchStart={() => onPrefetchProject(project.id)}
+                onMouseEnter={() => {
+                    void onPrefetchProject(project.id)
+                }}
+                onFocus={() => {
+                    void onPrefetchProject(project.id)
+                }}
+                onTouchStart={() => {
+                    void onPrefetchProject(project.id)
+                }}
                 className={cn(
                     "relative z-10 rounded-md pl-2 py-1.5 text-sm transition-colors flex-1 min-w-0",
                     isActive
@@ -256,7 +318,7 @@ function ProjectRowInner({
 }
 
 const SortableProjectRow = React.memo((props: ProjectRowProps) => {
-    const { project } = props
+    const { project, warmState, warmPulseStep } = props
     const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: project.id })
     const projectColor = project.color || "#3b82f6"
     const style: React.CSSProperties & { '--project-active-bg': string } = {
@@ -274,14 +336,17 @@ const SortableProjectRow = React.memo((props: ProjectRowProps) => {
             dragHandle={(
                 <button
                     type="button"
-                    className="relative z-10 h-6 w-6 shrink-0 flex items-center justify-center rounded-md cursor-grab active:cursor-grabbing opacity-60 group-hover:opacity-100"
-                    style={{ color: projectColor }}
+                    className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-md cursor-grab active:cursor-grabbing opacity-70 group-hover:opacity-100"
                     onClick={(e) => e.preventDefault()}
                     {...attributes}
                     {...listeners}
                     title="Reorder"
                 >
-                    <GripVertical className="h-4 w-4" />
+                    <ProjectWarmDots
+                        projectColor={projectColor}
+                        warmState={warmState}
+                        warmPulseStep={warmPulseStep}
+                    />
                 </button>
             )}
         />
@@ -308,11 +373,14 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     const [isSubmitting, setIsSubmitting] = React.useState(false)
     const [navigatingTo, setNavigatingTo] = React.useState<string | null>(null)
     const [chatState, setChatState] = React.useState<'small' | 'large' | 'hidden'>('hidden')
+    const [projectWarmStates, setProjectWarmStates] = React.useState<Record<string, ProjectWarmState>>({})
+    const [warmPulseStep, setWarmPulseStep] = React.useState(0)
     const editProjectDialogContentRef = React.useRef<HTMLDivElement | null>(null)
     const [settingsSpinNonce, setSettingsSpinNonce] = React.useState(0)
     const previousPathRef = React.useRef<string>('/dashboard')
     const shellWarmStartedRef = React.useRef(false)
-    const warmedProjectIdsRef = React.useRef<Set<string>>(new Set())
+    const projectWarmEntriesRef = React.useRef<Map<string, ProjectWarmEntry>>(new Map())
+    const pendingProjectNavigationIdRef = React.useRef(0)
 
     // Track previous path for settings toggle
     React.useEffect(() => {
@@ -334,6 +402,60 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
             setProjectsOpen(true)
         }
     }, [archivedProjects, pathname])
+
+    React.useEffect(() => {
+        const projectIds = new Set([
+            ...projects.map((project) => project.id),
+            ...archivedProjects.map((project) => project.id),
+        ])
+
+        setProjectWarmStates((current) => {
+            let didChange = false
+            const next: Record<string, ProjectWarmState> = {}
+
+            projectIds.forEach((projectId) => {
+                next[projectId] = current[projectId] ?? "idle"
+                if (next[projectId] !== current[projectId]) {
+                    didChange = true
+                }
+            })
+
+            if (!didChange && Object.keys(current).length === projectIds.size) {
+                return current
+            }
+
+            return next
+        })
+    }, [archivedProjects, projects])
+
+    const hasWarmingProjects = React.useMemo(
+        () => Object.values(projectWarmStates).some((state) => state === "warming"),
+        [projectWarmStates]
+    )
+
+    React.useEffect(() => {
+        if (!hasWarmingProjects) return
+
+        const interval = window.setInterval(() => {
+            setWarmPulseStep((current) => (current + 1) % 3)
+        }, 180)
+
+        return () => {
+            window.clearInterval(interval)
+        }
+    }, [hasWarmingProjects])
+
+    React.useEffect(() => {
+        return () => {
+            projectWarmEntriesRef.current.forEach((entry) => {
+                if (entry.cleanupTimer !== null) {
+                    window.clearTimeout(entry.cleanupTimer)
+                }
+                entry.unsubscribe?.()
+            })
+            projectWarmEntriesRef.current.clear()
+        }
+    }, [])
 
     // Form state for editing
     const [editLeadIds, setEditLeadIds] = React.useState<string[]>([])
@@ -393,6 +515,36 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
 
     const isAdmin = userData.role === 'Admin' || userData.role === 'Team Lead'
     const convex = useConvex()
+    const setProjectWarmState = React.useCallback((projectId: string, nextState: ProjectWarmState) => {
+        setProjectWarmStates((current) => {
+            if (current[projectId] === nextState) {
+                return current
+            }
+
+            return {
+                ...current,
+                [projectId]: nextState,
+            }
+        })
+    }, [])
+    const scheduleProjectWarmCleanup = React.useCallback((projectId: string, subscriptionMs: number) => {
+        const entry = projectWarmEntriesRef.current.get(projectId)
+        if (!entry) return
+
+        if (entry.cleanupTimer !== null) {
+            window.clearTimeout(entry.cleanupTimer)
+        }
+
+        entry.cleanupTimer = window.setTimeout(() => {
+            const currentEntry = projectWarmEntriesRef.current.get(projectId)
+            if (!currentEntry) return
+
+            currentEntry.unsubscribe?.()
+            currentEntry.unsubscribe = null
+            currentEntry.cleanupTimer = null
+            projectWarmEntriesRef.current.delete(projectId)
+        }, subscriptionMs)
+    }, [])
     const prefetchDashboardHome = React.useCallback((options?: { subscriptionMs?: number }) => {
         if (!initialUserId || !initialWorkspaceId) return
         const extendSubscriptionFor = options?.subscriptionMs ?? 15_000
@@ -465,18 +617,94 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     const prefetchProject = React.useCallback((projectId: string, options?: { subscriptionMs?: number }) => {
         preloadBoardModule()
         const extendSubscriptionFor = options?.subscriptionMs ?? 15_000
-        router.prefetch(`/dashboard/projects/${projectId}`)
-        if (initialWorkspaceId) {
-            convex.prewarmQuery({
-                query: api.projects.getPageData,
-                args: {
-                    projectId,
-                    workspaceId: initialWorkspaceId,
-                },
-                extendSubscriptionFor,
-            })
+        const existingEntry = projectWarmEntriesRef.current.get(projectId)
+
+        if (existingEntry) {
+            if (existingEntry.status !== "ready") {
+                setProjectWarmState(projectId, "warming")
+            }
+            scheduleProjectWarmCleanup(projectId, extendSubscriptionFor)
+            return existingEntry.readyPromise
         }
-    }, [convex, initialWorkspaceId, router])
+
+        setProjectWarmState(projectId, "warming")
+
+        const routePrefetchPromise = Promise.resolve(router.prefetch(`/dashboard/projects/${projectId}`))
+        let resolveDataReady!: () => void
+        let didResolveDataReady = false
+        const dataReadyPromise = new Promise<void>((resolve) => {
+            resolveDataReady = resolve
+        })
+        const markDataReady = () => {
+            if (didResolveDataReady) return
+            didResolveDataReady = true
+            resolveDataReady()
+        }
+
+        const readyPromise = Promise.all([routePrefetchPromise, dataReadyPromise]).then(() => {
+            const currentEntry = projectWarmEntriesRef.current.get(projectId)
+            if (!currentEntry) return
+            currentEntry.status = "ready"
+            setProjectWarmState(projectId, "ready")
+        })
+
+        const entry: ProjectWarmEntry = {
+            cleanupTimer: null,
+            readyPromise,
+            status: "warming",
+            unsubscribe: null,
+        }
+        projectWarmEntriesRef.current.set(projectId, entry)
+
+        if (!initialWorkspaceId) {
+            markDataReady()
+        } else {
+            const projectWatch = convex.watchQuery(api.projects.getPageData, {
+                projectId,
+                workspaceId: initialWorkspaceId,
+            })
+            const checkProjectData = () => {
+                try {
+                    if (projectWatch.localQueryResult() !== undefined) {
+                        markDataReady()
+                    }
+                } catch {
+                    markDataReady()
+                }
+            }
+
+            entry.unsubscribe = projectWatch.onUpdate(checkProjectData)
+            checkProjectData()
+        }
+
+        scheduleProjectWarmCleanup(projectId, extendSubscriptionFor)
+        return readyPromise
+    }, [convex, initialWorkspaceId, router, scheduleProjectWarmCleanup, setProjectWarmState])
+    const openProject = React.useCallback((projectId: string) => {
+        const href = `/dashboard/projects/${projectId}`
+        if (pathname === href) return
+
+        const navigationId = pendingProjectNavigationIdRef.current + 1
+        pendingProjectNavigationIdRef.current = navigationId
+        setNavigatingTo(href)
+
+        if (projectWarmStates[projectId] === "ready") {
+            router.push(href)
+            return
+        }
+
+        void Promise.race([
+            prefetchProject(projectId, { subscriptionMs: 180_000 }),
+            new Promise<void>((resolve) => {
+                window.setTimeout(resolve, 1500)
+            }),
+        ]).finally(() => {
+            if (pendingProjectNavigationIdRef.current !== navigationId) {
+                return
+            }
+            router.push(href)
+        })
+    }, [pathname, prefetchProject, projectWarmStates, router])
 
     React.useEffect(() => {
         if (!projectListResult) return
@@ -585,16 +813,13 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     React.useEffect(() => {
         if (isMobileSheet) return
 
-        const activeQueue = projects.filter((project) => !warmedProjectIdsRef.current.has(project.id))
-        const archivedQueue = archivedProjects.filter((project) => !warmedProjectIdsRef.current.has(project.id))
-        const queue = [...activeQueue, ...archivedQueue]
+        const queue = [...projects, ...archivedProjects]
 
         if (queue.length === 0) return
 
         const longWarmMs = 180_000
         queue.forEach((project) => {
-            warmedProjectIdsRef.current.add(project.id)
-            prefetchProject(project.id, { subscriptionMs: longWarmMs })
+            void prefetchProject(project.id, { subscriptionMs: longWarmMs })
         })
     }, [archivedProjects, isMobileSheet, prefetchProject, projects])
 
@@ -832,8 +1057,10 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                                         pathname={pathname}
                                                         navigatingTo={navigatingTo}
                                                         isAdmin={isAdmin}
-                                                        setNavigatingTo={setNavigatingTo}
+                                                        warmState={projectWarmStates[project.id] ?? "idle"}
+                                                        warmPulseStep={warmPulseStep}
                                                         onPrefetchProject={prefetchProject}
+                                                        onOpenProject={openProject}
                                                         setEditingProject={setEditingProject}
                                                         setDeleteConfirm={setDeleteConfirm}
                                                         onToggleArchive={handleToggleArchive}
@@ -859,8 +1086,10 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                                     pathname={pathname}
                                                     navigatingTo={navigatingTo}
                                                     isAdmin={isAdmin}
-                                                    setNavigatingTo={setNavigatingTo}
+                                                    warmState={projectWarmStates[project.id] ?? "idle"}
+                                                    warmPulseStep={warmPulseStep}
                                                     onPrefetchProject={prefetchProject}
+                                                    onOpenProject={openProject}
                                                     setEditingProject={setEditingProject}
                                                     setDeleteConfirm={setDeleteConfirm}
                                                     onToggleArchive={handleToggleArchive}
