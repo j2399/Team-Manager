@@ -1,7 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Check, Plus, Trash2, GripVertical, Loader2 } from "lucide-react"
+import { useQuery } from "convex/react"
+import { api } from "@convex/_generated/api"
+import { Check, Plus, Trash2, Loader2 } from "lucide-react"
+import { createChecklistItem, deleteChecklistItem, updateChecklistItem } from "@/app/actions/checklist"
 import { cn } from "@/lib/utils"
 
 type ChecklistItem = {
@@ -18,46 +21,27 @@ type TaskChecklistProps = {
 }
 
 export function TaskChecklist({ taskId, isEditable = true }: TaskChecklistProps) {
+    const liveItems = useQuery(api.tasks.getChecklistItems, taskId ? { taskId } : "skip")
     const [items, setItems] = useState<ChecklistItem[]>([])
-    const [loading, setLoading] = useState(true)
     const [newItemContent, setNewItemContent] = useState("")
     const [isAdding, setIsAdding] = useState(false)
     const [updatingItems, setUpdatingItems] = useState<Set<string>>(new Set())
     const inputRef = useRef<HTMLInputElement>(null)
 
-    // Fetch checklist items
     useEffect(() => {
-        fetchItems()
-    }, [taskId])
-
-    const fetchItems = async () => {
-        try {
-            const res = await fetch(`/api/tasks/${taskId}/checklist`)
-            if (res.ok) {
-                const data = await res.json()
-                setItems(data)
-            }
-        } catch (error) {
-            console.error('Failed to fetch checklist:', error)
-        } finally {
-            setLoading(false)
+        if (liveItems !== undefined) {
+            setItems(liveItems as ChecklistItem[])
         }
-    }
+    }, [liveItems])
 
     const addItem = async () => {
         if (!newItemContent.trim() || isAdding) return
 
         setIsAdding(true)
         try {
-            const res = await fetch(`/api/tasks/${taskId}/checklist`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: newItemContent.trim() })
-            })
-
-            if (res.ok) {
-                const newItem = await res.json()
-                setItems(prev => [...prev, newItem])
+            const result = await createChecklistItem(taskId, newItemContent.trim())
+            if (result?.success && result.item) {
+                setItems(prev => [...prev, result.item as ChecklistItem])
                 setNewItemContent("")
                 inputRef.current?.focus()
             }
@@ -79,13 +63,12 @@ export function TaskChecklist({ taskId, isEditable = true }: TaskChecklistProps)
         ))
 
         try {
-            const res = await fetch(`/api/tasks/${taskId}/checklist`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ itemId: item.id, completed: !item.completed })
+            const result = await updateChecklistItem(taskId, {
+                itemId: item.id,
+                completed: !item.completed,
             })
 
-            if (!res.ok) {
+            if (result?.error) {
                 // Revert on failure
                 setItems(prev => prev.map(i =>
                     i.id === item.id ? { ...i, completed: item.completed } : i
@@ -112,11 +95,8 @@ export function TaskChecklist({ taskId, isEditable = true }: TaskChecklistProps)
         setUpdatingItems(prev => new Set(prev).add(itemId))
 
         try {
-            const res = await fetch(`/api/tasks/${taskId}/checklist?itemId=${itemId}`, {
-                method: 'DELETE'
-            })
-
-            if (res.ok) {
+            const result = await deleteChecklistItem(taskId, itemId)
+            if (result?.success) {
                 setItems(prev => prev.filter(i => i.id !== itemId))
             }
         } catch (error) {
@@ -141,7 +121,7 @@ export function TaskChecklist({ taskId, isEditable = true }: TaskChecklistProps)
     const totalCount = items.length
     const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
-    if (loading) {
+    if (liveItems === undefined) {
         return (
             <div className="flex items-center justify-center py-4">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />

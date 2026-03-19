@@ -8,6 +8,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { useEffect, useState, useTransition } from "react"
+import { updateUserRole } from "@/app/actions/users"
 import { useToast } from "@/components/ui/use-toast"
 
 export function RoleSelect({
@@ -36,14 +37,9 @@ export function RoleSelect({
 
         startTransition(async () => {
             try {
-                const response = await fetch(`/api/users/${userId}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ role: newRole }),
-                })
-                const result = await response.json().catch(() => ({}))
+                const result = await updateUserRole(userId, newRole)
 
-                if (!response.ok) {
+                if (result?.error) {
                     setRole(currentRole) // Revert on error
                     toast({
                         title: "Error",

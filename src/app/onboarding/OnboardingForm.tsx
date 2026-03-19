@@ -2,21 +2,21 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useMutation } from "convex/react"
+import { api } from "@convex/_generated/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2 } from "lucide-react"
 
 type OnboardingFormProps = {
-    discordId: string
-    discordUsername: string
-    discordAvatar: string
+    userId: string
     suggestedName: string
-    inviteCode?: string
 }
 
-export function OnboardingForm({ discordId, discordUsername, discordAvatar, suggestedName }: OnboardingFormProps) {
+export function OnboardingForm({ userId, suggestedName }: OnboardingFormProps) {
     const router = useRouter()
+    const updateOnboardingProfile = useMutation(api.auth.updateOnboardingProfile)
     const [step, setStep] = useState(1)
     const [name, setName] = useState(suggestedName)
     const [interests, setInterests] = useState("")
@@ -57,28 +57,18 @@ export function OnboardingForm({ discordId, discordUsername, discordAvatar, sugg
         setError("")
 
         try {
-            const res = await fetch('/api/auth/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: name.trim(),
-                    discordId,
-                    discordUsername,
-                    avatar: discordAvatar,
-                    skills: [],
-                    interests: interests.trim()
-                })
+            await updateOnboardingProfile({
+                userId,
+                name: name.trim(),
+                skills: [],
+                interests: interests.trim(),
+                hasOnboarded: true,
+                updatedAt: Date.now(),
             })
 
-            if (res.ok) {
-                router.push('/dashboard')
-                router.refresh()
-            } else {
-                const data = await res.json()
-                setError(data.error || 'Failed to create account')
-                setIsSubmitting(false)
-            }
-        } catch (err) {
+            router.push('/dashboard')
+            router.refresh()
+        } catch {
             setError('Something went wrong. Please try again.')
             setIsSubmitting(false)
         }
@@ -153,5 +143,3 @@ export function OnboardingForm({ discordId, discordUsername, discordAvatar, sugg
         </div>
     )
 }
-
-

@@ -11,6 +11,8 @@ import {
     DragOverEvent,
 } from "@dnd-kit/core"
 import { useState, useEffect, useCallback, useRef } from "react"
+import { useAction, useConvex } from "convex/react"
+import { api } from "@convex/_generated/api"
 import { cn } from "@/lib/utils"
 import { createPortal } from "react-dom"
 import { Plus, ChevronDown, Check, Pencil, Lock } from "lucide-react"
@@ -91,6 +93,16 @@ type SyncTask = Partial<Task> & {
     hasAttachment?: boolean
 }
 
+type BoardDeltaResponse = {
+    tasks?: SyncTask[]
+    deletedTaskIds?: string[]
+    latestUpdate?: string | null
+    latestDeletion?: string | null
+    serverTime?: string | null
+    hasMore?: boolean
+    nextCursor?: string | null
+}
+
 type BoardProps = {
     board: {
         id: string
@@ -141,6 +153,7 @@ export function Board({
     initialPushId
 }: BoardProps) {
     const router = useRouter()
+    const convex = useConvex()
     const dashboardUser = useDashboardUser()
     const [columns, setColumns] = useState<ColumnData[]>(board.columns)
     const [activeTask, setActiveTask] = useState<Task | null>(null)
@@ -193,8 +206,10 @@ export function Board({
 
     const userRole = dashboardUser?.role ?? 'Member'
     const userId = dashboardUser?.id ?? null
+    const workspaceId = dashboardUser?.workspaceId ?? null
     const isAdmin = userRole === 'Admin' || userRole === 'Team Lead'
     const { triggerConfetti } = useConfetti()
+    const createOverdueNotifications = useAction(api.notifications.createOverdueTaskNotifications)
 
     // Handle initial new task creation from URL
     useEffect(() => {
@@ -214,10 +229,16 @@ export function Board({
 
     useEffect(() => {
         setMounted(true)
-        fetch('/api/tasks/check-overdue', { method: 'POST' }).catch(err =>
-            console.error('Failed to check overdue tasks:', err)
-        )
-    }, [])
+        if (!userId || !workspaceId) return
+
+        void createOverdueNotifications({
+            userId,
+            workspaceId,
+            now: Date.now(),
+        }).catch((error) => {
+            console.error('Failed to check overdue tasks:', error)
+        })
+    }, [createOverdueNotifications, userId, workspaceId])
 
     useEffect(() => {
         setColumns(board.columns)
@@ -262,11 +283,10 @@ export function Board({
         if (loadedPushes[pushId] || loadingPushes[pushId]) return
         setLoadingPushes((prev) => ({ ...prev, [pushId]: true }))
         try {
-            const res = await fetch(`/api/projects/${projectId}/tasks?pushId=${encodeURIComponent(pushId)}&lean=true`)
-            const data = await res.json()
-            if (!res.ok) throw new Error(data?.error || "Failed to load tasks")
-
-            const tasks: Task[] = Array.isArray(data?.tasks) ? data.tasks : []
+            const tasks = await convex.query(api.tasks.getLeanProjectTasks, {
+                projectId,
+                pushId,
+            }) as Task[]
             const byColumnId = new Map<string, Task[]>()
             for (const task of tasks) {
                 const colId = task.columnId || ""
@@ -294,7 +314,7 @@ export function Board({
                 return next
             })
         }
-    }, [loadedPushes, loadingPushes, projectId])
+    }, [convex, loadedPushes, loadingPushes, projectId])
 
     // Scroll to highlighted task
     useEffect(() => {
@@ -305,10 +325,12 @@ export function Board({
         const task = columns.flatMap(c => c.tasks).find(t => t.id === highlightTaskId)
         if (!task) {
             // If tasks aren't loaded yet (pushes are collapsed by default), fetch the task meta
-            fetch(`/api/tasks/${highlightTaskId}`)
-                .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
-                .then(async ({ ok, d }) => {
-                    if (!ok) return
+            void convex.query(api.tasks.getMeta, {
+                taskId: highlightTaskId,
+                workspaceId: workspaceId ?? undefined,
+            })
+                .then(async (d) => {
+                    if (!d) return
                     if (d?.projectId && d.projectId !== projectId) return
                     const pushId = d?.pushId || null
                     if (!pushId) return
@@ -364,7 +386,7 @@ export function Board({
             }
         }, didExpand ? 300 : 100)
 
-    }, [highlightTaskId, mounted, columns, loadPushTasks, projectId])
+    }, [columns, convex, highlightTaskId, loadPushTasks, mounted, projectId, workspaceId])
 
     // Sync from props when board data actually changes (from router.refresh)
     // This happens AFTER server operations complete
@@ -439,12 +461,13 @@ export function Board({
                 let guard = 0
 
                 while (guard < 20) {
-                    const params = new URLSearchParams({ since: baseSince })
-                    if (cursor) params.set('cursor', cursor)
-                    const res = await fetch(`/api/projects/${projectId}/sync?${params.toString()}`)
-                    if (!res.ok) return
-
-                    const data = await res.json()
+                    const data = await convex.query(api.projects.getBoardDelta, {
+                        projectId,
+                        workspaceId: workspaceId ?? undefined,
+                        since: baseSince,
+                        cursor: cursor ?? undefined,
+                    }) as BoardDeltaResponse | null
+                    if (!data) return
                     serverTime = data.serverTime || serverTime
 
                     const pageTasks = Array.isArray(data.tasks) ? data.tasks : []
@@ -567,7 +590,7 @@ export function Board({
 
         const interval = setInterval(syncChanges, 1500) // Poll every 1.5 seconds
         return () => clearInterval(interval)
-    }, [projectId, isDragging, reviewDialog, doneMoveDialog, editingTask, previewingTask])
+    }, [convex, doneMoveDialog, editingTask, isDragging, previewingTask, projectId, reviewDialog, workspaceId])
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } })

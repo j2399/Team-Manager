@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Send, Smile, ChevronDown, AtSign } from "lucide-react"
-import { useQuery } from "convex/react"
+import { useAction, useQuery } from "convex/react"
 import { api } from "@convex/_generated/api"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
@@ -55,6 +55,7 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
         api.chat.listMessages,
         workspaceId ? { workspaceId, limit: 50 } : "skip"
     ) as Message[] | undefined
+    const sendChatMessage = useAction(api.chat.sendMessageWithDiscordMentions)
     const workspaceUsers = useQuery(
         api.admin.getWorkspaceUsers,
         workspaceId ? { workspaceId } : "skip"
@@ -191,7 +192,7 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
     }, [])
 
     const sendMessage = async (content: string, type: "text" | "gif" = "text") => {
-        if (!content.trim() || !currentUser) return
+        if (!content.trim() || !currentUser || !currentUser.workspaceId) return
 
         // Optimistic update
         const tempId = crypto.randomUUID()
@@ -218,16 +219,14 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
         setMentionQuery(null)
 
         try {
-            const res = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content, type })
+            const newMsg = await sendChatMessage({
+                workspaceId: currentUser.workspaceId,
+                authorId: currentUser.id,
+                authorName: currentUser.name,
+                authorAvatar: currentUser.avatar || undefined,
+                content,
+                type,
             })
-            if (!res.ok) {
-                throw new Error("Failed to send message")
-            }
-
-            const newMsg = await res.json()
             setPendingMessages((prev) =>
                 prev.map((msg) =>
                     msg.id === tempId

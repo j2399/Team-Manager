@@ -60,6 +60,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { GeneralChat } from "@/components/layout/GeneralChat"
 import { CreateProjectWizard } from "@/features/projects/CreateProjectWizard"
 import { preloadBoardModule } from "@/lib/board-module"
+import { deleteProject, updateProjectDetails } from "@/app/actions/projects"
 
 type Project = {
     id: string
@@ -442,15 +443,13 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
         setIsSubmitting(true)
         try {
             const nextArchived = !project.archivedAt
-            const res = await fetch(`/api/projects/${project.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ archived: nextArchived })
+            const result = await updateProjectDetails({
+                projectId: project.id,
+                archived: nextArchived,
             })
 
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}))
-                alert(data.error || `Failed to ${nextArchived ? 'archive' : 'restore'} division`)
+            if (result?.error) {
+                alert(result.error || `Failed to ${nextArchived ? 'archive' : 'restore'} division`)
                 return
             }
 
@@ -532,24 +531,19 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
         try {
             const allowedIds = new Set(allUsers.map((u) => u.id))
             const sanitizedMemberIds = selectedEditMemberIds.filter((id) => allowedIds.has(id))
-            const res = await fetch(`/api/projects/${editingProject.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: trimmedName,
-                    description: editDescription.trim(),
-                    color: editColor,
-                    leadIds: editLeadIds,
-                    memberIds: sanitizedMemberIds
-                })
+            const result = await updateProjectDetails({
+                projectId: editingProject.id,
+                name: trimmedName,
+                description: editDescription.trim(),
+                color: editColor,
+                leadIds: editLeadIds,
+                memberIds: sanitizedMemberIds,
             })
-            if (res.ok) {
+            if (!result?.error) {
                 setEditingProject(null)
                 router.refresh()
             } else {
-                const data = await res.json().catch(() => ({}))
-                const message = (data as { error?: string })?.error || "Failed to rename division"
-                setEditError(message)
+                setEditError(result.error || "Failed to rename division")
             }
         } catch (err) {
             console.error(err)
@@ -567,19 +561,14 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
         setIsSubmitting(true)
 
         try {
-            const res = await fetch(`/api/projects/${deleteConfirm.id}`, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ confirmName: deleteConfirmName.trim() })
-            })
-            if (res.ok) {
+            const result = await deleteProject(deleteConfirm.id, deleteConfirmName.trim())
+            if (!result?.error) {
                 setDeleteConfirm(null)
                 setDeleteConfirmName("")
                 router.push('/dashboard')
                 router.refresh()
             } else {
-                const data = await res.json().catch(() => ({}))
-                alert(data.error || 'Failed to delete division')
+                alert(result.error || 'Failed to delete division')
             }
         } catch (err) {
             console.error(err)

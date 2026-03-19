@@ -73,9 +73,7 @@ export default async function OnboardingPage({
                     </CardHeader>
                     <CardContent className="pt-6">
                         <OnboardingForm
-                            discordId={discordUser.id}
-                            discordUsername={discordUser.username}
-                            discordAvatar={avatarUrl}
+                            userId={user.id}
                             suggestedName={discordUser.global_name || discordUser.username}
                         />
                     </CardContent >

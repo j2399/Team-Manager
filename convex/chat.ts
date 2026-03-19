@@ -1,5 +1,6 @@
 import { v } from "convex/values"
-import { mutation, query } from "./_generated/server"
+import { makeFunctionReference } from "convex/server"
+import { action, mutation, query } from "./_generated/server"
 import {
     createLegacyId,
     getUserByLegacyId,
@@ -7,6 +8,8 @@ import {
     now,
     stripDoc,
 } from "./lib"
+
+const createMessageRef = makeFunctionReference<"mutation">("chat:createMessage")
 
 export const listMessages = query({
     args: {
@@ -110,5 +113,62 @@ export const createMessage = mutation({
                     discordId: member.discordId!,
                 })),
         }
+    },
+})
+
+export const sendMessageWithDiscordMentions = action({
+    args: {
+        workspaceId: v.string(),
+        authorId: v.string(),
+        authorName: v.string(),
+        authorAvatar: v.optional(v.string()),
+        content: v.string(),
+        type: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const created = await ctx.runMutation(createMessageRef, args)
+
+        if (args.content.includes("@") && created.discordChannelId) {
+            try {
+                let discordContent = args.content
+                let hasMentions = false
+
+                const sortedMembers = [...created.mentionableMembers].sort((a, b) => b.name.length - a.name.length)
+
+                for (const member of sortedMembers) {
+                    if (!member.discordId) continue
+
+                    const mentionString = `@${member.name}`
+                    if (discordContent.includes(mentionString)) {
+                        discordContent = discordContent.split(mentionString).join(`<@${member.discordId}>`)
+                        hasMentions = true
+                    }
+                }
+
+                if (discordContent.includes("@everyone")) {
+                    hasMentions = true
+                }
+
+                if (hasMentions) {
+                    await fetch(created.discordChannelId, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            content: "",
+                            embeds: [{
+                                title: "💬 Chat Mention",
+                                description: discordContent,
+                                color: 0x5865F2,
+                                timestamp: new Date().toISOString(),
+                            }],
+                        }),
+                    })
+                }
+            } catch (error) {
+                console.error("Failed to send Discord notification for chat:", error)
+            }
+        }
+
+        return created.message
     },
 })

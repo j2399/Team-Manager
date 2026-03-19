@@ -1,59 +1,19 @@
 "use client"
 
-import { useState, useEffect, useTransition } from "react"
+import { useEffect, useState, useTransition } from "react"
+import { useMutation, useQuery } from "convex/react"
+import { api } from "@convex/_generated/api"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Loader2, Check, RotateCcw, ChevronDown, ChevronRight } from "lucide-react"
-import { cn } from "@/lib/utils"
-
-type WorkloadConfig = {
-    lookbackDays: number
-    minCompletedTasks: number
-    baseline: {
-        defaultCycleDays: number
-        defaultThroughputPerWeek: number
-    }
-    capacity: {
-        wipMultiplier: number
-        availableLoadRatio: number
-        overloadLoadRatio: number
-        overloadMinTasks: number
-    }
-    thresholds: {
-        dueSoonDays: number
-        stuckDays: number
-        reviewStaleDays: number
-        agingMultiplier: number
-        progressLagPercent: number
-    }
-    weights: {
-        overdue: number
-        stuck: number
-        help: number
-        dueSoon: number
-        age: number
-        progress: number
-        review: number
-        load: number
-    }
-    status: {
-        strugglingScore: number
-        criticalOverdueCount: number
-        criticalHelpCount: number
-        criticalStuckCount: number
-    }
-}
-
-const DEFAULT_CONFIG: WorkloadConfig = {
-    lookbackDays: 90,
-    minCompletedTasks: 5,
-    baseline: { defaultCycleDays: 5, defaultThroughputPerWeek: 2 },
-    capacity: { wipMultiplier: 1, availableLoadRatio: 0.5, overloadLoadRatio: 1.35, overloadMinTasks: 3 },
-    thresholds: { dueSoonDays: 3, stuckDays: 3, reviewStaleDays: 3, agingMultiplier: 1.5, progressLagPercent: 20 },
-    weights: { overdue: 4, stuck: 2, help: 2, dueSoon: 1, age: 1, progress: 1, review: 1, load: 1 },
-    status: { strugglingScore: 4, criticalOverdueCount: 1, criticalHelpCount: 1, criticalStuckCount: 2 }
-}
+import { useDashboardUser } from "@/components/DashboardUserProvider"
+import {
+    DEFAULT_WORKLOAD_CONFIG,
+    mergeWorkloadConfig,
+    normalizeWorkloadConfig,
+    type WorkloadConfig,
+} from "@/lib/workload"
 
 type SectionProps = {
     title: string
@@ -112,43 +72,47 @@ function Field({ label, hint, value, onChange, min = 0, max = 100, step = 1 }: F
 }
 
 export function WorkloadSettings() {
+    const dashboardUser = useDashboardUser()
+    const workspaceId = dashboardUser?.workspaceId ?? null
     const [isPending, startTransition] = useTransition()
     const [config, setConfig] = useState<WorkloadConfig | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState(false)
-    const [loading, setLoading] = useState(true)
+    const configRecord = useQuery(
+        api.settings.getWorkloadConfig,
+        workspaceId ? { workspaceId } : "skip"
+    )
+    const saveWorkloadConfig = useMutation(api.settings.upsertWorkloadConfig)
 
     useEffect(() => {
-        fetch('/api/workload-config')
-            .then(res => res.json())
-            .then(data => {
-                setConfig(data.config || DEFAULT_CONFIG)
-                setLoading(false)
-            })
-            .catch(() => {
-                setConfig(DEFAULT_CONFIG)
-                setLoading(false)
-            })
-    }, [])
+        if (!workspaceId || configRecord === undefined) return
+
+        setConfig(
+            normalizeWorkloadConfig(
+                (configRecord?.config as Partial<WorkloadConfig> | undefined) ?? DEFAULT_WORKLOAD_CONFIG
+            )
+        )
+    }, [configRecord, workspaceId])
 
     const handleSave = () => {
-        if (!config) return
+        if (!config || !workspaceId) return
         setError(null)
         setSuccess(false)
         startTransition(async () => {
             try {
-                const res = await fetch('/api/workload-config', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(config)
+                const baseConfig = configRecord
+                    ? normalizeWorkloadConfig(configRecord.config as Partial<WorkloadConfig>)
+                    : DEFAULT_WORKLOAD_CONFIG
+                const mergedConfig = mergeWorkloadConfig(baseConfig, config)
+                const normalized = normalizeWorkloadConfig(mergedConfig)
+
+                await saveWorkloadConfig({
+                    workspaceId,
+                    config: normalized,
+                    now: Date.now(),
                 })
-                if (!res.ok) {
-                    const data = await res.json()
-                    setError(data.error || 'Failed to save')
-                    return
-                }
-                const data = await res.json()
-                setConfig(data.config)
+
+                setConfig(normalized)
                 setSuccess(true)
                 setTimeout(() => setSuccess(false), 2000)
             } catch {
@@ -158,7 +122,7 @@ export function WorkloadSettings() {
     }
 
     const handleReset = () => {
-        setConfig(DEFAULT_CONFIG)
+        setConfig(DEFAULT_WORKLOAD_CONFIG)
     }
 
     const updateThresholds = (key: keyof WorkloadConfig['thresholds'], value: number) => {
@@ -186,7 +150,7 @@ export function WorkloadSettings() {
         setConfig({ ...config, baseline: { ...config.baseline, [key]: value } })
     }
 
-    if (loading || !config) {
+    if ((workspaceId && configRecord === undefined) || !config) {
         return (
             <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />

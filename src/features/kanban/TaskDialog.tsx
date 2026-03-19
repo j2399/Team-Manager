@@ -20,8 +20,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Plus, Trash2, X, ListChecks, Folder, ChevronRight, Loader2, ArrowLeft, AlertCircle } from "lucide-react"
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
+import { useQuery } from "convex/react"
+import { api } from "@convex/_generated/api"
 import { createTask, updateTaskDetails, deleteTask } from "@/app/actions/kanban"
+import { createChecklistItem } from "@/app/actions/checklist"
 import { RemoveScroll } from "react-remove-scroll"
+import { useDashboardUser } from "@/components/DashboardUserProvider"
 
 type TaskType = {
     id: string
@@ -94,6 +98,8 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     onBack?: () => void
     showOverlay?: boolean
 }) {
+    const dashboardUser = useDashboardUser()
+    const workspaceId = dashboardUser?.workspaceId ?? null
     const [internalOpen, setInternalOpen] = useState(false)
     const isControlled = externalOpen !== undefined
     const open = isControlled ? externalOpen : internalOpen
@@ -132,8 +138,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const [isDraggingFile, setIsDraggingFile] = useState(false)
     const [dragFileName, setDragFileName] = useState<string | null>(null)
     const descriptionRef = useRef<HTMLTextAreaElement>(null)
-    const [driveConfig, setDriveConfig] = useState<DriveConfig | null>(null)
-    const [driveLoading, setDriveLoading] = useState(true)
     const [folderTree, setFolderTree] = useState<FolderNode[]>([])
     const [pickerOpen, setPickerOpen] = useState(false)
     const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
@@ -142,60 +146,32 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const [selectedFolder, setSelectedFolder] = useState<{ id: string; name: string } | null>(null)
     const [folderSelectionChanged, setFolderSelectionChanged] = useState(false)
     const folderInitRef = useRef(false)
-    const driveConfigLoadedRef = useRef(false)
     const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false)
     const assigneePopoverCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [removedAssigneeNotice, setRemovedAssigneeNotice] = useState<{ removedCount: number; targetAssigneeCount: number } | null>(null)
     const initialAssigneeIdsRef = useRef<string[] | undefined>(initialAssigneeIds)
     const workspaceUserIdsRef = useRef<Set<string>>(new Set(workspaceUsers.map((u) => u.id)))
+    const workspaceUsersResult = useQuery(
+        api.admin.getWorkspaceUsers,
+        workspaceId ? { workspaceId } : "skip"
+    )
+    const driveConfigRecord = useQuery(
+        api.settings.getWorkspaceDriveConfig,
+        workspaceId ? { workspaceId } : "skip"
+    )
+    const driveLoading = workspaceId ? driveConfigRecord === undefined : false
+    const driveConfig: DriveConfig | null = driveConfigRecord === undefined
+        ? null
+        : {
+            connected: !!driveConfigRecord?.refreshToken,
+            folderId: driveConfigRecord?.folderId || null,
+            folderName: driveConfigRecord?.folderName || null,
+        }
 
     const sanitizeAssigneeIds = useCallback((ids: string[]) => {
         const workspaceUserIds = workspaceUserIdsRef.current
         return Array.from(new Set(ids.filter((id) => id.trim().length > 0 && workspaceUserIds.has(id))))
     }, [])
-
-    const refreshWorkspaceUsers = useCallback(async () => {
-        try {
-            const response = await fetch("/api/users")
-            if (!response.ok) return null
-
-            const data: unknown = await response.json().catch(() => null)
-            const rawUsers: unknown[] =
-                Array.isArray(data)
-                    ? data
-                    : typeof data === "object" && data !== null && Array.isArray((data as { users?: unknown[] }).users)
-                        ? (data as { users: unknown[] }).users
-                        : []
-
-            const normalizedUsers = rawUsers
-                .filter((user: unknown): user is { id: string; name?: string | null } =>
-                    typeof user === "object" &&
-                    user !== null &&
-                    typeof (user as { id?: unknown }).id === "string" &&
-                    (user as { id: string }).id.trim().length > 0
-                )
-                .map((user: { id: string; name?: string | null }) => ({
-                    id: user.id,
-                    name: typeof user.name === "string" && user.name.trim().length > 0 ? user.name : "Unknown"
-                }))
-
-            if (normalizedUsers.length === 0) return null
-
-            const nextIdSet = new Set(normalizedUsers.map((user) => user.id))
-
-            setWorkspaceUsers((previousUsers) => {
-                const previousMembershipById = new Map(previousUsers.map((user) => [user.id, !!user.isProjectMember]))
-                return normalizedUsers.map((user) => ({
-                    ...user,
-                    isProjectMember: projectMembershipById.get(user.id) ?? previousMembershipById.get(user.id) ?? false
-                }))
-            })
-            workspaceUserIdsRef.current = nextIdSet
-            return nextIdSet
-        } catch {
-            return null
-        }
-    }, [projectMembershipById])
 
     const applySanitizedAssignees = useCallback((originalIds: string[], sanitizedIds: string[]) => {
         setAssigneeIds(sanitizedIds)
@@ -285,17 +261,28 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     }, [])
 
     useEffect(() => {
-        setWorkspaceUsers(users)
-    }, [users])
+        const sourceUsers = workspaceUsersResult?.users?.length
+            ? workspaceUsersResult.users.map((user) => ({
+                id: user.id,
+                name: user.name,
+            }))
+            : users.map((user) => ({
+                id: user.id,
+                name: user.name,
+            }))
+
+        setWorkspaceUsers((previousUsers) => {
+            const previousMembershipById = new Map(previousUsers.map((user) => [user.id, !!user.isProjectMember]))
+            return sourceUsers.map((user) => ({
+                ...user,
+                isProjectMember: projectMembershipById.get(user.id) ?? previousMembershipById.get(user.id) ?? false,
+            }))
+        })
+    }, [projectMembershipById, users, workspaceUsersResult])
 
     useEffect(() => {
         workspaceUserIdsRef.current = new Set(workspaceUsers.map((u) => u.id))
     }, [workspaceUsers])
-
-    useEffect(() => {
-        if (!open) return
-        void refreshWorkspaceUsers()
-    }, [open, refreshWorkspaceUsers])
 
     useEffect(() => {
         initialAssigneeIdsRef.current = initialAssigneeIds
@@ -333,47 +320,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     }
 
     useEffect(() => {
-        if (driveConfigLoadedRef.current) return
-        driveConfigLoadedRef.current = true
-        let cancelled = false
-        const cached = readCachedDriveConfig()
-        const cachedAt = readCachedDriveConfigTime()
-        const isStale = !cachedAt || Date.now() - cachedAt > driveConfigCacheTtlMs
-        if (cached) {
-            setDriveConfig(cached)
-            setDriveLoading(false)
-        } else {
-            setDriveLoading(true)
-        }
-        const loadDriveConfig = async () => {
-            try {
-                const res = await fetch("/api/google-drive/config")
-                const data = await res.json().catch(() => null)
-                if (cancelled) return
-                if (data && typeof data.connected === "boolean") {
-                    const nextConfig = {
-                        connected: data.connected,
-                        folderId: data.folderId || null,
-                        folderName: data.folderName || null
-                    }
-                    setDriveConfig(nextConfig)
-                    writeCachedDriveConfig(nextConfig)
-                } else {
-                    const fallback = { connected: false, folderId: null, folderName: null }
-                    setDriveConfig(fallback)
-                    writeCachedDriveConfig(fallback)
-                }
-            } catch {
-                if (!cancelled) setDriveConfig({ connected: false, folderId: null, folderName: null })
-            } finally {
-                if (!cancelled) setDriveLoading(false)
-            }
-        }
-        loadDriveConfig()
-        return () => { cancelled = true }
-    }, [])
-
-    useEffect(() => {
         if (!open || folderInitRef.current) return
         if (driveConfig?.connected && driveConfig.folderId) {
             if (task?.attachmentFolderId) {
@@ -393,9 +339,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const rootId = driveConfig?.folderId || null
     const rootName = driveConfig?.folderName || "Drive"
     const showDriveSection = driveLoading || (!!(driveConfig?.connected && rootId))
-    const driveConfigCacheKey = "driveConfig:state"
-    const driveConfigCacheTimeKey = "driveConfig:state:ts"
-    const driveConfigCacheTtlMs = 30 * 60 * 1000
     const folderCacheKey = rootId ? `driveFolderTree:${rootId}` : null
     const folderCacheTimeKey = folderCacheKey ? `${folderCacheKey}:ts` : null
     const folderCacheTtlMs = 30 * 60 * 1000
@@ -453,41 +396,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         try {
             sessionStorage.setItem(folderCacheKey, JSON.stringify(tree))
             sessionStorage.setItem(folderCacheTimeKey, String(Date.now()))
-        } catch {
-            // Ignore cache write failures
-        }
-    }
-
-    const readCachedDriveConfig = () => {
-        try {
-            const raw = sessionStorage.getItem(driveConfigCacheKey)
-            if (!raw) return null
-            const parsed = JSON.parse(raw)
-            if (!parsed || typeof parsed.connected !== "boolean") return null
-            return {
-                connected: !!parsed.connected,
-                folderId: parsed.folderId || null,
-                folderName: parsed.folderName || null
-            } as DriveConfig
-        } catch {
-            return null
-        }
-    }
-
-    const readCachedDriveConfigTime = () => {
-        try {
-            const raw = sessionStorage.getItem(driveConfigCacheTimeKey)
-            const ts = raw ? Number(raw) : 0
-            return Number.isFinite(ts) ? ts : 0
-        } catch {
-            return 0
-        }
-    }
-
-    const writeCachedDriveConfig = (config: DriveConfig) => {
-        try {
-            sessionStorage.setItem(driveConfigCacheKey, JSON.stringify(config))
-            sessionStorage.setItem(driveConfigCacheTimeKey, String(Date.now()))
         } catch {
             // Ignore cache write failures
         }
@@ -686,16 +594,13 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
                 if (result?.error) {
                     if (result.error === "One or more assignees are not in this workspace") {
-                        const refreshedWorkspaceIds = await refreshWorkspaceUsers()
-                        if (refreshedWorkspaceIds) {
-                            const refreshedAssigneeIds = Array.from(
-                                new Set(
-                                    assigneeIds.filter((id) => id.trim().length > 0 && refreshedWorkspaceIds.has(id))
-                                )
+                        const refreshedAssigneeIds = Array.from(
+                            new Set(
+                                assigneeIds.filter((id) => id.trim().length > 0 && workspaceUserIdsRef.current.has(id))
                             )
-                            if (refreshedAssigneeIds.length !== assigneeIds.length) {
-                                applySanitizedAssignees(assigneeIds, refreshedAssigneeIds)
-                            }
+                        )
+                        if (refreshedAssigneeIds.length !== assigneeIds.length) {
+                            applySanitizedAssignees(assigneeIds, refreshedAssigneeIds)
                             setError(null)
                         } else {
                             setError(result.error)
@@ -763,16 +668,13 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
                 if (result?.error) {
                     if (result.error === "One or more assignees are not in this workspace") {
-                        const refreshedWorkspaceIds = await refreshWorkspaceUsers()
-                        if (refreshedWorkspaceIds) {
-                            const refreshedAssigneeIds = Array.from(
-                                new Set(
-                                    assigneeIds.filter((id) => id.trim().length > 0 && refreshedWorkspaceIds.has(id))
-                                )
+                        const refreshedAssigneeIds = Array.from(
+                            new Set(
+                                assigneeIds.filter((id) => id.trim().length > 0 && workspaceUserIdsRef.current.has(id))
                             )
-                            if (refreshedAssigneeIds.length !== assigneeIds.length) {
-                                applySanitizedAssignees(assigneeIds, refreshedAssigneeIds)
-                            }
+                        )
+                        if (refreshedAssigneeIds.length !== assigneeIds.length) {
+                            applySanitizedAssignees(assigneeIds, refreshedAssigneeIds)
                             setError(null)
                         } else {
                             setError(result.error)
@@ -805,11 +707,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 // Create checklist items for new task
                 if (enableChecklist && checklistItems.length > 0 && result.task?.id) {
                     for (let i = 0; i < checklistItems.length; i++) {
-                        await fetch(`/api/tasks/${result.task.id}/checklist`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ content: checklistItems[i], order: i })
-                        })
+                        await createChecklistItem(result.task.id, checklistItems[i], i)
                     }
                 }
 

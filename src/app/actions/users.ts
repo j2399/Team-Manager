@@ -127,6 +127,54 @@ export async function updateUserProjects(userId: string, projectIds: string[]) {
     }
 }
 
+export async function updateWorkspaceMemberName(userId: string, name: string) {
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+        return { error: 'Unauthorized: Not authenticated' }
+    }
+
+    if (!currentUser.workspaceId) {
+        return { error: 'Unauthorized: No workspace' }
+    }
+
+    if (currentUser.role !== 'Admin' && currentUser.role !== 'Team Lead') {
+        return { error: 'Unauthorized: Only Admins and Team Leads can change members' }
+    }
+
+    const trimmedName = name.trim()
+    if (!trimmedName || trimmedName.length > 50) {
+        return { error: 'Invalid name' }
+    }
+
+    const membershipData = await fetchQuery(api.admin.getManagedUser, {
+        workspaceId: currentUser.workspaceId,
+        userId,
+    })
+
+    if (!membershipData?.membership) {
+        return { error: 'User not found' }
+    }
+
+    try {
+        const result = await fetchMutation(api.admin.updateWorkspaceMemberName, {
+            workspaceId: currentUser.workspaceId,
+            userId,
+            name: trimmedName,
+        })
+
+        if ('error' in result) {
+            return { error: 'User not found' }
+        }
+
+        revalidatePath('/dashboard/members')
+        revalidatePath('/dashboard/settings')
+        return { success: true }
+    } catch (error) {
+        console.error("Failed to update member name", error)
+        return { error: 'Failed to update name' }
+    }
+}
+
 export async function removeUserFromWorkspace(userId: string) {
     const currentUser = await getCurrentUser()
     if (!currentUser) {

@@ -9,6 +9,7 @@ import { RoleSelect } from "../members/RoleSelect"
 import { ProjectSelect } from "../members/ProjectSelect"
 import { MemberActions } from "../members/MemberActions"
 import { WorkloadSettings } from "./WorkloadSettings"
+import { updateWorkspaceMemberName } from "@/app/actions/users"
 import { useToast } from "@/components/ui/use-toast"
 
 type Project = {
@@ -68,14 +69,9 @@ function EditableName({
 
         startTransition(async () => {
             try {
-                const response = await fetch(`/api/users/${userId}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name: trimmed }),
-                })
-                const res = await response.json().catch(() => ({}))
+                const res = await updateWorkspaceMemberName(userId, trimmed)
 
-                if (!response.ok) {
+                if (res?.error) {
                     setValue(name)
                     toast({
                         title: "Error",

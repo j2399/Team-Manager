@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { updateUserProjects } from "@/app/actions/users"
 import { ChevronDown } from "lucide-react"
 import { useEffect, useState, useTransition } from "react"
 import { useToast } from "@/components/ui/use-toast"
@@ -50,14 +51,9 @@ export function ProjectSelect({
     function handleSave() {
         startTransition(async () => {
             try {
-                const response = await fetch(`/api/users/${userId}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ projectIds: selectedProjectIds }),
-                })
-                const result = await response.json().catch(() => ({}))
+                const result = await updateUserProjects(userId, selectedProjectIds)
 
-                if (!response.ok) {
+                if (result?.error) {
                     setSelectedProjectIds(currentProjectIds) // Revert on error
                     toast({
                         title: "Error",

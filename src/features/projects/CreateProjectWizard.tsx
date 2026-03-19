@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useMutation } from "convex/react"
+import { api } from "@convex/_generated/api"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,7 +26,8 @@ import {
 import { RemoveScroll } from "react-remove-scroll"
 import { ChevronDown, ChevronLeft, ChevronRight, Loader2, Sparkles } from "lucide-react"
 import { WizardStepIndicator } from "./WizardStepIndicator"
-import { TimelineEditor, type PushDraft, formatDateISO } from "@/features/timeline-editor"
+import { TimelineEditor, type PushDraft } from "@/features/timeline-editor"
+import { useDashboardUser } from "@/components/DashboardUserProvider"
 
 type User = {
     id: string
@@ -59,10 +62,12 @@ export function CreateProjectWizard({
     onProjectCreated
 }: CreateProjectWizardProps) {
     const router = useRouter()
+    const dashboardUser = useDashboardUser()
     const dialogRef = useRef<HTMLDivElement>(null)
     const [currentStep, setCurrentStep] = useState(0)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const createProject = useMutation(api.projectsAdmin.createProject)
 
     // Step 1: Basic division info
     const [projectData, setProjectData] = useState<ProjectData>({
@@ -126,42 +131,37 @@ export function CreateProjectWizard({
     }
 
     const handleSubmit = async () => {
-        if (!isStep1Valid) return
+        if (!isStep1Valid || !dashboardUser?.workspaceId) return
 
         setIsSubmitting(true)
         setError(null)
 
         try {
-            // Create division with pushes
-            const response = await fetch('/api/projects', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: projectData.name.trim(),
-                    description: projectData.description.trim() || undefined,
-                    leadIds: projectData.leadIds,
-                    memberIds: selectedMemberIds,
-                    pushes: pushes.map(p => ({
-                        tempId: p.tempId,
-                        name: p.name,
-                        startDate: formatDateISO(p.startDate),
-                        endDate: p.endDate ? formatDateISO(p.endDate) : undefined,
-                        color: p.color,
-                        dependsOn: p.dependsOn
-                    }))
-                })
+            const response = await createProject({
+                projectId: `project_${crypto.randomUUID().replace(/-/g, "")}`,
+                workspaceId: dashboardUser.workspaceId,
+                name: projectData.name.trim(),
+                description: projectData.description.trim() || undefined,
+                leadIds: projectData.leadIds,
+                memberIds: selectedMemberIds,
+                pushes: pushes.map((push) => ({
+                    tempId: push.tempId,
+                    name: push.name,
+                    startDate: push.startDate.getTime(),
+                    endDate: push.endDate ? push.endDate.getTime() : undefined,
+                    color: push.color,
+                    dependsOn: push.dependsOn || undefined,
+                })),
+                now: Date.now(),
             })
 
-            if (!response.ok) {
-                const data = await response.json()
-                throw new Error(data.error || 'Failed to create division')
+            if (!response?.success || !response.project) {
+                throw new Error(response?.error || 'Failed to create division')
             }
-
-            const project = await response.json()
 
             onOpenChange(false)
             onProjectCreated?.()
-            router.push(`/dashboard/projects/${project.id}`)
+            router.push(`/dashboard/projects/${response.project.id}`)
             router.refresh()
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An error occurred')

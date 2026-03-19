@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useMemo, useState, useEffect, useRef } from "react"
+import { useQuery } from "convex/react"
+import { api } from "@convex/_generated/api"
 
 import {
     Dialog,
@@ -55,7 +56,7 @@ type Comment = {
     content: string
     authorId: string
     authorName: string
-    createdAt: string
+    createdAt: string | number
     replyToId: string | null
     replyTo: ReplyTo | null
 }
@@ -71,7 +72,7 @@ type Attachment = {
     size: number
     type: string
     uploadedBy?: string
-    createdAt: string
+    createdAt: string | number
     storageProvider?: string
     externalId?: string | null
 }
@@ -97,7 +98,7 @@ type TaskPreviewProps = {
     onTaskUpdated?: (task: Task) => void
 }
 
-const formatTimeAgo = (date: string) => {
+const formatTimeAgo = (date: string | number) => {
     const diff = new Date().getTime() - new Date(date).getTime()
     const minutes = Math.floor(diff / 60000)
     const hours = Math.floor(minutes / 60)
@@ -283,33 +284,71 @@ const buildCommentTree = (comments: Comment[]): CommentWithReplies[] => {
 
 export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTaskUpdated }: TaskPreviewProps) {
     const dashboardUser = useDashboardUser()
-    const [comments, setComments] = useState<Comment[]>([])
-    const [attachments, setAttachments] = useState<Attachment[]>([])
+    const workspaceId = dashboardUser?.workspaceId ?? null
     const [newComment, setNewComment] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const [isLoadingComments, setIsLoadingComments] = useState(false)
     const [commentError, setCommentError] = useState<string | null>(null)
     const [replyingTo, setReplyingTo] = useState<Comment | null>(null)
     const [enlargedImage, setEnlargedImage] = useState<{ url: string; name: string } | null>(null)
     const [isProcessingReview, setIsProcessingReview] = useState(false)
     const [isDragging, setIsDragging] = useState(false)
     const textareaRef = useRef<HTMLTextAreaElement>(null)
-    const [instructionsFile, setInstructionsFile] = useState<{ url: string; name: string } | null>(null)
     const [showInstructionsFullscreen, setShowInstructionsFullscreen] = useState(false)
     const commentsEndRef = useRef<HTMLDivElement>(null)
     const [uploadProgress, setUploadProgress] = useState<number | null>(null)
     const [uploadingFileName, setUploadingFileName] = useState<string | null>(null)
     const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
     const deleteTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
-    const [checklistCount, setChecklistCount] = useState<number>(0)
-    const [driveConfig, setDriveConfig] = useState<DriveConfig | null>(null)
     const [folderTree, setFolderTree] = useState<DriveFolderNode[]>([])
     const [uploadsPath, setUploadsPath] = useState<string>("")
-    const driveConfigLoadedRef = useRef(false)
+    const liveComments = useQuery(
+        api.tasks.getComments,
+        open && task.id ? { taskId: task.id } : "skip"
+    ) as Comment[] | undefined
+    const liveAttachments = useQuery(
+        api.tasks.getAttachments,
+        open && task.id ? { taskId: task.id } : "skip"
+    ) as Attachment[] | undefined
+    const liveChecklistItems = useQuery(
+        api.tasks.getChecklistItems,
+        open && task.id ? { taskId: task.id } : "skip"
+    )
+    const liveTaskRecord = useQuery(
+        api.tasks.getTaskById,
+        open && task.id ? { taskId: task.id } : "skip"
+    )
+    const projectColumns = useQuery(
+        api.projectsAdmin.getProjectColumns,
+        open && projectId ? { projectId } : "skip"
+    )
+    const driveConfigRecord = useQuery(
+        api.settings.getWorkspaceDriveConfig,
+        workspaceId ? { workspaceId } : "skip"
+    )
+    const driveConfig: DriveConfig | null = driveConfigRecord === undefined
+        ? null
+        : {
+            connected: !!driveConfigRecord?.refreshToken,
+            folderId: driveConfigRecord?.folderId || null,
+            folderName: driveConfigRecord?.folderName || null,
+        }
     const userRole = dashboardUser?.role ?? 'Member'
     const currentUser = dashboardUser
         ? { id: dashboardUser.id, name: dashboardUser.name }
         : null
+    const comments = useMemo(() => (liveComments ?? []) as Comment[], [liveComments])
+    const attachments = useMemo(() => (liveAttachments ?? []) as Attachment[], [liveAttachments])
+    const checklistCount = liveChecklistItems?.length ?? 0
+    const instructionsFile = useMemo(() => {
+        const url = liveTaskRecord?.instructionsFileUrl ?? task.instructionsFileUrl
+        const name = liveTaskRecord?.instructionsFileName ?? task.instructionsFileName
+        return url && name ? { url, name } : null
+    }, [
+        liveTaskRecord?.instructionsFileName,
+        liveTaskRecord?.instructionsFileUrl,
+        task.instructionsFileName,
+        task.instructionsFileUrl,
+    ])
 
     // Scroll to bottom on new comments
     useEffect(() => {
@@ -317,32 +356,6 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
             commentsEndRef.current.scrollIntoView({ behavior: "smooth" })
         }
     }, [comments.length])
-
-    useEffect(() => {
-        if (!open || driveConfigLoadedRef.current) return
-        driveConfigLoadedRef.current = true
-        let cancelled = false
-        const loadConfig = async () => {
-            try {
-                const res = await fetch("/api/google-drive/config")
-                const data = await res.json().catch(() => null)
-                if (cancelled) return
-                if (data && typeof data.connected === "boolean") {
-                    setDriveConfig({
-                        connected: data.connected,
-                        folderId: data.folderId || null,
-                        folderName: data.folderName || null
-                    })
-                } else {
-                    setDriveConfig({ connected: false, folderId: null, folderName: null })
-                }
-            } catch {
-                if (!cancelled) setDriveConfig({ connected: false, folderId: null, folderName: null })
-            }
-        }
-        loadConfig()
-        return () => { cancelled = true }
-    }, [open])
 
     useEffect(() => {
         if (!open || !driveConfig?.connected || !driveConfig.folderId) return
@@ -449,136 +462,15 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
         }
     }, [open, driveConfig?.folderId, driveConfig?.folderName, folderTree, task.attachmentFolderId, task.attachmentFolderName])
 
-    // Track last comment time for incremental polling
-    const lastCommentTime = useRef<string | null>(null)
-    const commentCount = useRef<number>(0)
-
-    // Full fetch - get all comments
-    const fetchComments = async () => {
-        if (!task.id) return
-        setIsLoadingComments(true)
-        setCommentError(null)
-        try {
-            const res = await fetch(`/api/tasks/${task.id}/comments`)
-            if (res.ok) {
-                const data = await res.json()
-                const newComments = Array.isArray(data.comments) ? data.comments : (Array.isArray(data) ? data : [])
-                setComments(newComments)
-                commentCount.current = newComments.length
-                if (newComments.length > 0) {
-                    lastCommentTime.current = newComments[newComments.length - 1].createdAt
-                }
-            } else {
-                setCommentError('Failed to load comments')
-            }
-        } catch (err) {
-            console.error('Failed to fetch comments:', err)
-            setCommentError('Failed to load comments')
-        } finally {
-            setIsLoadingComments(false)
-        }
-    }
-
-    // Lightweight poll - check for new comments
-    const checkNewComments = async () => {
-        if (!task.id || !lastCommentTime.current) return
-        try {
-            const since = encodeURIComponent(lastCommentTime.current)
-            const res = await fetch(`/api/tasks/${task.id}/comments?since=${since}`)
-            if (res.ok) {
-                const data = await res.json()
-                if (data.hasNew && data.comments?.length > 0) {
-                    // Append new comments
-                    setComments(prev => {
-                        const newOnes = data.comments.filter(
-                            (c: Comment) => !prev.some(p => p.id === c.id)
-                        )
-                        if (newOnes.length > 0) {
-                            const updated = [...prev, ...newOnes]
-                            lastCommentTime.current = updated[updated.length - 1].createdAt
-                            commentCount.current = updated.length
-                            return updated
-                        }
-                        return prev
-                    })
-                }
-            }
-        } catch (err) {
-            // Silent fail
-        }
-    }
-
-    const fetchAttachments = async () => {
-        if (!task.id) return
-        try {
-            const res = await fetch(`/api/tasks/${task.id}/attachments`)
-            if (res.ok) {
-                const data = await res.json()
-                setAttachments(Array.isArray(data) ? data : [])
-            }
-        } catch (err) {
-            console.error('Failed to fetch attachments:', err)
-        }
-    }
-
-    const fetchInstructions = async () => {
-        if (!task.id) return
-        try {
-            const res = await fetch(`/api/tasks/${task.id}/instructions`)
-            if (res.ok) {
-                const data = await res.json()
-                if (data.url && data.name) {
-                    setInstructionsFile({ url: data.url, name: data.name })
-                } else {
-                    setInstructionsFile(null)
-                }
-            }
-        } catch (err) {
-            console.error('Failed to fetch instructions:', err)
-        }
-    }
-
-    const fetchChecklistCount = async () => {
-        if (!task.id) return
-        try {
-            const res = await fetch(`/api/tasks/${task.id}/checklist`)
-            if (res.ok) {
-                const data = await res.json()
-                setChecklistCount(Array.isArray(data) ? data.length : 0)
-            }
-        } catch (err) {
-            console.error('Failed to fetch checklist:', err)
-        }
-    }
-
     useEffect(() => {
-        if (open && task.id) {
-            // Initial full fetch
-            fetchComments()
-            fetchAttachments()
-            fetchInstructions()
-            fetchChecklistCount()
-
-            // Smart polling - check for new comments every 3 seconds (lightweight)
-            const interval = setInterval(() => {
-                checkNewComments()
-            }, 3000)
-
-            return () => clearInterval(interval)
-        } else {
+        if (!open) {
             // Reset state when dialog closes
-            setComments([])
-            setAttachments([])
             setNewComment("")
             setCommentError(null)
             setReplyingTo(null)
-            setInstructionsFile(null)
             setShowInstructionsFullscreen(false)
-            lastCommentTime.current = null
-            commentCount.current = 0
-            setChecklistCount(0)
         }
-    }, [open, task.id])
+    }, [open])
 
     const handleAddComment = async () => {
         if (!newComment.trim() || isSubmitting) return
@@ -627,8 +519,6 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
 
             if (res.ok) {
                 if (data && 'id' in data && typeof data.id === 'string') {
-                    const comment = data as Comment
-                    setComments(prev => [...prev, comment])
                     setNewComment("")
                     setReplyingTo(null)
                     setCommentError(null)
@@ -699,10 +589,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                 xhr.send(formData)
             })
 
-            const attachment = await uploadPromise
-            setAttachments(prev => [...prev, attachment])
-            // Refresh attachments list to get proper order
-            fetchAttachments()
+            await uploadPromise
         } catch (err: unknown) {
             console.error('Upload error:', err)
             setCommentError((err as Error).message || 'Failed to upload file. Please try again.')
@@ -765,7 +652,6 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                     method: 'DELETE'
                 })
                 if (res.ok) {
-                    setAttachments(prev => prev.filter(a => a.id !== attachmentId))
                     // Remove from deleting set
                     setDeletingIds(prev => {
                         const next = new Set(prev)
@@ -823,18 +709,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
             })
 
             if (res.ok) {
-                // Optimistically remove from UI
-                const removeFromTree = (nodes: CommentWithReplies[]): CommentWithReplies[] => {
-                    return nodes.filter(node => {
-                        if (node.id === commentId) return false
-                        if (node.replies.length > 0) {
-                            node.replies = removeFromTree(node.replies)
-                        }
-                        return true
-                    })
-                }
-                // Refresh comments to be sure
-                fetchComments()
+                setReplyingTo((current) => (current?.id === commentId ? null : current))
             }
         } catch (err) {
             console.error('Failed to delete comment:', err)
@@ -883,12 +758,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
 
         setIsProcessingReview(true)
         try {
-            // Find the Done column
-            const response = await fetch(`/api/projects/${projectId}/columns`)
-            if (!response.ok) throw new Error('Failed to fetch columns')
-
-            const columns = await response.json()
-            const doneColumn = columns.find((c: { name: string }) => c.name === 'Done')
+            const doneColumn = (projectColumns ?? []).find((c: { name: string }) => c.name === 'Done')
 
             if (!doneColumn) {
                 alert('Done column not found')
@@ -918,12 +788,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
 
         setIsProcessingReview(true)
         try {
-            // Find the In Progress column
-            const response = await fetch(`/api/projects/${projectId}/columns`)
-            if (!response.ok) throw new Error('Failed to fetch columns')
-
-            const columns = await response.json()
-            const inProgressColumn = columns.find((c: { name: string }) => c.name === 'In Progress')
+            const inProgressColumn = (projectColumns ?? []).find((c: { name: string }) => c.name === 'In Progress')
 
             if (!inProgressColumn) {
                 alert('In Progress column not found')
@@ -1260,7 +1125,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
 
                             {/* Comments Section */}
                             <div className="border-t pt-2 flex flex-col min-h-0">
-                                {isLoadingComments && (
+                                {liveComments === undefined && (
                                     <div className="mb-1.5 shrink-0">
                                         <span className="text-[8px] text-muted-foreground">Loading...</span>
                                     </div>
@@ -1350,7 +1215,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                             </div>
                                         </div>
                                     </div>
-                                ) : !isLoadingComments && (
+                                ) : liveComments !== undefined && (
                                     <div className="text-[9px] text-muted-foreground italic py-4 text-center shrink-0">
                                         No comments yet. Be the first to comment!
                                     </div>

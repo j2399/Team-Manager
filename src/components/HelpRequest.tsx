@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useQuery } from "convex/react"
+import { api } from "@convex/_generated/api"
 import { HelpCircle, CheckCircle, Clock, X, Loader2, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -11,6 +13,7 @@ import {
     DialogTitle,
     DialogFooter,
 } from "@/components/ui/dialog"
+import { cancelHelpRequest, createHelpRequest, updateHelpRequestStatus } from "@/app/actions/help-requests"
 import { cn } from "@/lib/utils"
 
 type HelpRequestData = {
@@ -19,7 +22,7 @@ type HelpRequestData = {
     requestedByName: string
     message: string | null
     status: string
-    createdAt: string
+    createdAt: string | number
     resolvedByName: string | null
 }
 
@@ -31,49 +34,26 @@ type HelpRequestProps = {
 }
 
 export function HelpRequest({ taskId, taskTitle, currentUserId, userRole }: HelpRequestProps) {
-    const [helpRequest, setHelpRequest] = useState<HelpRequestData | null>(null)
-    const [loading, setLoading] = useState(true)
+    const liveHelpRequests = useQuery(
+        api.tasks.getHelpRequests,
+        taskId ? { taskId, statuses: ['open', 'acknowledged'] } : "skip"
+    ) as HelpRequestData[] | undefined
     const [showAskDialog, setShowAskDialog] = useState(false)
     const [message, setMessage] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     const isLeadership = userRole === 'Admin' || userRole === 'Team Lead'
-
-    useEffect(() => {
-        fetchHelpRequest()
-    }, [taskId])
-
-    const fetchHelpRequest = async () => {
-        try {
-            const res = await fetch(`/api/tasks/${taskId}/help`)
-            if (res.ok) {
-                const data = await res.json()
-                setHelpRequest(data)
-            }
-        } catch (error) {
-            console.error('Failed to fetch help request:', error)
-        } finally {
-            setLoading(false)
-        }
-    }
+    const helpRequest = liveHelpRequests?.[0] ?? null
 
     const askForHelp = async () => {
         setIsSubmitting(true)
         try {
-            const res = await fetch(`/api/tasks/${taskId}/help`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: message.trim() || null })
-            })
-
-            if (res.ok) {
-                const data = await res.json()
-                setHelpRequest(data)
+            const result = await createHelpRequest(taskId, message.trim() || null)
+            if (result?.success) {
                 setShowAskDialog(false)
                 setMessage("")
             } else {
-                const error = await res.json()
-                alert(error.error || 'Failed to submit help request')
+                alert(result?.error || 'Failed to submit help request')
             }
         } catch (error) {
             console.error('Failed to ask for help:', error)
@@ -88,20 +68,7 @@ export function HelpRequest({ taskId, taskTitle, currentUserId, userRole }: Help
 
         setIsSubmitting(true)
         try {
-            const res = await fetch(`/api/tasks/${taskId}/help`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ helpRequestId: helpRequest.id, status })
-            })
-
-            if (res.ok) {
-                const data = await res.json()
-                if (status === 'resolved') {
-                    setHelpRequest(null)
-                } else {
-                    setHelpRequest(data)
-                }
-            }
+            await updateHelpRequestStatus(taskId, helpRequest.id, status)
         } catch (error) {
             console.error('Failed to update help request:', error)
         } finally {
@@ -114,13 +81,7 @@ export function HelpRequest({ taskId, taskTitle, currentUserId, userRole }: Help
 
         setIsSubmitting(true)
         try {
-            const res = await fetch(`/api/tasks/${taskId}/help?helpRequestId=${helpRequest.id}`, {
-                method: 'DELETE'
-            })
-
-            if (res.ok) {
-                setHelpRequest(null)
-            }
+            await cancelHelpRequest(taskId, helpRequest.id)
         } catch (error) {
             console.error('Failed to cancel help request:', error)
         } finally {
@@ -128,7 +89,7 @@ export function HelpRequest({ taskId, taskTitle, currentUserId, userRole }: Help
         }
     }
 
-    if (loading) {
+    if (liveHelpRequests === undefined) {
         return null
     }
 

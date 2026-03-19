@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
+import { useQuery } from "convex/react"
+import { api } from "@convex/_generated/api"
 import { Eye, Check, X, Clock, Loader2, Paperclip, MessageSquare, Download, ExternalLink } from "lucide-react"
 import {
     Dialog,
@@ -20,14 +22,14 @@ type Attachment = {
     url: string
     size: number
     type: string
-    createdAt: string
+    createdAt: string | number
 }
 
 type Comment = {
     id: string
     content: string
     authorName: string
-    createdAt: string
+    createdAt: string | number
 }
 
 type ApprovalPreviewProps = {
@@ -61,7 +63,7 @@ const formatFileSize = (bytes: number) => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-const formatTimeAgo = (date: string) => {
+const formatTimeAgo = (date: string | number) => {
     const now = new Date()
     const then = new Date(date)
     const diffMs = now.getTime() - then.getTime()
@@ -83,33 +85,14 @@ export function ApprovalPreviewButton({ task, onApproved, onDenied }: ApprovalPr
     const [open, setOpen] = useState(false)
     const [isApproving, setIsApproving] = useState(false)
     const [isDenying, setIsDenying] = useState(false)
-    const [attachments, setAttachments] = useState<Attachment[]>([])
-    const [comments, setComments] = useState<Comment[]>([])
-    const [isLoading, setIsLoading] = useState(false)
+    const attachments = useQuery(api.tasks.getAttachments, open ? { taskId: task.id } : "skip") as Attachment[] | undefined
+    const comments = useQuery(api.tasks.getComments, open ? { taskId: task.id } : "skip") as Comment[] | undefined
     const { toast } = useToast()
 
     const pendingText = task.submittedAt ? (() => {
         const days = Math.floor((Date.now() - new Date(task.submittedAt).getTime()) / (1000 * 60 * 60 * 24))
         return days === 0 ? 'Pending today' : `Pending ${days}d`
     })() : null
-
-    // Fetch attachments and comments when dialog opens
-    useEffect(() => {
-        if (open) {
-            setIsLoading(true)
-            Promise.all([
-                fetch(`/api/tasks/${task.id}/attachments`).then(r => r.ok ? r.json() : []),
-                fetch(`/api/tasks/${task.id}/comments`).then(r => r.ok ? r.json() : [])
-            ]).then(([attachmentData, commentData]) => {
-                setAttachments(attachmentData || [])
-                setComments(commentData || [])
-            }).catch(() => {
-                // Silently fail - just show empty
-            }).finally(() => {
-                setIsLoading(false)
-            })
-        }
-    }, [open, task.id])
 
     const handleApprove = async () => {
         setIsApproving(true)
@@ -233,21 +216,21 @@ export function ApprovalPreviewButton({ task, onApproved, onDenied }: ApprovalPr
                             </div>
                         )}
 
-                        {isLoading ? (
+                        {attachments === undefined || comments === undefined ? (
                             <div className="flex items-center justify-center py-8">
                                 <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                             </div>
                         ) : (
                             <>
                                 {/* Attachments */}
-                                {attachments.length > 0 && (
+                                {(attachments ?? []).length > 0 && (
                                     <div className="mt-4">
                                         <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
                                             <Paperclip className="h-3 w-3" />
-                                            Attachments ({attachments.length})
+                                            Attachments ({(attachments ?? []).length})
                                         </div>
                                         <div className="space-y-2">
-                                            {attachments.map(attachment => (
+                                            {(attachments ?? []).map(attachment => (
                                                 <div
                                                     key={attachment.id}
                                                     className="flex items-center gap-3 p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
@@ -284,14 +267,14 @@ export function ApprovalPreviewButton({ task, onApproved, onDenied }: ApprovalPr
                                 )}
 
                                 {/* Comments */}
-                                {comments.length > 0 && (
+                                {(comments ?? []).length > 0 && (
                                     <div className="mt-4">
                                         <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
                                             <MessageSquare className="h-3 w-3" />
-                                            Comments ({comments.length})
+                                            Comments ({(comments ?? []).length})
                                         </div>
                                         <div className="space-y-2">
-                                            {comments.map(comment => (
+                                            {(comments ?? []).map(comment => (
                                                 <div key={comment.id} className="p-2 rounded-lg bg-muted/30">
                                                     <div className="flex items-center gap-1.5 mb-1">
                                                         <Avatar className="h-4 w-4 text-[8px]">
@@ -313,7 +296,7 @@ export function ApprovalPreviewButton({ task, onApproved, onDenied }: ApprovalPr
                                     </div>
                                 )}
 
-                                {attachments.length === 0 && comments.length === 0 && !task.description && (
+                                {(attachments ?? []).length === 0 && (comments ?? []).length === 0 && !task.description && (
                                     <div className="text-center py-6 text-xs text-muted-foreground">
                                         No additional details
                                     </div>

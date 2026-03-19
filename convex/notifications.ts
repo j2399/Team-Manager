@@ -1,9 +1,32 @@
 import { v } from "convex/values"
-import { mutation, query } from "./_generated/server"
+import { makeFunctionReference } from "convex/server"
+import { action, mutation, query } from "./_generated/server"
 import { createLegacyId, now, stripDoc } from "./lib"
+
+const getOverdueTasksRef = makeFunctionReference<"query">("tasks:getOverdueTasks")
+const listLinksByTypeSinceRef = makeFunctionReference<"query">("notifications:listLinksByTypeSince")
+const createManyRef = makeFunctionReference<"mutation">("notifications:createMany")
 
 function isBroadcastNotification(notification: { userId?: string }) {
     return notification.userId === undefined
+}
+
+type OverdueTask = {
+    id: string
+    title: string
+    projectId: string | null
+}
+
+type TaskDueNotification = {
+    id: string
+    workspaceId: string
+    userId: string
+    type: string
+    title: string
+    message: string
+    link: string
+    read: boolean
+    createdAt: number
 }
 
 export const getUnreadCount = query({
@@ -235,5 +258,72 @@ export const listLinksByTypeSince = query({
                 args.links.includes(notification.link)
             )
             .map((notification) => notification.link as string)
+    },
+})
+
+export const createOverdueTaskNotifications = action({
+    args: {
+        workspaceId: v.string(),
+        userId: v.string(),
+        now: v.number(),
+    },
+    handler: async (ctx, args) => {
+        const cutoff = args.now - 24 * 60 * 60 * 1000
+
+        const overdueTasks = await ctx.runQuery(getOverdueTasksRef, {
+            userId: args.userId,
+            workspaceId: args.workspaceId,
+            now: args.now,
+        }) as OverdueTask[]
+
+        if (overdueTasks.length === 0) {
+            return { created: 0 }
+        }
+
+        const links = overdueTasks
+            .map((task) => task.projectId ? `/dashboard/projects/${task.projectId}?highlight=${task.id}` : null)
+            .filter((link): link is string => Boolean(link))
+
+        const existingLinks = new Set(
+            links.length > 0
+                ? await ctx.runQuery(listLinksByTypeSinceRef, {
+                    workspaceId: args.workspaceId,
+                    userId: args.userId,
+                    type: "task_due",
+                    links,
+                    since: cutoff,
+                })
+                : []
+        )
+
+        const notifications = overdueTasks
+            .map((task) => {
+                const projectId = task.projectId
+                if (!projectId) return null
+
+                const link = `/dashboard/projects/${projectId}?highlight=${task.id}`
+                if (existingLinks.has(link)) return null
+
+                return {
+                    id: createLegacyId("notification"),
+                    workspaceId: args.workspaceId,
+                    userId: args.userId,
+                    type: "task_due",
+                    title: "Task overdue",
+                    message: `${task.title} is overdue and needs attention.`,
+                    link,
+                    read: false,
+                    createdAt: args.now,
+                }
+            })
+            .filter((notification): notification is TaskDueNotification => Boolean(notification))
+
+        if (notifications.length > 0) {
+            await ctx.runMutation(createManyRef, {
+                notifications,
+            })
+        }
+
+        return { created: notifications.length }
     },
 })

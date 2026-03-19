@@ -24,6 +24,7 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { TaskDialog } from "@/features/kanban/TaskDialog"
+import { updateTaskDetails } from "@/app/actions/kanban"
 
 export type HeatmapTask = {
     id: string
@@ -772,15 +773,14 @@ export function DashboardHeatmap({
         const errors: string[] = []
         for (const taskId of taskIds) {
             try {
-                const res = await fetch(`/api/tasks/${taskId}`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ assigneeIds: [userId] })
+                const result = await updateTaskDetails(taskId, {
+                    assigneeId: userId,
+                    assigneeIds: [userId],
                 })
-                if (!res.ok) {
+                if (result?.error) {
                     errors.push(taskId)
                 }
-            } catch (error) {
+            } catch {
                 errors.push(taskId)
             }
         }
