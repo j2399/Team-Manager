@@ -72,9 +72,42 @@ type ActivityMonitor = {
     signals: Signal[]
 }
 
+type LegacyTimelineEvent = {
+    date: string
+    type: "submitted" | "approved"
+}
+
+type LegacyPushStats = {
+    id: string
+    name: string
+    startDate: string
+    endDate: string | null
+    status: string
+    total: number
+    completed: number
+    inReview: number
+    inProgress: number
+    todo: number
+    timeline: LegacyTimelineEvent[]
+}
+
+type LegacyProjectActivity = {
+    id: string
+    name: string
+    color: string
+    totalTasks: number
+    totalCompleted: number
+    totalInReview: number
+    completionRate: number
+    pushes: LegacyPushStats[]
+}
+
 const CHART_WIDTH = 760
 const CHART_HEIGHT = 260
 const CHART_PADDING = { top: 18, right: 16, bottom: 28, left: 36 }
+const DAY_MS = 24 * 60 * 60 * 1000
+const MONITOR_WINDOW_DAYS = 42
+const LEGACY_BEHIND_PLAN_PCT = 10
 
 function formatShortDate(value: string | null) {
     if (!value) return "No data"
@@ -110,6 +143,245 @@ function buildLinePath(points: ProgressPoint[], getX: (index: number) => number,
         const y = getY(point.completedPct)
         return `${path}${index === 0 ? "M" : " L"} ${x} ${y}`
     }, "")
+}
+
+function startOfUtcDay(timestamp: number) {
+    const date = new Date(timestamp)
+    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+}
+
+function clamp(value: number, min: number, max: number) {
+    return Math.min(max, Math.max(min, value))
+}
+
+function roundToTenths(value: number) {
+    return Math.round(value * 10) / 10
+}
+
+function isLegacyProjectActivity(value: unknown): value is LegacyProjectActivity {
+    if (!value || typeof value !== "object") return false
+
+    const candidate = value as Partial<LegacyProjectActivity>
+    return typeof candidate.id === "string"
+        && typeof candidate.name === "string"
+        && Array.isArray(candidate.pushes)
+        && typeof candidate.totalTasks === "number"
+}
+
+function buildLegacyCumulativeApprovalSeries(totalTasks: number, pushes: LegacyPushStats[], windowStart: number, windowDays: number) {
+    const dailyCounts = Array.from({ length: windowDays }, () => 0)
+
+    for (const push of pushes) {
+        for (const event of push.timeline) {
+            if (event.type !== "approved") continue
+
+            const approvedAt = new Date(event.date).getTime()
+            if (!Number.isFinite(approvedAt)) continue
+
+            const approvedDay = startOfUtcDay(approvedAt)
+            if (approvedDay <= windowStart) {
+                dailyCounts[0] += 1
+                continue
+            }
+
+            const index = Math.floor((approvedDay - windowStart) / DAY_MS)
+            if (index >= 0 && index < windowDays) {
+                dailyCounts[index] += 1
+            }
+        }
+    }
+
+    let cumulative = 0
+
+    return dailyCounts.map((count, index) => {
+        cumulative += count
+
+        return {
+            date: new Date(windowStart + index * DAY_MS).toISOString(),
+            completedPct: totalTasks > 0 ? roundToTenths((cumulative / totalTasks) * 100) : 0,
+        }
+    })
+}
+
+function buildLegacyExpectedSeries(pushes: LegacyPushStats[], windowStart: number, windowDays: number) {
+    const plannedPushes = pushes
+        .map((push) => ({
+            startDate: new Date(push.startDate).getTime(),
+            endDate: push.endDate ? new Date(push.endDate).getTime() : NaN,
+            taskCount: push.total,
+        }))
+        .filter((push) => Number.isFinite(push.startDate) && Number.isFinite(push.endDate) && push.taskCount > 0)
+
+    const totalWeightedTasks = plannedPushes.reduce((sum, push) => sum + push.taskCount, 0)
+    if (totalWeightedTasks === 0) return []
+
+    return Array.from({ length: windowDays }, (_, index) => {
+        const dayEnd = windowStart + index * DAY_MS + DAY_MS - 1
+        let weightedCompletion = 0
+
+        for (const push of plannedPushes) {
+            const duration = Math.max(push.endDate - push.startDate, DAY_MS)
+            const fraction = clamp((dayEnd - push.startDate) / duration, 0, 1)
+            weightedCompletion += push.taskCount * fraction
+        }
+
+        return {
+            date: new Date(windowStart + index * DAY_MS).toISOString(),
+            completedPct: roundToTenths((weightedCompletion / totalWeightedTasks) * 100),
+        }
+    })
+}
+
+function buildLegacyMonitor(projects: LegacyProjectActivity[]): ActivityMonitor {
+    const now = Date.now()
+    const windowStart = startOfUtcDay(now - (MONITOR_WINDOW_DAYS - 1) * DAY_MS)
+
+    const divisions = projects
+        .slice()
+        .sort((left, right) => left.name.localeCompare(right.name))
+        .map((project) => {
+            const totalTasks = project.totalTasks
+            const completedTasks = project.totalCompleted
+            const inReviewCount = project.totalInReview
+            const inProgressCount = project.pushes.reduce((sum, push) => sum + push.inProgress, 0)
+            const todoCount = project.pushes.reduce((sum, push) => sum + push.todo, 0)
+            const completedLast7d = project.pushes.reduce(
+                (sum, push) =>
+                    sum + push.timeline.filter((event) => event.type === "approved" && new Date(event.date).getTime() >= now - 7 * DAY_MS).length,
+                0
+            )
+            const overdueCount = project.pushes.reduce((sum, push) => {
+                if (!push.endDate) return sum
+                const endDate = new Date(push.endDate).getTime()
+                if (!Number.isFinite(endDate) || endDate >= now) return sum
+                return sum + Math.max(push.total - push.completed, 0)
+            }, 0)
+            const progressSeries = buildLegacyCumulativeApprovalSeries(totalTasks, project.pushes, windowStart, MONITOR_WINDOW_DAYS)
+            const expectedSeries = buildLegacyExpectedSeries(project.pushes, windowStart, MONITOR_WINDOW_DAYS)
+            const actualPlannedPct = totalTasks > 0 ? roundToTenths((completedTasks / totalTasks) * 100) : null
+            const expectedPlannedPct = expectedSeries.length > 0 ? expectedSeries[expectedSeries.length - 1].completedPct : null
+            const scheduleDeltaPct = actualPlannedPct !== null && expectedPlannedPct !== null
+                ? roundToTenths(actualPlannedPct - expectedPlannedPct)
+                : null
+            const overduePushes = project.pushes.filter((push) => {
+                if (!push.endDate) return false
+                const endDate = new Date(push.endDate).getTime()
+                return Number.isFinite(endDate) && endDate < now && push.completed < push.total
+            })
+            const latestTimelineAt = Math.max(
+                0,
+                ...project.pushes.flatMap((push) => push.timeline.map((event) => new Date(event.date).getTime()).filter(Number.isFinite))
+            )
+            const latestPushDeadlineAt = Math.max(
+                0,
+                ...project.pushes.map((push) => (push.endDate ? new Date(push.endDate).getTime() : 0)).filter(Number.isFinite)
+            )
+            const lastActivityAtMs = Math.max(latestTimelineAt, latestPushDeadlineAt)
+            const paceSignal: Signal | null = scheduleDeltaPct !== null && scheduleDeltaPct <= -LEGACY_BEHIND_PLAN_PCT
+                ? {
+                    id: `legacy-behind-${project.id}`,
+                    kind: "pace",
+                    severity: "critical",
+                    headline: `${project.name}: behind plan`,
+                    detail: `${Math.abs(scheduleDeltaPct)} percentage points behind the current push schedule.`,
+                    createdAt: new Date(lastActivityAtMs || now).toISOString(),
+                    projectId: project.id,
+                    taskId: null,
+                    taskTitle: null,
+                }
+                : null
+            const overdueSignal: Signal | null = overdueCount > 0
+                ? {
+                    id: `legacy-overdue-${project.id}`,
+                    kind: "overdue",
+                    severity: "warning",
+                    headline: `${project.name}: overdue push work`,
+                    detail: `${overdueCount} incomplete task${overdueCount === 1 ? "" : "s"} remain past push deadline.`,
+                    createdAt: new Date(lastActivityAtMs || now).toISOString(),
+                    projectId: project.id,
+                    taskId: null,
+                    taskTitle: null,
+                }
+                : null
+            const delayedPushSignal: Signal | null = overduePushes.length > 0
+                ? {
+                    id: `legacy-push-${project.id}`,
+                    kind: "push_overdue",
+                    severity: "warning",
+                    headline: `${project.name}: delayed push`,
+                    detail: `${overduePushes[0].name} is still incomplete after its deadline.`,
+                    createdAt: new Date(lastActivityAtMs || now).toISOString(),
+                    projectId: project.id,
+                    taskId: null,
+                    taskTitle: null,
+                }
+                : null
+            const signals = [paceSignal, overdueSignal, delayedPushSignal].filter((signal): signal is Signal => signal !== null)
+
+            return {
+                id: project.id,
+                name: project.name,
+                color: project.color ?? "#64748b",
+                totalTasks,
+                completedTasks,
+                activeCount: Math.max(totalTasks - completedTasks, 0),
+                inReviewCount,
+                inProgressCount,
+                todoCount,
+                blockedCount: 0,
+                overdueCount,
+                staleCount: 0,
+                reworkCount14d: 0,
+                completedLast7d,
+                oldestReviewDays: null,
+                scheduleDeltaPct,
+                actualPlannedPct,
+                expectedPlannedPct,
+                riskScore: overdueCount * 8 + (scheduleDeltaPct !== null && scheduleDeltaPct < 0 ? Math.abs(scheduleDeltaPct) : 0),
+                lastActivityAt: lastActivityAtMs > 0 ? new Date(lastActivityAtMs).toISOString() : null,
+                progressSeries,
+                expectedSeries,
+                signals,
+            }
+        })
+
+    return {
+        generatedAt: new Date(now).toISOString(),
+        windowDays: MONITOR_WINDOW_DAYS,
+        summary: {
+            behindPlanCount: divisions.filter((division) => division.scheduleDeltaPct !== null && division.scheduleDeltaPct <= -LEGACY_BEHIND_PLAN_PCT).length,
+            blockedTasks: 0,
+            staleTasks: 0,
+            overdueTasks: divisions.reduce((sum, division) => sum + division.overdueCount, 0),
+            reworkEvents14d: 0,
+        },
+        divisions,
+        signals: divisions
+            .flatMap((division) => division.signals)
+            .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+            .slice(0, 10),
+    }
+}
+
+function normalizeMonitorPayload(payload: ActivityMonitor | LegacyProjectActivity[] | undefined) {
+    if (!payload) {
+        return {
+            monitor: undefined,
+            isLegacy: false,
+        }
+    }
+
+    if (Array.isArray(payload)) {
+        return {
+            monitor: payload.every(isLegacyProjectActivity) ? buildLegacyMonitor(payload) : undefined,
+            isLegacy: true,
+        }
+    }
+
+    return {
+        monitor: payload,
+        isLegacy: false,
+    }
 }
 
 function signalTone(signal: Signal["severity"]) {
@@ -412,7 +684,8 @@ export function ProjectActivityTracker({
     workspaceId: string
 }) {
     const { prefetchProjectRoute, pushProjectRoute } = useProjectRoute()
-    const monitor = useQuery(api.settings.getProjectActivity, { workspaceId }) as ActivityMonitor | undefined
+    const rawMonitor = useQuery(api.settings.getProjectActivity, { workspaceId }) as ActivityMonitor | LegacyProjectActivity[] | undefined
+    const { monitor, isLegacy } = React.useMemo(() => normalizeMonitorPayload(rawMonitor), [rawMonitor])
     const [selectedDivisionId, setSelectedDivisionId] = React.useState<string | null>(null)
     const [hoverIndex, setHoverIndex] = React.useState<number | null>(null)
 
@@ -470,8 +743,9 @@ export function ProjectActivityTracker({
                     </div>
                     <h2 className="mt-1 text-lg font-semibold">Progress over time, queue pressure, and reversals</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        The overlay shows cumulative completions across all divisions. The rest of the panel only surfaces pace misses,
-                        blocked work, review aging, stale tasks, and backward movement.
+                        {isLegacy
+                            ? "Running in compatibility mode from the previous Convex activity payload. Progress and pace are live; blocker and rework signals will fill in after the backend deploy catches up."
+                            : "The overlay shows cumulative completions across all divisions. The rest of the panel only surfaces pace misses, blocked work, review aging, stale tasks, and backward movement."}
                     </p>
                 </div>
 
