@@ -58,6 +58,7 @@ export function SettingsPageClient({
                         members={members}
                         allProjects={allProjects}
                         currentUserEmail={user.email}
+                        currentUserRole={user.role}
                         canManage={isAdmin}
                         showWorkload={user.role === "Admin"}
                     />

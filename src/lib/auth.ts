@@ -52,14 +52,16 @@ export async function getCurrentUser() {
 
         const dbUser = session.user
         const workspaceId = dbUser.workspaceId || null
-        const membershipRole = workspaceId
-            ? dbUser.memberships?.find((membership) => membership.workspaceId === workspaceId)?.role
+        const activeMembership = workspaceId
+            ? dbUser.memberships?.find((membership) => membership.workspaceId === workspaceId) ?? null
             : null
-        const resolvedRole = resolveCurrentUserRole(workspaceId, membershipRole ?? null, dbUser.role)
+        const membershipRole = activeMembership?.role ?? null
+        const resolvedRole = resolveCurrentUserRole(workspaceId, membershipRole, dbUser.role)
+        const displayName = activeMembership?.name || dbUser.name
 
         const currentUser: CurrentUser = {
             id: dbUser.id,
-            name: dbUser.name,
+            name: displayName,
             email: dbUser.email,
             avatar: dbUser.avatar || null,
             role: resolvedRole,

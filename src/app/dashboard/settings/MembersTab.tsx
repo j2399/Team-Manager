@@ -30,6 +30,7 @@ type MembersTabProps = {
     members: Member[]
     allProjects: Project[]
     currentUserEmail: string
+    currentUserRole: string
     canManage: boolean
     showWorkload: boolean
 }
@@ -149,7 +150,14 @@ function EditableName({
     )
 }
 
-export function MembersTab({ members, allProjects, currentUserEmail, canManage, showWorkload }: MembersTabProps) {
+export function MembersTab({
+    members,
+    allProjects,
+    currentUserEmail,
+    currentUserRole,
+    canManage,
+    showWorkload,
+}: MembersTabProps) {
     const [workloadOpen, setWorkloadOpen] = useState(false)
     const [copiedEmailId, setCopiedEmailId] = useState<string | null>(null)
     const [visibleMembers, setVisibleMembers] = useState<Member[]>(members)
@@ -240,6 +248,7 @@ export function MembersTab({ members, allProjects, currentUserEmail, canManage, 
                                     <RoleSelect
                                         userId={m.id}
                                         currentRole={m.role}
+                                        currentUserRole={currentUserRole}
                                         disabled={!canManage}
                                         onRoleUpdated={(nextRole) => handleMemberRoleUpdated(m.id, nextRole)}
                                     />
@@ -328,6 +337,7 @@ export function MembersTab({ members, allProjects, currentUserEmail, canManage, 
                                             <RoleSelect
                                                 userId={m.id}
                                                 currentRole={m.role}
+                                                currentUserRole={currentUserRole}
                                                 disabled={!canManage}
                                                 onRoleUpdated={(nextRole) => handleMemberRoleUpdated(m.id, nextRole)}
                                             />
@@ -349,6 +359,8 @@ export function MembersTab({ members, allProjects, currentUserEmail, canManage, 
                                                     userId={m.id}
                                                     isCurrentUser={isSelf}
                                                     canRemove={canManage}
+                                                    currentUserRole={currentUserRole}
+                                                    targetRole={m.role}
                                                     onRemoved={handleMemberRemoved}
                                                 />
                                             </td>

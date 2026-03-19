@@ -603,7 +603,25 @@ export const updateWorkspaceMemberName = mutation({
             return { error: "membership_not_found" as const }
         }
 
-        await ctx.db.patch(membership._id, { name: args.name })
+        const user = await getUserByLegacyId(ctx.db, args.userId)
+        if (!user) {
+            return { error: "user_not_found" as const }
+        }
+
+        await ctx.db.patch(user._id, {
+            name: args.name,
+            updatedAt: Date.now(),
+        })
+
+        const memberships = await ctx.db
+            .query("workspaceMembers")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .collect()
+
+        for (const currentMembership of memberships) {
+            await ctx.db.patch(currentMembership._id, { name: args.name })
+        }
+
         return { success: true }
     },
 })

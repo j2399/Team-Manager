@@ -152,6 +152,7 @@ export function MembersPageClient({
                                         <RoleSelect
                                             userId={user.id}
                                             currentRole={user.role}
+                                            currentUserRole={currentUser.role}
                                             disabled={!canChangeRoles}
                                         />
                                         <ProjectSelect
@@ -165,6 +166,8 @@ export function MembersPageClient({
                                                 userId={user.id}
                                                 isCurrentUser={isCurrentUser}
                                                 canRemove={canChangeRoles}
+                                                currentUserRole={currentUser.role}
+                                                targetRole={user.role}
                                             />
                                         )}
                                     </div>

@@ -40,13 +40,14 @@ export async function getConvexCurrentUser() {
 
     const dbUser = session.user
     const workspaceId = dbUser.workspaceId ?? null
-    const membershipRole = workspaceId
-        ? dbUser.memberships?.find((membership) => membership.workspaceId === workspaceId)?.role ?? null
+    const activeMembership = workspaceId
+        ? dbUser.memberships?.find((membership) => membership.workspaceId === workspaceId) ?? null
         : null
+    const membershipRole = activeMembership?.role ?? null
 
     return {
         id: dbUser.id,
-        name: dbUser.name,
+        name: activeMembership?.name || dbUser.name,
         email: dbUser.email,
         avatar: dbUser.avatar ?? null,
         role: resolveCurrentUserRole(workspaceId, membershipRole, dbUser.role),

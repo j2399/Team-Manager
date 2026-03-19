@@ -32,6 +32,8 @@ export async function updateDisplayName(newName: string) {
         }
 
         revalidatePath('/dashboard')
+        revalidatePath('/dashboard/my-board')
+        revalidatePath('/dashboard/projects')
         revalidatePath('/dashboard/settings')
         revalidatePath('/dashboard/members')
         revalidatePath('/workspaces')
@@ -140,6 +142,9 @@ export async function updateMemberName(targetUserId: string, newName: string) {
         revalidatePath('/dashboard/settings')
         revalidatePath('/dashboard/members')
         revalidatePath('/dashboard')
+        revalidatePath('/dashboard/my-board')
+        revalidatePath('/dashboard/projects')
+        revalidatePath('/workspaces')
 
         return { success: true }
     } catch (error) {

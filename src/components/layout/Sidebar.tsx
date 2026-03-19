@@ -62,6 +62,7 @@ import { CreateProjectWizard } from "@/features/projects/CreateProjectWizard"
 import { preloadBoardModule } from "@/lib/board-module"
 import { preloadDashboardHomeModule, preloadMyBoardModule } from "@/lib/dashboard-route-modules"
 import { deleteProject, updateProjectDetails } from "@/app/actions/projects"
+import { useDashboardUser } from "@/components/DashboardUserProvider"
 
 type Project = {
     id: string
@@ -512,15 +513,16 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
             : "skip"
     )
     const reorderProjects = useMutation(api.projectsAdmin.reorderProjects)
+    const dashboardUser = useDashboardUser()
 
     const currentUserRecord = workspaceUsersResult?.users.find((candidate) => candidate.id === initialUserId)
     const userData: UserData = {
-        name: currentUserRecord?.name ?? initialUserData?.name ?? "User",
-        role: currentUserRecord?.role ?? initialUserData?.role ?? "Member",
+        name: dashboardUser?.name ?? currentUserRecord?.name ?? initialUserData?.name ?? "User",
+        role: dashboardUser?.role ?? currentUserRecord?.role ?? initialUserData?.role ?? "Member",
         id: initialUserId,
         workspaceId: initialWorkspaceId,
-        workspaceName: initialUserData?.workspaceName,
-        avatar: currentUserRecord?.avatar ?? initialUserData?.avatar ?? null,
+        workspaceName: dashboardUser?.workspaceName ?? initialUserData?.workspaceName,
+        avatar: dashboardUser?.avatar ?? currentUserRecord?.avatar ?? initialUserData?.avatar ?? null,
     }
     const allUsers: UserCandidate[] = (workspaceUsersResult?.users ?? []).map((user) => ({
         id: user.id,

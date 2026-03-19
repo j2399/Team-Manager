@@ -20,18 +20,28 @@ type MemberActionsProps = {
     userId: string
     isCurrentUser: boolean
     canRemove: boolean
+    currentUserRole: string
+    targetRole: string
     onRemoved?: (userId: string) => void
 }
 
-export function MemberActions({ userId, isCurrentUser, canRemove, onRemoved }: MemberActionsProps) {
+export function MemberActions({
+    userId,
+    isCurrentUser,
+    canRemove,
+    currentUserRole,
+    targetRole,
+    onRemoved,
+}: MemberActionsProps) {
     const { toast } = useToast()
     const [isLoading, setIsLoading] = useState(false)
     const [showConfirm, setShowConfirm] = useState(false)
+    const canRemoveTarget = isCurrentUser || currentUserRole === "Admin" || targetRole !== "Admin"
 
     // Only show if:
     // 1. It's the current user (Leave button)
     // 2. OR the viewer has permission to remove others
-    if (!isCurrentUser && !canRemove) {
+    if (!isCurrentUser && (!canRemove || !canRemoveTarget)) {
         return null
     }
 

@@ -14,17 +14,22 @@ import { useToast } from "@/components/ui/use-toast"
 export function RoleSelect({
     userId,
     currentRole,
+    currentUserRole,
     disabled,
     onRoleUpdated,
 }: {
     userId: string
     currentRole: string
+    currentUserRole: string
     disabled?: boolean
     onRoleUpdated?: (newRole: string) => void
 }) {
     const [isPending, startTransition] = useTransition()
     const [role, setRole] = useState(currentRole)
     const { toast } = useToast()
+    const viewerIsAdmin = currentUserRole === "Admin"
+    const isAdminTarget = currentRole === "Admin"
+    const selectDisabled = isPending || disabled || (!viewerIsAdmin && isAdminTarget)
 
     useEffect(() => {
         setRole(currentRole)
@@ -67,12 +72,12 @@ export function RoleSelect({
     }
 
     return (
-        <Select value={role} onValueChange={handleValueChange} disabled={isPending || disabled}>
+        <Select value={role} onValueChange={handleValueChange} disabled={selectDisabled}>
             <SelectTrigger className="w-[140px] ml-auto">
                 <SelectValue placeholder="Select Role" />
             </SelectTrigger>
             <SelectContent align="end">
-                <SelectItem value="Admin">Admin</SelectItem>
+                <SelectItem value="Admin" disabled={!viewerIsAdmin}>Admin</SelectItem>
                 <SelectItem value="Team Lead">Team Lead</SelectItem>
                 <SelectItem value="Member">Member</SelectItem>
             </SelectContent>
