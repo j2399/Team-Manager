@@ -1,6 +1,6 @@
 "use client"
 
-import { type Preloaded, usePreloadedQuery } from "convex/react"
+import { useQuery } from "convex/react"
 import { api } from "@convex/_generated/api"
 import { Users, ChevronRight } from "lucide-react"
 import Link from "next/link"
@@ -12,26 +12,39 @@ import { DashboardHeatmapLoader } from "./DashboardHeatmapLoader"
 import { ProjectActivityTracker } from "./ProjectActivityTracker"
 import { DriveUploadWidget } from "./DriveUploadWidget"
 import { InviteNoticeCard } from "@/components/InviteNoticeCard"
+import { DashboardRouteSkeleton } from "@/components/loading/dashboard-route-skeletons"
+import { useDashboardUser } from "@/components/DashboardUserProvider"
 import type { InviteNotice } from "@/lib/invite-status"
 
 type DashboardPageClientProps = {
-    user: {
-        id: string
-        name: string
-        role: string
-        workspaceId: string
-    }
     inviteNotice: InviteNotice | null
-    preloadedPageData: Preloaded<typeof api.dashboard.getDashboardPageData>
 }
 
 export function DashboardPageClient({
-    user,
     inviteNotice,
-    preloadedPageData,
 }: DashboardPageClientProps) {
+    const user = useDashboardUser()
+    const pageData = useQuery(
+        api.dashboard.getDashboardPageData,
+        user?.id && user.workspaceId
+            ? {
+                userId: user.id,
+                workspaceId: user.workspaceId,
+                role: user.role,
+            }
+            : "skip"
+    )
+
+    if (!user?.id || user.id === "pending") {
+        return <div className="p-6 text-muted-foreground">Please complete your profile setup.</div>
+    }
+
+    if (!user.workspaceId || pageData === undefined) {
+        return <DashboardRouteSkeleton />
+    }
+
     const { myTasks, pendingApproval, teamStats, recentActivity, driveConfig } =
-        usePreloadedQuery(preloadedPageData)
+        pageData
 
     const isAdmin = user.role === "Admin"
     const isTeamLead = user.role === "Team Lead"
