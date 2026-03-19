@@ -133,6 +133,8 @@ type ProjectWarmEntry = {
     unsubscribe: (() => void) | null
 }
 
+type ShellWarmKey = "dashboard" | "myBoard"
+
 type ProjectRowProps = {
     project: Project
     pathname: string
@@ -375,12 +377,18 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     const [chatState, setChatState] = React.useState<'small' | 'large' | 'hidden'>('hidden')
     const [projectWarmStates, setProjectWarmStates] = React.useState<Record<string, ProjectWarmState>>({})
     const [warmPulseStep, setWarmPulseStep] = React.useState(0)
+    const [shellWarmStates, setShellWarmStates] = React.useState<Record<ShellWarmKey, ProjectWarmState>>({
+        dashboard: "idle",
+        myBoard: "idle",
+    })
     const editProjectDialogContentRef = React.useRef<HTMLDivElement | null>(null)
     const [settingsSpinNonce, setSettingsSpinNonce] = React.useState(0)
     const previousPathRef = React.useRef<string>('/dashboard')
     const shellWarmStartedRef = React.useRef(false)
     const projectWarmEntriesRef = React.useRef<Map<string, ProjectWarmEntry>>(new Map())
     const pendingProjectNavigationIdRef = React.useRef(0)
+    const shellWarmEntriesRef = React.useRef<Map<ShellWarmKey, ProjectWarmEntry>>(new Map())
+    const pendingShellNavigationIdRef = React.useRef(0)
 
     // Track previous path for settings toggle
     React.useEffect(() => {
@@ -454,6 +462,13 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 entry.unsubscribe?.()
             })
             projectWarmEntriesRef.current.clear()
+            shellWarmEntriesRef.current.forEach((entry) => {
+                if (entry.cleanupTimer !== null) {
+                    window.clearTimeout(entry.cleanupTimer)
+                }
+                entry.unsubscribe?.()
+            })
+            shellWarmEntriesRef.current.clear()
         }
     }, [])
 
@@ -527,6 +542,18 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
             }
         })
     }, [])
+    const setShellWarmState = React.useCallback((key: ShellWarmKey, nextState: ProjectWarmState) => {
+        setShellWarmStates((current) => {
+            if (current[key] === nextState) {
+                return current
+            }
+
+            return {
+                ...current,
+                [key]: nextState,
+            }
+        })
+    }, [])
     const scheduleProjectWarmCleanup = React.useCallback((projectId: string, subscriptionMs: number) => {
         const entry = projectWarmEntriesRef.current.get(projectId)
         if (!entry) return
@@ -545,10 +572,29 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
             projectWarmEntriesRef.current.delete(projectId)
         }, subscriptionMs)
     }, [])
+    const scheduleShellWarmCleanup = React.useCallback((key: ShellWarmKey, subscriptionMs: number) => {
+        const entry = shellWarmEntriesRef.current.get(key)
+        if (!entry) return
+
+        if (entry.cleanupTimer !== null) {
+            window.clearTimeout(entry.cleanupTimer)
+        }
+
+        entry.cleanupTimer = window.setTimeout(() => {
+            const currentEntry = shellWarmEntriesRef.current.get(key)
+            if (!currentEntry) return
+
+            currentEntry.unsubscribe?.()
+            currentEntry.unsubscribe = null
+            currentEntry.cleanupTimer = null
+            shellWarmEntriesRef.current.delete(key)
+        }, subscriptionMs)
+    }, [])
     const prefetchDashboardHome = React.useCallback((options?: { subscriptionMs?: number }) => {
         if (!initialUserId || !initialWorkspaceId) return
         const extendSubscriptionFor = options?.subscriptionMs ?? 15_000
-        router.prefetch("/dashboard")
+        const existingEntry = shellWarmEntriesRef.current.get("dashboard")
+
         convex.prewarmQuery({
             query: api.dashboard.getDashboardPageData,
             args: {
@@ -558,6 +604,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
             },
             extendSubscriptionFor,
         })
+
         if (isAdmin) {
             convex.prewarmQuery({
                 query: api.dashboard.getHeatmapWidgetData,
@@ -570,11 +617,67 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                 extendSubscriptionFor,
             })
         }
-    }, [convex, initialUserId, initialWorkspaceId, isAdmin, router, userData.role])
+        if (existingEntry) {
+            if (existingEntry.status !== "ready") {
+                setShellWarmState("dashboard", "warming")
+            }
+            scheduleShellWarmCleanup("dashboard", extendSubscriptionFor)
+            return existingEntry.readyPromise
+        }
+
+        setShellWarmState("dashboard", "warming")
+
+        const routePrefetchPromise = Promise.resolve(router.prefetch("/dashboard"))
+        let resolveDataReady!: () => void
+        let didResolveDataReady = false
+        const dataReadyPromise = new Promise<void>((resolve) => {
+            resolveDataReady = resolve
+        })
+        const markDataReady = () => {
+            if (didResolveDataReady) return
+            didResolveDataReady = true
+            resolveDataReady()
+        }
+
+        const readyPromise = Promise.all([routePrefetchPromise, dataReadyPromise]).then(() => {
+            const currentEntry = shellWarmEntriesRef.current.get("dashboard")
+            if (!currentEntry) return
+            currentEntry.status = "ready"
+            setShellWarmState("dashboard", "ready")
+        })
+
+        const entry: ProjectWarmEntry = {
+            cleanupTimer: null,
+            readyPromise,
+            status: "warming",
+            unsubscribe: null,
+        }
+        shellWarmEntriesRef.current.set("dashboard", entry)
+
+        const dashboardWatch = convex.watchQuery(api.dashboard.getDashboardPageData, {
+            userId: initialUserId,
+            workspaceId: initialWorkspaceId,
+            role: userData.role,
+        })
+        const checkDashboardData = () => {
+            try {
+                if (dashboardWatch.localQueryResult() !== undefined) {
+                    markDataReady()
+                }
+            } catch {
+                markDataReady()
+            }
+        }
+
+        entry.unsubscribe = dashboardWatch.onUpdate(checkDashboardData)
+        checkDashboardData()
+
+        scheduleShellWarmCleanup("dashboard", extendSubscriptionFor)
+        return readyPromise
+    }, [convex, initialUserId, initialWorkspaceId, isAdmin, router, scheduleShellWarmCleanup, setShellWarmState, userData.role])
     const prefetchMyBoard = React.useCallback((options?: { subscriptionMs?: number }) => {
         if (!initialUserId || !initialWorkspaceId) return
         const extendSubscriptionFor = options?.subscriptionMs ?? 15_000
-        router.prefetch("/dashboard/my-board")
         convex.prewarmQuery({
             query: api.dashboard.getMyBoardPageData,
             args: {
@@ -583,7 +686,65 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
             },
             extendSubscriptionFor,
         })
-    }, [convex, initialUserId, initialWorkspaceId, router])
+        const existingEntry = shellWarmEntriesRef.current.get("myBoard")
+
+        if (existingEntry) {
+            if (existingEntry.status !== "ready") {
+                setShellWarmState("myBoard", "warming")
+            }
+            scheduleShellWarmCleanup("myBoard", extendSubscriptionFor)
+            return existingEntry.readyPromise
+        }
+
+        setShellWarmState("myBoard", "warming")
+
+        const routePrefetchPromise = Promise.resolve(router.prefetch("/dashboard/my-board"))
+        let resolveDataReady!: () => void
+        let didResolveDataReady = false
+        const dataReadyPromise = new Promise<void>((resolve) => {
+            resolveDataReady = resolve
+        })
+        const markDataReady = () => {
+            if (didResolveDataReady) return
+            didResolveDataReady = true
+            resolveDataReady()
+        }
+
+        const readyPromise = Promise.all([routePrefetchPromise, dataReadyPromise]).then(() => {
+            const currentEntry = shellWarmEntriesRef.current.get("myBoard")
+            if (!currentEntry) return
+            currentEntry.status = "ready"
+            setShellWarmState("myBoard", "ready")
+        })
+
+        const entry: ProjectWarmEntry = {
+            cleanupTimer: null,
+            readyPromise,
+            status: "warming",
+            unsubscribe: null,
+        }
+        shellWarmEntriesRef.current.set("myBoard", entry)
+
+        const myBoardWatch = convex.watchQuery(api.dashboard.getMyBoardPageData, {
+            userId: initialUserId,
+            workspaceId: initialWorkspaceId,
+        })
+        const checkMyBoardData = () => {
+            try {
+                if (myBoardWatch.localQueryResult() !== undefined) {
+                    markDataReady()
+                }
+            } catch {
+                markDataReady()
+            }
+        }
+
+        entry.unsubscribe = myBoardWatch.onUpdate(checkMyBoardData)
+        checkMyBoardData()
+
+        scheduleShellWarmCleanup("myBoard", extendSubscriptionFor)
+        return readyPromise
+    }, [convex, initialUserId, initialWorkspaceId, router, scheduleShellWarmCleanup, setShellWarmState])
     const prefetchSettings = React.useCallback((options?: { subscriptionMs?: number }) => {
         if (!initialWorkspaceId) return
         const extendSubscriptionFor = options?.subscriptionMs ?? 15_000
@@ -705,6 +866,54 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
             router.push(href)
         })
     }, [pathname, prefetchProject, projectWarmStates, router])
+    const openDashboardHome = React.useCallback(() => {
+        const href = "/dashboard"
+        if (pathname === href) return
+
+        const navigationId = pendingShellNavigationIdRef.current + 1
+        pendingShellNavigationIdRef.current = navigationId
+
+        if (shellWarmStates.dashboard === "ready") {
+            router.push(href)
+            return
+        }
+
+        void Promise.race([
+            prefetchDashboardHome({ subscriptionMs: 180_000 }),
+            new Promise<void>((resolve) => {
+                window.setTimeout(resolve, 1500)
+            }),
+        ]).finally(() => {
+            if (pendingShellNavigationIdRef.current !== navigationId) {
+                return
+            }
+            router.push(href)
+        })
+    }, [pathname, prefetchDashboardHome, router, shellWarmStates.dashboard])
+    const openMyBoard = React.useCallback(() => {
+        const href = "/dashboard/my-board"
+        if (pathname === href) return
+
+        const navigationId = pendingShellNavigationIdRef.current + 1
+        pendingShellNavigationIdRef.current = navigationId
+
+        if (shellWarmStates.myBoard === "ready") {
+            router.push(href)
+            return
+        }
+
+        void Promise.race([
+            prefetchMyBoard({ subscriptionMs: 180_000 }),
+            new Promise<void>((resolve) => {
+                window.setTimeout(resolve, 1500)
+            }),
+        ]).finally(() => {
+            if (pendingShellNavigationIdRef.current !== navigationId) {
+                return
+            }
+            router.push(href)
+        })
+    }, [pathname, prefetchMyBoard, router, shellWarmStates.myBoard])
 
     React.useEffect(() => {
         if (!projectListResult) return
@@ -790,8 +999,8 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
 
         shellWarmStartedRef.current = true
         const longWarmMs = 180_000
-        prefetchDashboardHome({ subscriptionMs: longWarmMs })
-        prefetchMyBoard({ subscriptionMs: longWarmMs })
+        void prefetchDashboardHome({ subscriptionMs: longWarmMs })
+        void prefetchMyBoard({ subscriptionMs: longWarmMs })
         prefetchSettings({ subscriptionMs: longWarmMs })
 
         if (isAdmin) {
@@ -981,14 +1190,20 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                         {/* Dashboard Link */}
                         <Link
                             href="/dashboard"
-                            onClick={() => {
+                            onClick={(event) => {
                                 if (pathname === "/dashboard") return
-                                prefetchDashboardHome()
-                                setNavigatingTo("/dashboard")
+                                event.preventDefault()
+                                openDashboardHome()
                             }}
-                            onMouseEnter={() => prefetchDashboardHome()}
-                            onFocus={() => prefetchDashboardHome()}
-                            onTouchStart={() => prefetchDashboardHome()}
+                            onMouseEnter={() => {
+                                void prefetchDashboardHome()
+                            }}
+                            onFocus={() => {
+                                void prefetchDashboardHome()
+                            }}
+                            onTouchStart={() => {
+                                void prefetchDashboardHome()
+                            }}
                             className={cn(
                                 "flex items-center gap-3 rounded-md px-3 py-2 transition-all hover:translate-x-0.5 text-sm",
                                 pathname === "/dashboard" ? "bg-muted font-medium" : "text-muted-foreground"
@@ -996,20 +1211,25 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                         >
                             <LayoutDashboard className="h-5 w-5" />
                             Dashboard
-                            {navigatingTo === "/dashboard" && <Loader2 className="h-4 w-4 ml-auto animate-spin" />}
                         </Link>
 
                         {/* My Board Link */}
                         <Link
                             href="/dashboard/my-board"
-                            onClick={() => {
+                            onClick={(event) => {
                                 if (pathname === "/dashboard/my-board") return
-                                prefetchMyBoard()
-                                setNavigatingTo("/dashboard/my-board")
+                                event.preventDefault()
+                                openMyBoard()
                             }}
-                            onMouseEnter={() => prefetchMyBoard()}
-                            onFocus={() => prefetchMyBoard()}
-                            onTouchStart={() => prefetchMyBoard()}
+                            onMouseEnter={() => {
+                                void prefetchMyBoard()
+                            }}
+                            onFocus={() => {
+                                void prefetchMyBoard()
+                            }}
+                            onTouchStart={() => {
+                                void prefetchMyBoard()
+                            }}
                             className={cn(
                                 "flex items-center gap-3 rounded-md px-3 py-2 transition-all hover:translate-x-0.5 text-sm",
                                 pathname === "/dashboard/my-board" ? "bg-muted font-medium" : "text-muted-foreground"
@@ -1017,7 +1237,6 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                         >
                             <Kanban className="h-5 w-5" />
                             My Board
-                            {navigatingTo === "/dashboard/my-board" && <Loader2 className="h-4 w-4 ml-auto animate-spin" />}
                         </Link>
 
                         {/* Divisions Section */}
