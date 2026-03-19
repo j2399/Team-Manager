@@ -6,6 +6,7 @@ import { api } from "@convex/_generated/api"
 import { ArrowRight, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useProjectRoute } from "@/features/projects/useProjectRoute"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 type ProgressPoint = {
     date: string
@@ -435,8 +436,8 @@ function OverlayChart({
 
     return (
         <div className="rounded-lg border bg-background/80 p-2.5">
-            <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                <span>All Divisions</span>
+            <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                <span>All divisions</span>
                 <span>{formatShortDate(activeDate)}</span>
             </div>
 
@@ -577,6 +578,7 @@ export function ProjectActivityTracker({
     const { monitor, isLegacy } = React.useMemo(() => normalizeMonitorPayload(rawMonitor), [rawMonitor])
     const [selectedDivisionId, setSelectedDivisionId] = React.useState<string | null>(null)
     const [hoverIndex, setHoverIndex] = React.useState<number | null>(null)
+    const [activeTab, setActiveTab] = React.useState<"graph" | "stack">("graph")
 
     const divisions = monitor?.divisions ?? []
     const sortedDivisions = React.useMemo(
@@ -625,9 +627,7 @@ export function ProjectActivityTracker({
             <div className="flex h-full flex-col gap-3">
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                        <div className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                            Division Intelligence
-                        </div>
+                        <div className="text-sm font-medium">Division Intelligence</div>
                         {selectedDivision && (
                             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                                 <span className="font-medium text-foreground">{selectedDivision.name}</span>
@@ -638,8 +638,8 @@ export function ProjectActivityTracker({
                             </div>
                         )}
                         {isLegacy && (
-                            <div className="mt-1 text-[10px] text-muted-foreground">
-                                Compatibility mode until Convex deploy updates.
+                            <div className="mt-1 text-[11px] text-muted-foreground">
+                                Compatibility mode
                             </div>
                         )}
                     </div>
@@ -657,72 +657,78 @@ export function ProjectActivityTracker({
                 </div>
 
                 <div className="flex min-h-0 flex-1 flex-col gap-3">
-                    <OverlayChart
-                        divisions={divisions}
-                        selectedDivision={selectedDivision}
-                        activeIndex={activeIndex}
-                        onActiveIndexChange={setHoverIndex}
-                    />
+                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "graph" | "stack")} className="flex min-h-0 flex-1 flex-col">
+                        <TabsList className="grid h-8 w-full grid-cols-2">
+                            <TabsTrigger value="graph" className="text-xs">Graph</TabsTrigger>
+                            <TabsTrigger value="stack" className="text-xs">Stack</TabsTrigger>
+                        </TabsList>
 
-                    <div className="min-h-0 flex-1 rounded-lg border bg-background/80 p-2.5">
-                        <div className="flex items-center justify-between gap-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-                            <span>Division Stack</span>
-                            <span>{divisions.length}</span>
-                        </div>
+                        <TabsContent value="graph" className="mt-3 min-h-0 flex-1">
+                            <OverlayChart
+                                divisions={divisions}
+                                selectedDivision={selectedDivision}
+                                activeIndex={activeIndex}
+                                onActiveIndexChange={setHoverIndex}
+                            />
+                        </TabsContent>
 
-                        <div className="mt-2 h-[calc(100%-20px)] space-y-1.5 overflow-y-auto pr-1">
-                            {sortedDivisions.map((division) => {
-                                const isSelected = division.id === selectedDivision?.id
-                                const livePct = division.progressSeries[activeIndex]?.completedPct ?? 0
-                                const currentPct = division.totalTasks > 0 ? (division.completedTasks / division.totalTasks) * 100 : 0
+                        <TabsContent value="stack" className="mt-3 min-h-0 flex-1">
+                            <div className="h-full rounded-lg border bg-background/80 p-2.5">
+                                <div className="space-y-1.5">
+                                    {sortedDivisions.map((division) => {
+                                        const isSelected = division.id === selectedDivision?.id
+                                        const livePct = division.progressSeries[activeIndex]?.completedPct ?? 0
+                                        const currentPct = division.totalTasks > 0 ? (division.completedTasks / division.totalTasks) * 100 : 0
 
-                                return (
-                                    <div
-                                        key={division.id}
-                                        className={cn(
-                                            "rounded-md border px-2 py-2 transition-colors",
-                                            isSelected ? "border-foreground/20 bg-muted/40" : "border-border bg-background/60"
-                                        )}
-                                        onMouseEnter={() => void prefetchProjectRoute(division.id)}
-                                    >
-                                        <div className="flex items-start justify-between gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setSelectedDivisionId(division.id)}
-                                                className="min-w-0 flex-1 text-left"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: division.color }} />
-                                                    <span className="truncate text-xs font-medium">{division.name}</span>
-                                                </div>
-                                                <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
-                                                    <span>{livePct.toFixed(0)}% cum</span>
-                                                    <span>{currentPct.toFixed(0)}% now</span>
-                                                    <span>{division.inReviewCount} rev</span>
-                                                    <span>{formatDelta(division.scheduleDeltaPct)}</span>
-                                                </div>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => openDivision(division.id)}
-                                                className="rounded-md border p-1 hover:bg-muted/50"
-                                                aria-label={`Open ${division.name}`}
-                                            >
-                                                <ArrowRight className="h-3 w-3" />
-                                            </button>
-                                        </div>
-
-                                        <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
+                                        return (
                                             <div
-                                                className="h-full rounded-full"
-                                                style={{ width: `${Math.max(currentPct, 2)}%`, backgroundColor: division.color }}
-                                            />
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
+                                                key={division.id}
+                                                className={cn(
+                                                    "rounded-md border px-2 py-2 transition-colors",
+                                                    isSelected ? "border-foreground/20 bg-muted/40" : "border-border bg-background/60"
+                                                )}
+                                                onMouseEnter={() => void prefetchProjectRoute(division.id)}
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSelectedDivisionId(division.id)}
+                                                        className="min-w-0 flex-1 text-left"
+                                                    >
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: division.color }} />
+                                                            <span className="truncate text-xs font-medium">{division.name}</span>
+                                                        </div>
+                                                        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
+                                                            <span>{livePct.toFixed(0)}% cum</span>
+                                                            <span>{currentPct.toFixed(0)}% now</span>
+                                                            <span>{division.inReviewCount} rev</span>
+                                                            <span>{formatDelta(division.scheduleDeltaPct)}</span>
+                                                        </div>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openDivision(division.id)}
+                                                        className="rounded-md border p-1 hover:bg-muted/50"
+                                                        aria-label={`Open ${division.name}`}
+                                                    >
+                                                        <ArrowRight className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+
+                                                <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
+                                                    <div
+                                                        className="h-full rounded-full"
+                                                        style={{ width: `${Math.max(currentPct, 2)}%`, backgroundColor: division.color }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        </TabsContent>
+                    </Tabs>
                 </div>
             </div>
         </section>
