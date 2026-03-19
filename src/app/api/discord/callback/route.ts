@@ -5,7 +5,7 @@ import { createSession, SESSION_COOKIE_NAME, SESSION_TTL_SECONDS } from '@/lib/s
 import { joinWorkspaceByCode } from '@/lib/workspaceInvites'
 import { createWorkspaceForUser } from '@/lib/workspaces'
 import { appendInviteNotice, type InviteNotice } from '@/lib/invite-status'
-import { resolveAppBaseUrl } from '@/lib/appUrl'
+import { getDiscordRedirectUri, resolveAppBaseUrl } from '@/lib/appUrl'
 
 type PendingWorkspaceFlow = {
     mode: 'create' | 'join'
@@ -158,7 +158,7 @@ export async function GET(request: Request) {
     // Clear the state cookie after verification
     cookieStore.delete('oauth_state')
     const redirectUri = cookieStore.get('oauth_redirect_uri')?.value
-        || new URL('/api/discord/callback', appBaseUrl).toString()
+        || getDiscordRedirectUri(request.url)
     cookieStore.delete('oauth_redirect_uri')
 
     const clientId = process.env.DISCORD_CLIENT_ID

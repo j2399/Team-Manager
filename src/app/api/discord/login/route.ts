@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import crypto from 'crypto'
-import { getAppBaseUrl, resolveAppBaseUrl } from '@/lib/appUrl'
+import { getAppBaseUrl, getDiscordRedirectUri } from '@/lib/appUrl'
 
 export async function GET(request: Request) {
     const clientId = process.env.DISCORD_CLIENT_ID
@@ -19,15 +19,14 @@ export async function GET(request: Request) {
         }
     }
 
-    const appBaseUrl = resolveAppBaseUrl(request.url)
-    const redirectUri = new URL('/api/discord/callback', appBaseUrl).toString()
+    const redirectUri = getDiscordRedirectUri(request.url)
 
     if (!clientId) {
         return NextResponse.json({ error: 'Discord Client ID not configured' }, { status: 500 })
     }
 
     // SECURITY: Generate cryptographically secure state for CSRF protection
-    const state = crypto.randomBytes(32).toString('hex')
+    const state = crypto.randomBytes(18).toString('base64url')
 
     // Store state in HTTP-only cookie for verification on callback
     const cookieStore = await cookies()
@@ -47,8 +46,12 @@ export async function GET(request: Request) {
     })
 
     const scope = 'identify email'
-    const url = `https://discord.com/api/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${state}`
+    const url = new URL('https://discord.com/oauth2/authorize')
+    url.searchParams.set('client_id', clientId)
+    url.searchParams.set('redirect_uri', redirectUri)
+    url.searchParams.set('response_type', 'code')
+    url.searchParams.set('scope', scope)
+    url.searchParams.set('state', state)
 
     return NextResponse.redirect(url)
 }
-

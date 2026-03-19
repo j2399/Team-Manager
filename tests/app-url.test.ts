@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { appUrl, getAppBaseUrl, resolveAppBaseUrl } from '@/lib/appUrl'
+import { appUrl, getAppBaseUrl, getDiscordRedirectUri, resolveAppBaseUrl } from '@/lib/appUrl'
 
 const ORIGINAL_ENV = { ...process.env }
 
@@ -41,6 +41,17 @@ const baseUrlCases = [
         name: 'uses VERCEL_URL when explicit urls are missing',
         env: { NEXT_PUBLIC_APP_URL: undefined, APP_URL: undefined, VERCEL_URL: 'preview-cupi.vercel.app/', NODE_ENV: 'production' },
         expected: 'https://preview-cupi.vercel.app',
+    },
+    {
+        name: 'prefers VERCEL_PROJECT_PRODUCTION_URL over VERCEL_URL',
+        env: {
+            NEXT_PUBLIC_APP_URL: undefined,
+            APP_URL: undefined,
+            VERCEL_PROJECT_PRODUCTION_URL: 'teammanager.vercel.app',
+            VERCEL_URL: 'preview-cupi.vercel.app/',
+            NODE_ENV: 'production',
+        },
+        expected: 'https://teammanager.vercel.app',
     },
     {
         name: 'returns localhost in development',
@@ -123,6 +134,44 @@ test('resolveAppBaseUrl falls back to request origin when no configured base exi
             assert.equal(
                 resolveAppBaseUrl('https://preview-cupi.vercel.app/invite/ABC123'),
                 'https://preview-cupi.vercel.app'
+            )
+        }
+    )
+})
+
+test('getDiscordRedirectUri prefers DISCORD_REDIRECT_URI when present', () => {
+    withEnv(
+        {
+            DISCORD_REDIRECT_URI: 'https://teammanager.vercel.app/api/discord/callback',
+            NEXT_PUBLIC_APP_URL: undefined,
+            APP_URL: undefined,
+            VERCEL_PROJECT_PRODUCTION_URL: undefined,
+            VERCEL_URL: 'preview-cupi.vercel.app',
+            NODE_ENV: 'production',
+        },
+        () => {
+            assert.equal(
+                getDiscordRedirectUri('https://preview-cupi.vercel.app/invite/ABC123'),
+                'https://teammanager.vercel.app/api/discord/callback'
+            )
+        }
+    )
+})
+
+test('getDiscordRedirectUri falls back to canonical app base', () => {
+    withEnv(
+        {
+            DISCORD_REDIRECT_URI: undefined,
+            NEXT_PUBLIC_APP_URL: undefined,
+            APP_URL: undefined,
+            VERCEL_PROJECT_PRODUCTION_URL: 'teammanager.vercel.app',
+            VERCEL_URL: 'preview-cupi.vercel.app',
+            NODE_ENV: 'production',
+        },
+        () => {
+            assert.equal(
+                getDiscordRedirectUri('https://preview-cupi.vercel.app/invite/ABC123'),
+                'https://teammanager.vercel.app/api/discord/callback'
             )
         }
     )
