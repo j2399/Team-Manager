@@ -19,6 +19,10 @@ import { Grid } from '@giphy/react-components'
 
 const giphyFetch = new GiphyFetch(process.env.NEXT_PUBLIC_GIPHY_API_KEY || "dc6zaTOxFJmzC")
 
+function getCurrentTimestamp() {
+    return Date.now()
+}
+
 type Message = {
     id: string
     content: string
@@ -203,7 +207,7 @@ export function GeneralChat({ isExpanded, onToggleExpand }: { isExpanded?: boole
             authorId: currentUser.id,
             authorName: currentUser.name,
             authorAvatar: currentUser.avatar,
-            createdAt: Date.now(),
+            createdAt: getCurrentTimestamp(),
             author: {
                 id: currentUser.id,
                 name: currentUser.name,

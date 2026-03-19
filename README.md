@@ -8,13 +8,13 @@ CuPI is a Next.js workspace platform for project planning, Kanban execution, wor
 - Project divisions, pushes, Kanban boards, approvals, comments, and attachments
 - Leadership dashboards for workload, activity, and delivery health
 - Discord login plus optional Google Drive-backed storage
-- Prisma-backed persistence and server actions for core mutations
+- Convex-backed persistence with server actions and reactive client queries
 
 ## Stack
 
 - Next.js App Router
 - React 19
-- Prisma
+- Convex
 - Tailwind CSS
 - TypeScript
 
@@ -22,7 +22,8 @@ CuPI is a Next.js workspace platform for project planning, Kanban execution, wor
 
 Core:
 
-- `DATABASE_URL`
+- `CONVEX_DEPLOYMENT`
+- `NEXT_PUBLIC_CONVEX_URL`
 - `APP_URL` or `NEXT_PUBLIC_APP_URL`
 
 Discord auth:
@@ -48,7 +49,7 @@ Optional:
 
 ```bash
 npm install
-npx prisma generate
+npx convex dev
 npm run dev
 ```
 
@@ -60,17 +61,12 @@ Open `http://localhost:3000`.
 - `npm run lint` - run ESLint
 - `npm run typecheck` - run TypeScript without emitting files
 - `npm run test` - run the automated unit test suite
-- `npm run build` - generate Prisma client and build the app
-
-If you want to compile without applying migrations first:
-
-```bash
-SKIP_MIGRATIONS=1 npm run build
-```
+- `npm run build` - build the app for production
+- `npm run convex:dev` - run Convex locally/in watch mode
 
 ## Notes
 
-- New Prisma migrations are checked into `prisma/migrations/`.
+- Convex schema and backend functions live in [`convex/`](./convex).
 - Google Drive tokens are stored encrypted before persistence.
 - Attachment access is proxied through authenticated routes instead of exposing direct links.
 - CI runs lint, typecheck, and tests on every push and pull request.

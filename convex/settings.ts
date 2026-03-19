@@ -364,7 +364,6 @@ export const getProjectActivity = query({
                                     .withIndex("by_pushId", (q) => q.eq("pushId", push.id))
                                     .collect()
 
-                                const completed = tasks.filter((task) => task.status?.toLowerCase() === "done").length
                                 const timeline = tasks.flatMap((task) => {
                                     const items: Array<{ date: string; type: "submitted" | "approved" }> = []
                                     if (task.submittedAt) {
@@ -376,18 +375,26 @@ export const getProjectActivity = query({
                                     return items
                                 }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
+                                const doneColumnIds = new Set<string>()
                                 const reviewColumnIds = new Set<string>()
+                                const inProgressColumnIds = new Set<string>()
+                                const todoColumnIds = new Set<string>()
                                 const board = await getBoardForProject(ctx, project.id)
                                 if (board) {
                                     const columns = await getColumnsForBoard(ctx, board.id)
-                                    columns
-                                        .filter((column) => column.name.toLowerCase() === "review")
-                                        .forEach((column) => reviewColumnIds.add(column.id))
+                                    for (const column of columns) {
+                                        const name = column.name.toLowerCase()
+                                        if (name === "done") doneColumnIds.add(column.id)
+                                        else if (name === "review") reviewColumnIds.add(column.id)
+                                        else if (name === "in progress") inProgressColumnIds.add(column.id)
+                                        else if (name === "to do" || name === "todo") todoColumnIds.add(column.id)
+                                    }
                                 }
 
+                                const completed = tasks.filter((task) => task.columnId && doneColumnIds.has(task.columnId)).length
                                 const inReview = tasks.filter((task) => task.columnId && reviewColumnIds.has(task.columnId)).length
-                                const inProgress = tasks.filter((task) => task.status?.toLowerCase() === "in progress").length
-                                const todo = tasks.filter((task) => task.status?.toLowerCase() === "todo").length
+                                const inProgress = tasks.filter((task) => task.columnId && inProgressColumnIds.has(task.columnId)).length
+                                const todo = tasks.filter((task) => task.columnId && todoColumnIds.has(task.columnId)).length
 
                                 return {
                                     id: push.id,

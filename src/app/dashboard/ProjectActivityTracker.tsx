@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useQuery } from "convex/react"
 import { api } from "@convex/_generated/api"
@@ -261,6 +261,7 @@ export function ProjectActivityTracker({
     const [openTooltipId, setOpenTooltipId] = useState<string | null>(null)
     const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const projects = useQuery(api.settings.getProjectActivity, { workspaceId }) as ProjectActivity[] | undefined
+    const resolvedProjects = projects ?? []
 
     const handleMouseEnter = (projectId: string) => {
         if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current)
@@ -280,24 +281,17 @@ export function ProjectActivityTracker({
         setOpenTooltipId(projectId)
     }
 
-    useEffect(() => {
-        if (!projects || projects.length === 0) {
-            setSelectedProject(null)
-            return
+    const effectiveSelectedProjectId = useMemo(() => {
+        if (resolvedProjects.length === 0) return null
+        if (selectedProject && resolvedProjects.some((project) => project.id === selectedProject)) {
+            return selectedProject
         }
 
-        setSelectedProject((current) => {
-            if (current && projects.some((project) => project.id === current)) {
-                return current
-            }
+        const firstWithPushes = resolvedProjects.find((project) => project.pushes.length > 0)
+        return firstWithPushes?.id || resolvedProjects[0].id
+    }, [resolvedProjects, selectedProject])
 
-            const firstWithPushes = projects.find((project) => project.pushes.length > 0)
-            return firstWithPushes?.id || projects[0].id
-        })
-    }, [projects])
-
-    const resolvedProjects = projects ?? []
-    const selectedProjectData = resolvedProjects.find((project) => project.id === selectedProject)
+    const selectedProjectData = resolvedProjects.find((project) => project.id === effectiveSelectedProjectId)
     const hoveredPushData = selectedProjectData?.pushes.find(p => p.id === hoveredPush)
 
     // Calculate project health and trends

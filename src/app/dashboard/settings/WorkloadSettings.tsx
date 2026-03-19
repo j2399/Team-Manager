@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useTransition } from "react"
+import { useMemo, useState, useTransition } from "react"
 import { useMutation, useQuery } from "convex/react"
 import { api } from "@convex/_generated/api"
 import { Button } from "@/components/ui/button"
@@ -75,7 +75,7 @@ export function WorkloadSettings() {
     const dashboardUser = useDashboardUser()
     const workspaceId = dashboardUser?.workspaceId ?? null
     const [isPending, startTransition] = useTransition()
-    const [config, setConfig] = useState<WorkloadConfig | null>(null)
+    const [draftConfigs, setDraftConfigs] = useState<Record<string, WorkloadConfig>>({})
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState(false)
     const configRecord = useQuery(
@@ -84,15 +84,34 @@ export function WorkloadSettings() {
     )
     const saveWorkloadConfig = useMutation(api.settings.upsertWorkloadConfig)
 
-    useEffect(() => {
-        if (!workspaceId || configRecord === undefined) return
+    const baseConfig = useMemo(() => {
+        if (!workspaceId || configRecord === undefined) {
+            return null
+        }
 
-        setConfig(
-            normalizeWorkloadConfig(
-                (configRecord?.config as Partial<WorkloadConfig> | undefined) ?? DEFAULT_WORKLOAD_CONFIG
-            )
+        return normalizeWorkloadConfig(
+            (configRecord?.config as Partial<WorkloadConfig> | undefined) ?? DEFAULT_WORKLOAD_CONFIG
         )
     }, [configRecord, workspaceId])
+
+    const config = workspaceId
+        ? draftConfigs[workspaceId]
+            ?? baseConfig
+        : null
+
+    const setConfig = (nextConfig: WorkloadConfig) => {
+        if (!workspaceId) return
+        setDraftConfigs((current) => ({
+            ...current,
+            [workspaceId]: nextConfig,
+        }))
+    }
+
+    const getConfigOrFallback = () => {
+        if (config) return config
+        if (baseConfig) return baseConfig
+        return DEFAULT_WORKLOAD_CONFIG
+    }
 
     const handleSave = () => {
         if (!config || !workspaceId) return
@@ -122,32 +141,36 @@ export function WorkloadSettings() {
     }
 
     const handleReset = () => {
-        setConfig(DEFAULT_WORKLOAD_CONFIG)
+        if (!workspaceId) return
+        setDraftConfigs((current) => ({
+            ...current,
+            [workspaceId]: DEFAULT_WORKLOAD_CONFIG,
+        }))
     }
 
     const updateThresholds = (key: keyof WorkloadConfig['thresholds'], value: number) => {
-        if (!config) return
-        setConfig({ ...config, thresholds: { ...config.thresholds, [key]: value } })
+        const currentConfig = getConfigOrFallback()
+        setConfig({ ...currentConfig, thresholds: { ...currentConfig.thresholds, [key]: value } })
     }
 
     const updateStatus = (key: keyof WorkloadConfig['status'], value: number) => {
-        if (!config) return
-        setConfig({ ...config, status: { ...config.status, [key]: value } })
+        const currentConfig = getConfigOrFallback()
+        setConfig({ ...currentConfig, status: { ...currentConfig.status, [key]: value } })
     }
 
     const updateWeights = (key: keyof WorkloadConfig['weights'], value: number) => {
-        if (!config) return
-        setConfig({ ...config, weights: { ...config.weights, [key]: value } })
+        const currentConfig = getConfigOrFallback()
+        setConfig({ ...currentConfig, weights: { ...currentConfig.weights, [key]: value } })
     }
 
     const updateCapacity = (key: keyof WorkloadConfig['capacity'], value: number) => {
-        if (!config) return
-        setConfig({ ...config, capacity: { ...config.capacity, [key]: value } })
+        const currentConfig = getConfigOrFallback()
+        setConfig({ ...currentConfig, capacity: { ...currentConfig.capacity, [key]: value } })
     }
 
     const updateBaseline = (key: keyof WorkloadConfig['baseline'], value: number) => {
-        if (!config) return
-        setConfig({ ...config, baseline: { ...config.baseline, [key]: value } })
+        const currentConfig = getConfigOrFallback()
+        setConfig({ ...currentConfig, baseline: { ...currentConfig.baseline, [key]: value } })
     }
 
     if ((workspaceId && configRecord === undefined) || !config) {

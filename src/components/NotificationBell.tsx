@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Bell, Check, Clock, FileText, User } from "lucide-react"
 import { useMutation, useQuery } from "convex/react"
 import { api } from "@convex/_generated/api"
@@ -31,8 +31,8 @@ export function NotificationBell({
     workspaceId: string
 }) {
     const [open, setOpen] = useState(false)
-    const [bellRingNonce, setBellRingNonce] = useState(0)
-    const previousUnreadCount = useRef<number | null>(null)
+    const [manualBellRingNonce, setManualBellRingNonce] = useState(0)
+    const [clock, setClock] = useState(() => Date.now())
 
     const notifications = useQuery(api.notifications.listForUser, {
         workspaceId,
@@ -48,17 +48,17 @@ export function NotificationBell({
     const markAllRead = useMutation(api.notifications.markAllRead)
 
     useEffect(() => {
-        if (typeof unreadCount !== "number") return
+        const interval = window.setInterval(() => {
+            setClock(Date.now())
+        }, 60000)
 
-        if (previousUnreadCount.current !== null && unreadCount > previousUnreadCount.current) {
-            setBellRingNonce((nonce) => nonce + 1)
-        }
-
-        previousUnreadCount.current = unreadCount
-    }, [unreadCount])
+        return () => window.clearInterval(interval)
+    }, [])
 
     const resolvedUnreadCount = unreadCount ?? 0
     const resolvedNotifications = notifications ?? []
+    const bellAnimationKey = `${resolvedUnreadCount}-${manualBellRingNonce}`
+    const shouldAnimateBell = resolvedUnreadCount > 0 || manualBellRingNonce > 0
 
     const handleOpenChange = (isOpen: boolean) => {
         setOpen(isOpen)
@@ -100,8 +100,7 @@ export function NotificationBell({
     }
 
     const formatTime = (createdAt: number) => {
-        const now = Date.now()
-        const diff = now - createdAt
+        const diff = clock - createdAt
         const minutes = Math.floor(diff / 60000)
         const hours = Math.floor(minutes / 60)
         const days = Math.floor(hours / 24)
@@ -135,13 +134,13 @@ export function NotificationBell({
                     variant="ghost"
                     size="icon"
                     className="relative h-8 w-8"
-                    onClick={() => setBellRingNonce((nonce) => nonce + 1)}
+                    onClick={() => setManualBellRingNonce((nonce) => nonce + 1)}
                 >
                     <Bell
-                        key={bellRingNonce}
+                        key={bellAnimationKey}
                         className={cn(
                             "h-4 w-4 origin-top",
-                            bellRingNonce > 0 && "motion-safe:animate-[cupi-bell-ring_900ms_cubic-bezier(0.16,1,0.3,1)_both]"
+                            shouldAnimateBell && "motion-safe:animate-[cupi-bell-ring_900ms_cubic-bezier(0.16,1,0.3,1)_both]"
                         )}
                     />
                     {resolvedUnreadCount > 0 && (
