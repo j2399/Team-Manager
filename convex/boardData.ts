@@ -129,12 +129,21 @@ export async function getProjectLeadUsers(ctx: QueryCtx, projectId: string) {
 }
 
 export async function getProjectMemberIds(ctx: QueryCtx, projectId: string) {
-    const members = await ctx.db
-        .query("projectMembers")
-        .withIndex("by_projectId", (q) => q.eq("projectId", projectId))
-        .collect()
+    const [members, leadAssignments] = await Promise.all([
+        ctx.db
+            .query("projectMembers")
+            .withIndex("by_projectId", (q) => q.eq("projectId", projectId))
+            .collect(),
+        ctx.db
+            .query("projectLeadAssignments")
+            .withIndex("by_projectId", (q) => q.eq("projectId", projectId))
+            .collect(),
+    ])
 
-    return new Set(members.map((member) => member.userId))
+    return new Set([
+        ...members.map((member) => member.userId),
+        ...leadAssignments.map((assignment) => assignment.userId),
+    ])
 }
 
 export async function getWorkspaceUsersForProject(ctx: QueryCtx, workspaceId: string, projectId: string) {

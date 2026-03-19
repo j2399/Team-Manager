@@ -112,15 +112,19 @@ export async function updateUserProjects(userId: string, projectIds: string[]) {
     }
 
     try {
-        await fetchMutation(api.admin.replaceUserProjectMemberships, {
+        const result = await fetchMutation(api.admin.replaceUserProjectMemberships, {
             workspaceId: currentUser.workspaceId,
             userId,
             projectIds: uniqueProjectIds,
         })
 
+        const savedProjectIds = 'projectIds' in result && Array.isArray(result.projectIds)
+            ? result.projectIds
+            : uniqueProjectIds
+
         revalidatePath('/dashboard/members')
         revalidatePath('/dashboard')
-        return { success: true }
+        return { success: true, projectIds: savedProjectIds }
     } catch (error) {
         console.error("Failed to update division assignments", error)
         return { error: 'Failed to update division assignments' }

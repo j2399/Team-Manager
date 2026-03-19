@@ -40,17 +40,28 @@ async function getWorkspaceActiveProjectIds(db: Db, workspaceId: string) {
 }
 
 async function getUserWorkspaceProjectIds(db: Db, workspaceId: string, userId: string) {
-    const [projectMembers, activeProjectIds] = await Promise.all([
+    const [projectMembers, leadAssignments, activeProjectIds] = await Promise.all([
         db
             .query("projectMembers")
+            .withIndex("by_userId", (q) => q.eq("userId", userId))
+            .collect(),
+        db
+            .query("projectLeadAssignments")
             .withIndex("by_userId", (q) => q.eq("userId", userId))
             .collect(),
         getWorkspaceActiveProjectIds(db, workspaceId),
     ])
 
-    return projectMembers
-        .filter((membership) => activeProjectIds.has(membership.projectId))
-        .map((membership) => membership.projectId)
+    return Array.from(
+        new Set([
+            ...projectMembers
+                .filter((membership) => activeProjectIds.has(membership.projectId))
+                .map((membership) => membership.projectId),
+            ...leadAssignments
+                .filter((assignment) => activeProjectIds.has(assignment.projectId))
+                .map((assignment) => assignment.projectId),
+        ])
+    )
 }
 
 async function getTaskWorkspaceInfo(db: Db, task: { columnId?: string; pushId?: string }) {
@@ -484,7 +495,22 @@ export const replaceUserProjectMemberships = mutation({
         projectIds: v.array(v.string()),
     },
     handler: async (ctx, args) => {
-        const activeProjectIds = await getWorkspaceActiveProjectIds(ctx.db, args.workspaceId)
+        const [activeProjectIds, leadAssignments] = await Promise.all([
+            getWorkspaceActiveProjectIds(ctx.db, args.workspaceId),
+            ctx.db
+                .query("projectLeadAssignments")
+                .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+                .collect(),
+        ])
+
+        const nextProjectIds = Array.from(
+            new Set([
+                ...args.projectIds.filter((projectId) => activeProjectIds.has(projectId)),
+                ...leadAssignments
+                    .filter((assignment) => activeProjectIds.has(assignment.projectId))
+                    .map((assignment) => assignment.projectId),
+            ])
+        )
 
         const existing = await ctx.db
             .query("projectMembers")
@@ -497,8 +523,7 @@ export const replaceUserProjectMemberships = mutation({
             }
         }
 
-        for (const projectId of args.projectIds) {
-            if (!activeProjectIds.has(projectId)) continue
+        for (const projectId of nextProjectIds) {
             await ctx.db.insert("projectMembers", {
                 id: createLegacyId("project_member"),
                 userId: args.userId,
@@ -507,7 +532,7 @@ export const replaceUserProjectMemberships = mutation({
             })
         }
 
-        return { success: true }
+        return { success: true, projectIds: nextProjectIds }
     },
 })
 

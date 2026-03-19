@@ -63,10 +63,17 @@ export function ProjectSelect({
                     return
                 }
 
-                onProjectsUpdated?.(selectedProjectIds)
+                const savedProjectIds = Array.isArray(result?.projectIds)
+                    ? result.projectIds
+                    : selectedProjectIds
+
+                setSelectedProjectIds(savedProjectIds)
+                onProjectsUpdated?.(savedProjectIds)
                 toast({
                     title: "Divisions Updated",
-                    description: `User is now assigned to ${selectedProjectIds.length} division(s)`,
+                    description: savedProjectIds.length === selectedProjectIds.length
+                        ? `User is now assigned to ${savedProjectIds.length} division(s)`
+                        : `Lead-owned divisions stay assigned automatically. User now has ${savedProjectIds.length} division(s).`,
                     variant: "success"
                 })
                 setOpen(false)

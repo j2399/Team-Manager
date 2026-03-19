@@ -9,6 +9,7 @@ import { MemberActions } from "./MemberActions"
 import { MemberTaskList } from "./MemberTaskList"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { CheckCircle2, Clock, Circle, TrendingUp, AlertCircle, Activity } from "lucide-react"
+import { buildTasksByUser, calculateMemberCardStats } from "@/lib/member-card-stats"
 
 export const dynamic = 'force-dynamic'
 
@@ -32,21 +33,7 @@ export default async function MembersPage() {
     } = await fetchDashboardMembersPageData({ workspaceId })
 
     const userIds = users.map(u => u.id)
-    const userIdSet = new Set(userIds)
-
-    const tasksByUser = new Map<string, typeof workspaceTasks>()
-    for (const task of workspaceTasks) {
-        const assigneeIds = new Set<string>()
-        if (task.assigneeId) assigneeIds.add(task.assigneeId)
-        for (const assignee of task.assignees) assigneeIds.add(assignee.userId)
-
-        for (const assigneeId of assigneeIds) {
-            if (!userIdSet.has(assigneeId)) continue
-            const current = tasksByUser.get(assigneeId) || []
-            current.push(task)
-            tasksByUser.set(assigneeId, current)
-        }
-    }
+    const tasksByUser = buildTasksByUser(userIds, workspaceTasks)
 
     // Group activity logs by user
     const activityByUser = userIds.reduce((acc, id) => {
@@ -57,44 +44,20 @@ export default async function MembersPage() {
     // Process user stats
     const userStats = users.map(user => {
         const uniqueTasks = tasksByUser.get(user.id) || []
-
-        const completedTasks = uniqueTasks.filter(t => t.column?.name === 'Done')
-        const inProgressTasks = uniqueTasks.filter(t => t.column?.name === 'In Progress')
-        const todoTasks = uniqueTasks.filter(t => t.column?.name === 'Todo' || t.column?.name === 'To Do')
-        const reviewTasks = uniqueTasks.filter(t => t.column?.name === 'Review')
-
-        // Calculate overdue tasks
-        const overdueTasks = uniqueTasks.filter(t => {
-            if (t.column?.name === 'Done') return false
-            const dueDate = t.dueDate || t.endDate
-            if (!dueDate) return false
-            return new Date(dueDate) < new Date()
-        })
-
-        // Calculate completion rate
-        const completionRate = uniqueTasks.length > 0
-            ? Math.round((completedTasks.length / uniqueTasks.length) * 100)
-            : 0
-
-        // Get recent activity count (last 7 days)
         const userLogs = activityByUser[user.id] || []
-        const weekAgo = new Date()
-        weekAgo.setDate(weekAgo.getDate() - 7)
-        const recentActivityCount = userLogs.filter(
-            log => new Date(log.createdAt) > weekAgo
-        ).length
+        const stats = calculateMemberCardStats(uniqueTasks, userLogs)
 
         return {
             ...user,
             tasks: uniqueTasks,
-            completedTasks,
-            inProgressTasks,
-            todoTasks,
-            reviewTasks,
-            overdueTasks,
-            completionRate,
-            recentActivityCount,
-            totalTasks: uniqueTasks.length,
+            completedTasks: stats.completedTasks,
+            inProgressTasks: stats.inProgressTasks,
+            todoTasks: stats.todoTasks,
+            reviewTasks: stats.reviewTasks,
+            overdueTasks: stats.overdueTasks,
+            completionRate: stats.completionRate,
+            recentActivityCount: stats.recentActivityCount,
+            totalTasks: stats.totalTasks,
             activityLogs: userLogs
         }
     })

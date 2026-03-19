@@ -162,20 +162,15 @@ async function buildWorkspaceMembers(ctx: QueryCtx, workspaceId: string) {
 }
 
 async function buildProjectMembershipMap(ctx: QueryCtx, projects: Doc<"projects">[]) {
-    const rows = await Promise.all(
-        projects.map((project) =>
-            ctx.db
-                .query("projectMembers")
-                .withIndex("by_projectId", (q) => q.eq("projectId", project.id))
-                .collect()
-        )
+    const projectUserIds = await Promise.all(
+        projects.map((project) => getProjectMemberIds(ctx, project.id))
     )
 
     const memberships = new Map<string, Array<{ project: ProjectSummary }>>()
 
     projects.forEach((project, index) => {
-        for (const row of rows[index]) {
-            const existing = memberships.get(row.userId) ?? []
+        for (const userId of projectUserIds[index]) {
+            const existing = memberships.get(userId) ?? []
             existing.push({
                 project: {
                     id: project.id,
@@ -183,7 +178,7 @@ async function buildProjectMembershipMap(ctx: QueryCtx, projects: Doc<"projects"
                     color: project.color ?? null,
                 },
             })
-            memberships.set(row.userId, existing)
+            memberships.set(userId, existing)
         }
     })
 
