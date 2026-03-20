@@ -321,8 +321,8 @@ export function TimelineBar({
                     !isDragging && "hover:brightness-105",
                     leftEdgeRounded ? "rounded-l-lg" : "rounded-l-none",
                     rightEdgeRounded ? "rounded-r-lg" : "rounded-r-none",
-                    // Use standard card styling:
-                    push.status === 'Completed' ? "bg-muted/40 border border-border/50" : "bg-card border border-border"
+                    // Completed pushes should read as inactive without the extra boxed chrome.
+                    push.status === 'Completed' ? "bg-muted/40" : "bg-card border border-border"
                 )}
                 style={{
                     left: `${visualLeft}%`,

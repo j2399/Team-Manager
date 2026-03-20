@@ -168,7 +168,6 @@ export const joinWorkspaceByCode = mutation({
                     type: "member_joined",
                     title: "New member joined",
                     message: `${args.userName} has joined the workspace.`,
-                    link: "/dashboard/members",
                     read: false,
                     createdAt: args.now,
                 })

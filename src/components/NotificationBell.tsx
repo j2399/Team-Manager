@@ -44,7 +44,6 @@ export function NotificationBell({
         userId,
     })
 
-    const markRead = useMutation(api.notifications.markRead)
     const markAllRead = useMutation(api.notifications.markAllRead)
 
     useEffect(() => {
@@ -78,14 +77,6 @@ export function NotificationBell({
         })
     }
 
-    const markNotificationRead = async (notificationId: string) => {
-        await markRead({
-            workspaceId,
-            userId,
-            notificationId,
-        })
-    }
-
     const getIcon = (type: string) => {
         switch (type) {
             case "member_joined":
@@ -109,22 +100,6 @@ export function NotificationBell({
         if (hours > 0) return `${hours}h ago`
         if (minutes > 0) return `${minutes}m ago`
         return "Just now"
-    }
-
-    const handleNotificationClick = async (notification: Notification) => {
-        if (!notification.read) {
-            try {
-                await markNotificationRead(notification.id)
-            } catch (error) {
-                console.error("Failed to mark notification as read", error)
-            }
-        }
-
-        if (notification.link) {
-            window.location.assign(notification.link)
-        }
-
-        setOpen(false)
     }
 
     return (
@@ -181,8 +156,7 @@ export function NotificationBell({
                             {resolvedNotifications.map((notification) => (
                                 <div
                                     key={notification.id}
-                                    onClick={() => void handleNotificationClick(notification)}
-                                    className={`flex gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors ${!notification.read ? 'bg-muted/30 dark:bg-muted/20' : ''
+                                    className={`flex gap-3 p-3 ${!notification.read ? 'bg-muted/30 dark:bg-muted/20' : ''
                                         }`}
                                 >
                                     <div className="shrink-0 mt-0.5">
