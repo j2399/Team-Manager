@@ -6,12 +6,13 @@ import { joinWorkspaceByCode } from '@/lib/workspaceInvites'
 import { createWorkspaceForUser } from '@/lib/workspaces'
 import { appendInviteNotice, type InviteNotice } from '@/lib/invite-status'
 import { getDiscordRedirectUri, resolveAppBaseUrl } from '@/lib/appUrl'
-
-type PendingWorkspaceFlow = {
-    mode: 'create' | 'join'
-    value: string
-    username: string
-}
+import {
+    buildExistingDiscordUserUpdate,
+    getDiscordDisplayName,
+    resolvePendingWorkspaceFlow,
+    shouldSyncPendingUserName,
+    type PendingWorkspaceFlow,
+} from '@/lib/discord-auth'
 
 type PendingWorkspaceFlowResult = {
     redirectToDashboard: boolean
@@ -19,15 +20,11 @@ type PendingWorkspaceFlowResult = {
 }
 
 function getPendingWorkspaceFlow(cookieStore: Awaited<ReturnType<typeof cookies>>): PendingWorkspaceFlow | null {
-    const mode = cookieStore.get('pending_mode')?.value
-    const value = cookieStore.get('pending_value')?.value?.trim()
-    const username = cookieStore.get('pending_username')?.value?.trim()
-
-    if ((mode === 'create' || mode === 'join') && value && username) {
-        return { mode, value, username }
-    }
-
-    return null
+    return resolvePendingWorkspaceFlow(
+        cookieStore.get('pending_mode')?.value,
+        cookieStore.get('pending_value')?.value,
+        cookieStore.get('pending_username')?.value
+    )
 }
 
 function clearPendingWorkspaceFlow(cookieStore: Awaited<ReturnType<typeof cookies>>) {
@@ -37,10 +34,11 @@ function clearPendingWorkspaceFlow(cookieStore: Awaited<ReturnType<typeof cookie
 }
 
 async function syncPendingUserName(userId: string, currentName: string, pendingName: string, shouldSync: boolean) {
-    const trimmedPendingName = pendingName.trim()
-    if (!shouldSync || !trimmedPendingName || trimmedPendingName === currentName) {
+    if (!shouldSyncPendingUserName({ currentName, pendingName, shouldSync })) {
         return currentName
     }
+
+    const trimmedPendingName = pendingName.trim()
 
     await fetchMutation(api.auth.updateUserName, {
         userId,
@@ -246,23 +244,13 @@ export async function GET(request: Request) {
 
         if (existingUser) {
             // EXISTING USER: Login & Skip Onboarding
-            const discordDisplayName: string = discordUser.global_name || discordUser.username
-            const nextUserData: {
-                avatar: string | null
-                discordId: string
-                hasOnboarded: true
-                name?: string
-            } = {
-                avatar: discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png` : null,
+            const discordDisplayName = getDiscordDisplayName(discordUser)
+            const nextUserData = buildExistingDiscordUserUpdate({
+                existingUserHasOnboarded: existingUser.hasOnboarded,
+                discordDisplayName,
                 discordId: discordUser.id,
-                hasOnboarded: true // Auto-onboard returning users
-            }
-
-            // Only sync name from Discord if the user hasn't completed onboarding yet.
-            // Once a user customizes their name in CuPI, we should not overwrite it on re-login.
-            if (!existingUser.hasOnboarded) {
-                nextUserData.name = discordDisplayName
-            }
+                avatarUrl: discordUser.avatar ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png` : null,
+            })
 
             await fetchMutation(api.auth.updateUserFromDiscord, {
                 userId: existingUser.id,
@@ -281,7 +269,7 @@ export async function GET(request: Request) {
                 cookieStore,
                 userId: existingUser.id,
                 currentName: nextUserData.name || existingUser.name,
-                shouldSyncName: !existingUser.hasOnboarded,
+                shouldSyncName: nextUserData.shouldSyncName,
             })
 
             // Redirect to Workspaces or Dashboard if invite processed
@@ -311,11 +299,12 @@ export async function GET(request: Request) {
         console.log(`[Auth] User not found. Creating NEW user.`)
         const userCount = await fetchQuery(api.auth.getUserCount, {})
         const role = userCount === 0 ? 'Admin' : 'Member'
+        const discordDisplayName = getDiscordDisplayName(discordUser)
 
         const newUser = await fetchMutation(api.auth.createUserFromDiscord, {
             id: createLegacyId("user"),
             email,
-            name: discordUser.global_name || discordUser.username,
+            name: discordDisplayName,
             avatar: discordUser.avatar
                 ? `https://cdn.discordapp.com/avatars/${discordUser.id}/${discordUser.avatar}.png`
                 : undefined,

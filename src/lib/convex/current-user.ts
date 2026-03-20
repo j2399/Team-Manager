@@ -1,25 +1,15 @@
 import crypto from "node:crypto"
 import { cookies } from "next/headers"
 import { api, fetchMutation } from "@/lib/convex/server"
+import {
+    resolveCurrentUserDisplayName,
+    resolveCurrentUserRole,
+} from "@/lib/current-user-resolution"
 
 const SESSION_COOKIE_NAME = "session_token"
 
-type CurrentUserRole = "Admin" | "Team Lead" | "Member"
-
 function hashSessionToken(token: string) {
     return crypto.createHash("sha256").update(token).digest("hex")
-}
-
-function resolveCurrentUserRole(
-    workspaceId: string | null,
-    membershipRole: string | null,
-    fallbackRole: string
-): CurrentUserRole {
-    if (!workspaceId) {
-        return fallbackRole === "Admin" || fallbackRole === "Team Lead" ? fallbackRole : "Member"
-    }
-
-    return membershipRole === "Admin" || membershipRole === "Team Lead" ? membershipRole : "Member"
 }
 
 export async function getConvexCurrentUser() {
@@ -47,7 +37,7 @@ export async function getConvexCurrentUser() {
 
     return {
         id: dbUser.id,
-        name: activeMembership?.name || dbUser.name,
+        name: resolveCurrentUserDisplayName(activeMembership?.name, dbUser.name),
         email: dbUser.email,
         avatar: dbUser.avatar ?? null,
         role: resolveCurrentUserRole(workspaceId, membershipRole, dbUser.role),

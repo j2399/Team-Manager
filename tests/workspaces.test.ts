@@ -4,7 +4,7 @@ import { generateWorkspaceInviteCode } from '@/lib/workspaces'
 
 const ALLOWED_CHARACTERS = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/
 
-for (let index = 0; index < 30; index += 1) {
+for (let index = 0; index < 300; index += 1) {
     test(`generateWorkspaceInviteCode produces a six-character safe code #${index + 1}`, () => {
         const code = generateWorkspaceInviteCode()
         assert.match(code, ALLOWED_CHARACTERS)

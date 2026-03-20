@@ -5,8 +5,13 @@ import {
     type SessionMembership,
     type SessionWorkspace,
 } from "./session"
+import {
+    resolveCurrentUserDisplayName,
+    resolveCurrentUserRole,
+    type CurrentUserRole,
+} from "./current-user-resolution"
 
-export type CurrentUserRole = "Admin" | "Team Lead" | "Member"
+export type { CurrentUserRole } from "./current-user-resolution"
 
 export type CurrentUser = {
     id: string
@@ -22,18 +27,6 @@ export type CurrentUser = {
     hasOnboarded: boolean
     skills: string[]
     interests: string | null
-}
-
-function resolveCurrentUserRole(
-    workspaceId: string | null,
-    membershipRole: string | null,
-    fallbackRole: string
-): CurrentUserRole {
-    if (!workspaceId) {
-        return fallbackRole === "Admin" || fallbackRole === "Team Lead" ? fallbackRole : "Member"
-    }
-
-    return membershipRole === "Admin" || membershipRole === "Team Lead" ? membershipRole : "Member"
 }
 
 export async function getCurrentUser() {
@@ -57,7 +50,7 @@ export async function getCurrentUser() {
             : null
         const membershipRole = activeMembership?.role ?? null
         const resolvedRole = resolveCurrentUserRole(workspaceId, membershipRole, dbUser.role)
-        const displayName = activeMembership?.name || dbUser.name
+        const displayName = resolveCurrentUserDisplayName(activeMembership?.name, dbUser.name)
 
         const currentUser: CurrentUser = {
             id: dbUser.id,
