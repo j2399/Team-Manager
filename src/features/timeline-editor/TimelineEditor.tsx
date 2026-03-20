@@ -12,7 +12,6 @@ import {
     DialogHeader,
     DialogTitle,
     DialogDescription,
-    DialogFooter,
 } from "@/components/ui/dialog"
 import { Calendar, Trash2 } from "lucide-react"
 import { TimelineGrid } from "./TimelineGrid"
@@ -35,6 +34,7 @@ type TimelineEditorProps = {
     viewRange?: TimelineViewRange
     readOnly?: boolean
     minHeight?: number
+    maxInteractiveDate?: Date | null
 }
 
 const ROW_HEIGHT = 48
@@ -48,7 +48,8 @@ export function TimelineEditor({
     onPushesChange,
     viewRange: externalViewRange,
     readOnly = false,
-    minHeight = 200
+    minHeight = 200,
+    maxInteractiveDate = null,
 }: TimelineEditorProps) {
     const containerRef = useRef<HTMLDivElement>(null)
     const [selectedPushId, setSelectedPushId] = useState<string | null>(null)
@@ -76,11 +77,14 @@ export function TimelineEditor({
 
     // Bar drag indicator state (shows date tag next to bar when dragging)
     const [barDragInfo, setBarDragInfo] = useState<{ date: Date; row: number; isEnd?: boolean } | null>(null)
+    const today = useMemo(() => startOfDay(new Date()), [])
+    const maxTimelineDate = useMemo(
+        () => maxInteractiveDate ? startOfDay(maxInteractiveDate) : null,
+        [maxInteractiveDate]
+    )
 
     // Calculate dynamic view range based on pushes with extra space
     const calculatedViewRange = useMemo(() => {
-        const today = startOfDay(new Date())
-
         if (pushes.length === 0) {
             return {
                 start: addDays(today, -7),
@@ -95,7 +99,7 @@ export function TimelineEditor({
         })
 
         const minDate = new Date(Math.min(...dates.map(d => d.getTime()), today.getTime()))
-        const maxDate = new Date(Math.max(...dates.map(d => d.getTime())))
+        const maxDate = new Date(Math.max(...dates.map(d => d.getTime()), today.getTime()))
 
         return {
             start: addDays(minDate, -14),
@@ -106,13 +110,21 @@ export function TimelineEditor({
     const viewRange = externalViewRange || calculatedViewRange
     const totalDuration = viewRange.end.getTime() - viewRange.start.getTime()
 
+    const clampInteractiveDate = useCallback((date: Date) => {
+        if (maxTimelineDate && date > maxTimelineDate) {
+            return maxTimelineDate
+        }
+
+        return startOfDay(date)
+    }, [maxTimelineDate])
+
     const getDateFromClientX = useCallback((clientX: number) => {
         if (!containerRef.current) return new Date()
         const rect = containerRef.current.getBoundingClientRect()
         const percent = (clientX - rect.left) / rect.width
         const timestamp = viewRange.start.getTime() + percent * totalDuration
-        return startOfDay(new Date(timestamp))
-    }, [viewRange, totalDuration])
+        return clampInteractiveDate(new Date(timestamp))
+    }, [viewRange, totalDuration, clampInteractiveDate])
 
     const getPositionPercent = useCallback((date: Date) => {
         return ((date.getTime() - viewRange.start.getTime()) / totalDuration) * 100
@@ -250,9 +262,9 @@ export function TimelineEditor({
         // Always update hover info for date indicator
         if (containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect()
-            const relativeX = e.clientX - rect.left
             const date = getDateFromClientX(e.clientX)
-            setHoverInfo({ x: relativeX, date })
+            const clampedPercent = Math.max(0, Math.min(getPositionPercent(date), 100))
+            setHoverInfo({ x: (clampedPercent / 100) * rect.width, date })
         }
 
         if (!isCreating || !createStart) return
@@ -277,7 +289,7 @@ export function TimelineEditor({
                 setCreatePreview({ start, end })
             }
         }
-    }, [isCreating, createStart, getDateFromClientX, pushes, rowAssignments, numRows])
+    }, [isCreating, createStart, getDateFromClientX, getPositionPercent, pushes, rowAssignments, numRows])
 
     const handleMouseLeave = useCallback(() => {
         setHoverInfo(null)
@@ -371,30 +383,17 @@ export function TimelineEditor({
         setEditEndDate(push.endDate ? formatDateISO(push.endDate) : "")
     }, [])
 
-    // Handle edit save
-    const handleEditSave = useCallback(() => {
-        if (!editingPush) return
-
-        const updates: Partial<PushDraft> = {
-            name: editName.trim() || editingPush.name
-        }
-
-        if (editStartDate) {
-            updates.startDate = new Date(editStartDate)
-        }
-        if (editEndDate) {
-            updates.endDate = new Date(editEndDate)
-        }
-
-        onPushesChange(pushes.map(p =>
-            p.tempId === editingPush.tempId ? { ...p, ...updates } : p
-        ))
-        setEditingPush(null)
-    }, [editingPush, editName, editStartDate, editEndDate, pushes, onPushesChange])
-
     const handleUpdatePush = useCallback((id: string, updates: Partial<PushDraft>) => {
         onPushesChange(pushes.map(p => p.tempId === id ? { ...p, ...updates } : p))
     }, [pushes, onPushesChange])
+
+    const syncEditingPush = useCallback((updates: Partial<PushDraft>) => {
+        if (!editingPush) return
+
+        const nextPush = { ...editingPush, ...updates }
+        setEditingPush(nextPush)
+        handleUpdatePush(editingPush.tempId, updates)
+    }, [editingPush, handleUpdatePush])
 
     const handleDeletePush = useCallback((id: string) => {
         onPushesChange(pushes.filter(p => p.tempId !== id).map(p =>
@@ -456,6 +455,7 @@ export function TimelineEditor({
                         startDate={viewRange.start}
                         endDate={viewRange.end}
                         height={gridHeight}
+                        highlightDate={today}
                     />
 
                     {/* Hover date indicator (only when not dragging a bar) */}
@@ -623,7 +623,10 @@ export function TimelineEditor({
             <Dialog open={!!editingPush} onOpenChange={(open) => !open && setEditingPush(null)}>
                 <DialogContent className="sm:max-w-sm">
                     <DialogHeader>
-                        <DialogTitle>Edit Push</DialogTitle>
+                        <div className="flex items-center justify-between gap-3">
+                            <DialogTitle>Edit Project</DialogTitle>
+                            <Button size="sm" onClick={() => setEditingPush(null)}>Done</Button>
+                        </div>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">
@@ -631,7 +634,13 @@ export function TimelineEditor({
                             <Input
                                 id="edit-name"
                                 value={editName}
-                                onChange={(e) => setEditName(e.target.value)}
+                                onChange={(e) => {
+                                    const value = e.target.value
+                                    setEditName(value)
+                                    if (value.trim()) {
+                                        syncEditingPush({ name: value })
+                                    }
+                                }}
                                 placeholder="Push name"
                             />
                         </div>
@@ -642,7 +651,24 @@ export function TimelineEditor({
                                     id="edit-start"
                                     type="date"
                                     value={editStartDate}
-                                    onChange={(e) => setEditStartDate(e.target.value)}
+                                    onChange={(e) => {
+                                        const value = e.target.value
+                                        setEditStartDate(value)
+                                        if (!value || !editingPush) return
+
+                                        const nextStart = new Date(value)
+                                        if (Number.isNaN(nextStart.getTime())) return
+
+                                        const nextUpdates: Partial<PushDraft> = { startDate: nextStart }
+                                        const currentEnd = editingPush.endDate
+
+                                        if (currentEnd && nextStart > currentEnd) {
+                                            nextUpdates.endDate = nextStart
+                                            setEditEndDate(formatDateISO(nextStart))
+                                        }
+
+                                        syncEditingPush(nextUpdates)
+                                    }}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -651,7 +677,26 @@ export function TimelineEditor({
                                     id="edit-end"
                                     type="date"
                                     value={editEndDate}
-                                    onChange={(e) => setEditEndDate(e.target.value)}
+                                    onChange={(e) => {
+                                        const value = e.target.value
+                                        setEditEndDate(value)
+                                        if (!editingPush) return
+
+                                        if (!value) {
+                                            syncEditingPush({ endDate: null })
+                                            return
+                                        }
+
+                                        let nextEnd = new Date(value)
+                                        if (Number.isNaN(nextEnd.getTime())) return
+
+                                        if (nextEnd < editingPush.startDate) {
+                                            nextEnd = editingPush.startDate
+                                            setEditEndDate(formatDateISO(nextEnd))
+                                        }
+
+                                        syncEditingPush({ endDate: nextEnd })
+                                    }}
                                 />
                             </div>
                         </div>
@@ -674,7 +719,7 @@ export function TimelineEditor({
                             </div>
                         )}
                     </div>
-                    <DialogFooter className="flex-row justify-between sm:justify-between">
+                    <div className="flex justify-start border-t pt-4">
                         <Button
                             variant="outline"
                             size="icon"
@@ -683,11 +728,7 @@ export function TimelineEditor({
                         >
                             <Trash2 className="h-4 w-4" />
                         </Button>
-                        <div className="flex gap-2">
-                            <Button variant="outline" onClick={() => setEditingPush(null)}>Cancel</Button>
-                            <Button onClick={handleEditSave}>Save</Button>
-                        </div>
-                    </DialogFooter>
+                    </div>
                 </DialogContent>
             </Dialog>
         </TooltipProvider>

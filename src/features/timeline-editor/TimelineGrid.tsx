@@ -8,6 +8,8 @@ type TimelineGridProps = {
     endDate: Date
     height: number
     showToday?: boolean
+    highlightDate?: Date | null
+    highlightLabel?: string
 }
 
 type WeekMarker = {
@@ -23,7 +25,14 @@ type MonthHeader = {
     showYear: boolean
 }
 
-export function TimelineGrid({ startDate, endDate, height, showToday = true }: TimelineGridProps) {
+export function TimelineGrid({
+    startDate,
+    endDate,
+    height,
+    showToday = true,
+    highlightDate = showToday ? new Date() : null,
+    highlightLabel = "Today",
+}: TimelineGridProps) {
     const startTime = startDate.getTime()
     const endTime = endDate.getTime()
     const totalDuration = endTime - startTime || 1
@@ -32,9 +41,8 @@ export function TimelineGrid({ startDate, endDate, height, showToday = true }: T
         return ((date.getTime() - startTime) / totalDuration) * 100
     }
 
-    const today = new Date()
-    const todayPos = getPosition(today)
-    const showTodayLine = showToday && todayPos >= 0 && todayPos <= 100
+    const highlightPos = highlightDate ? getPosition(highlightDate) : null
+    const showTodayLine = showToday && highlightPos !== null && highlightPos >= 0 && highlightPos <= 100
 
     // Generate week markers (Mondays)
     const weekMarkers = useMemo<WeekMarker[]>(() => {
@@ -87,6 +95,23 @@ export function TimelineGrid({ startDate, endDate, height, showToday = true }: T
         <>
             {/* Header with month and week markers */}
             <div className="flex-1 relative h-12 overflow-hidden border-b bg-muted/5">
+                {showTodayLine && highlightPos !== null && (
+                    <>
+                        <div
+                            className="absolute top-0 bottom-0 w-px bg-primary/35 z-10"
+                            style={{ left: `${highlightPos}%` }}
+                        />
+                        <div
+                            className="absolute top-1.5 -translate-x-1/2 z-20"
+                            style={{ left: `${highlightPos}%` }}
+                        >
+                            <span className="rounded-full border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.01em] text-primary">
+                                {highlightLabel}
+                            </span>
+                        </div>
+                    </>
+                )}
+
                 {/* Month labels */}
                 {monthHeaders.map((month, i) => (
                     <div
@@ -126,6 +151,13 @@ export function TimelineGrid({ startDate, endDate, height, showToday = true }: T
                         style={{ left: `${marker.pos}%` }}
                     />
                 ))}
+
+                {showTodayLine && highlightPos !== null && (
+                    <div
+                        className="absolute top-0 bottom-0 w-px bg-primary/35 z-10"
+                        style={{ left: `${highlightPos}%` }}
+                    />
+                )}
 
             </div>
         </>

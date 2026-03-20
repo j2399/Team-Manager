@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useTransition } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { useRouter } from "next/navigation"
 import {
     Dialog,
     DialogContent,
@@ -10,9 +11,9 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { TimelineEditor } from "@/features/timeline-editor/TimelineEditor"
-import { type PushDraft } from "@/features/timeline-editor/types"
+import { type PushDraft, startOfDay } from "@/features/timeline-editor/types"
 import { createPush, updatePush, deletePush } from "@/app/actions/pushes"
-import { Loader2, Save, Sparkles } from "lucide-react"
+import { Check, Loader2, Sparkles } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 
 type PushType = {
@@ -32,50 +33,115 @@ interface TimelineManagerDialogProps {
     initialPushes: PushType[]
 }
 
+function toDraftPush(push: PushType): PushDraft {
+    return {
+        tempId: push.id,
+        name: push.name,
+        startDate: new Date(push.startDate),
+        endDate: push.endDate ? new Date(push.endDate) : null,
+        color: push.color || "#3b82f6",
+        dependsOn: push.dependsOnId || null,
+    }
+}
+
+function normalizePush(push: PushDraft) {
+    return {
+        tempId: push.tempId,
+        name: push.name,
+        startDate: push.startDate.toISOString().split("T")[0],
+        endDate: push.endDate ? push.endDate.toISOString().split("T")[0] : null,
+        color: push.color,
+        dependsOn: push.dependsOn || null,
+    }
+}
+
+function arePushesEqual(left: PushDraft[], right: PushDraft[]) {
+    if (left.length !== right.length) return false
+    return JSON.stringify(left.map(normalizePush)) === JSON.stringify(right.map(normalizePush))
+}
+
+function remapPushIds(pushes: PushDraft[], idMap: Record<string, string>) {
+    return pushes.map((push) => ({
+        ...push,
+        tempId: idMap[push.tempId] || push.tempId,
+        dependsOn: push.dependsOn ? (idMap[push.dependsOn] || push.dependsOn) : null,
+    }))
+}
+
 export function TimelineManagerDialog({
     projectId,
     open,
     onOpenChange,
     initialPushes
 }: TimelineManagerDialogProps) {
+    const router = useRouter()
     const { toast } = useToast()
-    const [isPending, startTransition] = useTransition()
     const [pushes, setPushes] = useState<PushDraft[]>([])
     const [hasChanges, setHasChanges] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
+    const [isClosing, setIsClosing] = useState(false)
+    const initializedRef = useRef(false)
+    const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const savePromiseRef = useRef<Promise<boolean> | null>(null)
+    const savedPushesRef = useRef<PushDraft[]>([])
+    const latestPushesRef = useRef<PushDraft[]>([])
+    const today = useMemo(() => startOfDay(new Date()), [])
 
     // Sync initial pushes to local state when dialog opens
     useEffect(() => {
-        if (open) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect -- reset editable push draft when dialog opens
-            setPushes(initialPushes.map(p => ({
-                tempId: p.id, // Using real ID as tempId for existing pushes
-                name: p.name,
-                startDate: new Date(p.startDate),
-                endDate: p.endDate ? new Date(p.endDate) : null,
-                color: p.color || "#3b82f6",
-                dependsOn: p.dependsOnId || null
-            })))
-            setHasChanges(false)
+        if (!open) {
+            initializedRef.current = false
+            setIsClosing(false)
+            if (autosaveTimerRef.current) {
+                clearTimeout(autosaveTimerRef.current)
+                autosaveTimerRef.current = null
+            }
+            return
         }
+
+        if (initializedRef.current) return
+
+        const nextPushes = initialPushes.map(toDraftPush)
+
+        setPushes(nextPushes)
+        latestPushesRef.current = nextPushes
+        savedPushesRef.current = nextPushes
+        setHasChanges(false)
+        initializedRef.current = true
     }, [open, initialPushes])
 
-    const handlePushesChange = (newPushes: PushDraft[]) => {
+    const handlePushesChange = useCallback((newPushes: PushDraft[]) => {
+        latestPushesRef.current = newPushes
         setPushes(newPushes)
-        setHasChanges(true)
-    }
+        setHasChanges(!arePushesEqual(newPushes, savedPushesRef.current))
+    }, [])
 
-    const handleSave = () => {
-        startTransition(async () => {
+    const persistPushes = useCallback(async () => {
+        if (savePromiseRef.current) {
+            return savePromiseRef.current
+        }
+
+        const savePromise = (async () => {
+            const targetPushes = latestPushesRef.current
+            const baselinePushes = savedPushesRef.current
+
+            if (arePushesEqual(targetPushes, baselinePushes)) {
+                setHasChanges(false)
+                return true
+            }
+
+            setIsSaving(true)
+
             try {
-                // In a real implementation, we would diff and batch update.
-                // For this MVP, we'll identify new vs updated vs deleted.
+                const baselineMap = new Map(baselinePushes.map((push) => [push.tempId, push]))
+                const targetIds = new Set(targetPushes.map((push) => push.tempId))
 
-                const deletedPushIds = initialPushes
-                    .filter(p => !pushes.some(dp => dp.tempId === p.id))
-                    .map(p => p.id)
+                const deletedPushIds = baselinePushes
+                    .filter((push) => !targetIds.has(push.tempId))
+                    .map((push) => push.tempId)
 
-                const updatedPushes = pushes.filter(p => initialPushes.some(ip => ip.id === p.tempId))
-                const newPushes = pushes.filter(p => !initialPushes.some(ip => ip.id === p.tempId))
+                const updatedPushes = targetPushes.filter((push) => baselineMap.has(push.tempId))
+                const newPushes = targetPushes.filter((push) => !baselineMap.has(push.tempId))
 
                 // Map of tempId -> realId for newly created pushes
                 const idMap: Record<string, string> = {}
@@ -85,16 +151,25 @@ export function TimelineManagerDialog({
                     await deletePush(id, projectId)
                 }
 
-                // Perform updates (existing pushes already have real IDs as tempIds)
+                // Perform updates (existing pushes already have real IDs as tempIds).
                 for (const p of updatedPushes) {
-                    await updatePush({
+                    const previousPush = baselineMap.get(p.tempId)
+                    if (!previousPush || arePushesEqual([p], [previousPush])) {
+                        continue
+                    }
+
+                    const result = await updatePush({
                         id: p.tempId,
                         name: p.name,
-                        startDate: p.startDate.toISOString().split('T')[0],
-                        endDate: p.endDate?.toISOString().split('T')[0] || null,
+                        startDate: p.startDate.toISOString().split("T")[0],
+                        endDate: p.endDate?.toISOString().split("T")[0] || null,
                         color: p.color,
-                        dependsOnId: p.dependsOn || null
+                        dependsOnId: p.dependsOn || null,
                     })
+
+                    if (result?.error) {
+                        throw new Error(result.error)
+                    }
                 }
 
                 // Perform creations matching tempId to realId for chaining
@@ -102,27 +177,33 @@ export function TimelineManagerDialog({
                 // and to build the ID map.
                 for (const p of newPushes) {
                     const formData = new FormData()
-                    formData.append('name', p.name)
-                    formData.append('projectId', projectId)
-                    formData.append('startDate', p.startDate.toISOString().split('T')[0])
-                    if (p.endDate) formData.append('endDate', p.endDate.toISOString().split('T')[0])
-                    if (p.color) formData.append('color', p.color)
+                    formData.append("name", p.name)
+                    formData.append("projectId", projectId)
+                    formData.append("startDate", p.startDate.toISOString().split("T")[0])
+                    if (p.endDate) formData.append("endDate", p.endDate.toISOString().split("T")[0])
+                    if (p.color) formData.append("color", p.color)
 
                     // Resolve dependency: either a real ID from initialPushes or a newly created one from idMap
                     const resolvedDependsOnId = p.dependsOn ? (idMap[p.dependsOn] || p.dependsOn) : null
-                    if (resolvedDependsOnId) formData.append('dependsOnId', resolvedDependsOnId)
+                    if (resolvedDependsOnId) formData.append("dependsOnId", resolvedDependsOnId)
 
                     const result = await createPush(formData)
-                    if (result.success && result.push) {
-                        idMap[p.tempId] = result.push.id
+                    if (!result?.success || !result.push) {
+                        throw new Error(result?.error || "Failed to create project")
                     }
+
+                    idMap[p.tempId] = result.push.id
                 }
 
-                toast({
-                    title: "Success",
-                    description: "Timeline saved successfully",
-                })
-                onOpenChange(false)
+                const canonicalSavedPushes = remapPushIds(targetPushes, idMap)
+                const canonicalLatestPushes = remapPushIds(latestPushesRef.current, idMap)
+
+                savedPushesRef.current = canonicalSavedPushes
+                latestPushesRef.current = canonicalLatestPushes
+                setPushes(canonicalLatestPushes)
+                setHasChanges(!arePushesEqual(canonicalLatestPushes, canonicalSavedPushes))
+
+                return true
             } catch (err) {
                 console.error("Failed to save timeline:", err)
                 toast({
@@ -130,12 +211,68 @@ export function TimelineManagerDialog({
                     description: "Failed to save timeline",
                     variant: "destructive",
                 })
+                setHasChanges(!arePushesEqual(latestPushesRef.current, savedPushesRef.current))
+                return false
+            } finally {
+                setIsSaving(false)
             }
-        })
-    }
+        })()
+
+        savePromiseRef.current = savePromise
+
+        try {
+            return await savePromise
+        } finally {
+            savePromiseRef.current = null
+        }
+    }, [projectId, toast])
+
+    useEffect(() => {
+        if (!open || !hasChanges || isSaving) return
+
+        if (autosaveTimerRef.current) {
+            clearTimeout(autosaveTimerRef.current)
+        }
+
+        autosaveTimerRef.current = setTimeout(() => {
+            void persistPushes()
+        }, 450)
+
+        return () => {
+            if (autosaveTimerRef.current) {
+                clearTimeout(autosaveTimerRef.current)
+                autosaveTimerRef.current = null
+            }
+        }
+    }, [open, hasChanges, isSaving, persistPushes])
+
+    const handleDone = useCallback(async () => {
+        if (autosaveTimerRef.current) {
+            clearTimeout(autosaveTimerRef.current)
+            autosaveTimerRef.current = null
+        }
+
+        setIsClosing(true)
+        const savedSuccessfully = await persistPushes()
+        if (savedSuccessfully) {
+            router.refresh()
+            onOpenChange(false)
+        }
+        setIsClosing(false)
+    }, [onOpenChange, persistPushes, router])
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog
+            open={open}
+            onOpenChange={(nextOpen) => {
+                if (nextOpen) {
+                    onOpenChange(true)
+                    return
+                }
+
+                void handleDone()
+            }}
+        >
             <DialogContent showCloseButton={false} className="sm:max-w-3xl h-[85vh] flex flex-col p-0 overflow-hidden">
                 <DialogHeader className="p-6 pb-2">
                     <div className="flex items-center justify-between">
@@ -148,24 +285,16 @@ export function TimelineManagerDialog({
                         <DialogDescription className="sr-only">Visual editor for managing project timelines.</DialogDescription>
                         <div className="flex items-center gap-2 pr-8">
                             <Button
-                                variant="outline"
                                 size="sm"
-                                onClick={() => onOpenChange(false)}
-                                disabled={isPending}
+                                onClick={() => void handleDone()}
+                                disabled={isClosing}
                             >
-                                Cancel
-                            </Button>
-                            <Button
-                                size="sm"
-                                onClick={handleSave}
-                                disabled={!hasChanges || isPending}
-                            >
-                                {isPending ? (
+                                {isSaving || isClosing ? (
                                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                 ) : (
-                                    <Save className="h-4 w-4 mr-2" />
+                                    <Check className="h-4 w-4 mr-2" />
                                 )}
-                                Save Changes
+                                Done
                             </Button>
                         </div>
                     </div>
@@ -178,6 +307,7 @@ export function TimelineManagerDialog({
                             pushes={pushes}
                             onPushesChange={handlePushesChange}
                             minHeight={400}
+                            maxInteractiveDate={today}
                         />
 
                         {pushes.length > 0 && (
