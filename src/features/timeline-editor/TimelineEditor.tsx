@@ -130,6 +130,15 @@ export function TimelineEditor({
         return ((date.getTime() - viewRange.start.getTime()) / totalDuration) * 100
     }, [viewRange, totalDuration])
 
+    const formatIndicatorLabel = useCallback((date: Date) => {
+        const normalizedDate = startOfDay(date)
+        if (normalizedDate.getTime() === today.getTime()) {
+            return "Today"
+        }
+
+        return normalizedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    }, [today])
+
     // Calculate row assignments - chained pushes go on the same row
     const rowAssignments = useMemo(() => {
         const assignments: Record<string, number> = {}
@@ -455,7 +464,6 @@ export function TimelineEditor({
                         startDate={viewRange.start}
                         endDate={viewRange.end}
                         height={gridHeight}
-                        highlightDate={today}
                     />
 
                     {/* Hover date indicator (only when not dragging a bar) */}
@@ -485,7 +493,7 @@ export function TimelineEditor({
                                     top: '-18px'
                                 }}
                             >
-                                {hoverInfo.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                {formatIndicatorLabel(hoverInfo.date)}
                             </div>
                         </div>
                     )}
@@ -557,7 +565,7 @@ export function TimelineEditor({
                                 }}
                             >
                                 <div className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary text-primary-foreground whitespace-nowrap shadow-md">
-                                    {barDragInfo.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                    {formatIndicatorLabel(barDragInfo.date)}
                                 </div>
                             </div>
                         )}
