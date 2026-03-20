@@ -408,6 +408,8 @@ export function TimelineEditor({
 
     const gridHeight = Math.max((numRows + 1) * ROW_HEIGHT, MIN_ROWS * ROW_HEIGHT)
     const totalHeight = HEADER_HEIGHT + gridHeight
+    const viewportHeight = Math.max(totalHeight, minHeight)
+    const bodyHeight = viewportHeight - HEADER_HEIGHT
 
     const getDependencyName = useCallback((dependsOnId: string | undefined | null) => {
         if (!dependsOnId) return null
@@ -449,7 +451,7 @@ export function TimelineEditor({
                     <TimelineGrid
                         startDate={viewRange.start}
                         endDate={viewRange.end}
-                        height={gridHeight}
+                        height={bodyHeight}
                     />
 
                     {/* Hover date indicator (only when not dragging a bar) */}
@@ -486,7 +488,7 @@ export function TimelineEditor({
 
                     <div
                         className="absolute left-0 right-0"
-                        style={{ top: `${HEADER_HEIGHT}px`, height: `${gridHeight}px` }}
+                        style={{ top: `${HEADER_HEIGHT}px`, height: `${bodyHeight}px` }}
                     >
                         {/* Active drag preview (Render before map for correct layering) */}
                         {isCreating && hasDragged && createPreview && (
