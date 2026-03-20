@@ -432,7 +432,7 @@ export function PushChainStrip({
                                                     className={cn(
                                                         "h-7 w-7 md:w-full inline-flex items-center justify-center gap-1.5 overflow-hidden rounded-md border px-0 md:px-3 text-xs font-medium transition-[background-color,border-color,color]",
                                                         pushIsComplete
-                                                            ? "border-transparent bg-transparent text-green-700 hover:bg-green-50/60"
+                                                            ? "border-transparent bg-transparent text-emerald-700/70 hover:bg-emerald-50/40 hover:text-emerald-700"
                                                             : "border-green-200/80 bg-green-50/35 text-foreground hover:border-green-300 hover:bg-green-100/70"
                                                     )}
                                                 >
@@ -460,11 +460,13 @@ export function PushChainStrip({
 
                                         <div
                                             className={cn(
-                                                "hidden md:flex md:w-[150px] md:shrink-0 md:justify-center transition-opacity duration-200 ease-out",
-                                                !pushIsComplete ? "opacity-100" : "opacity-0 pointer-events-none"
+                                                "hidden md:flex md:w-[150px] md:shrink-0 md:justify-center transition-opacity duration-200 ease-out opacity-100"
                                             )}
                                         >
-                                            <span className="inline-flex w-full items-center justify-center px-2 py-0.5 text-xs tabular-nums text-muted-foreground whitespace-nowrap">
+                                            <span className={cn(
+                                                "inline-flex w-full items-center justify-center px-2 py-0.5 text-xs tabular-nums whitespace-nowrap",
+                                                pushIsComplete ? "text-muted-foreground/55" : "text-muted-foreground"
+                                            )}>
                                                 {pushDateLabel}
                                             </span>
                                         </div>
