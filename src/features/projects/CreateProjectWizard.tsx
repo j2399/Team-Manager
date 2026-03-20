@@ -23,7 +23,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover"
 import { RemoveScroll } from "react-remove-scroll"
-import { ChevronDown, ChevronLeft, ChevronRight, Loader2, Sparkles } from "lucide-react"
+import { ChevronDown, ChevronLeft, ChevronRight, Loader2 } from "lucide-react"
 import { WizardStepIndicator } from "./WizardStepIndicator"
 import { TimelineEditor, type PushDraft } from "@/features/timeline-editor"
 import { useProjectRoute } from "@/features/projects/useProjectRoute"
@@ -339,11 +339,8 @@ export function CreateProjectWizard({
                         )}
                     >
                         <div className="space-y-4">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Sparkles className="h-4 w-4 text-primary" />
-                                <span>
-                                    Drag to create projects. Click to edit. Hover for + to chain.
-                                </span>
+                            <div className="text-sm text-muted-foreground">
+                                Drag to create projects. Click to edit. Hover for + to chain.
                             </div>
 
                             <TimelineEditor

@@ -282,7 +282,7 @@ export function TimelineManagerDialog({
                             </DialogTitle>
                         </div>
                         <DialogDescription className="sr-only">Visual editor for managing project timelines.</DialogDescription>
-                        <div className="flex items-center gap-2 pr-8">
+                        <div className="flex items-center gap-2">
                             <Button
                                 size="sm"
                                 onClick={() => void handleDone()}
