@@ -123,6 +123,13 @@ export function TimelineGrid({
                 className="absolute inset-0 pointer-events-none"
                 style={{ top: '48px', height: `${height}px` }}
             >
+                {showTodayLine && (
+                    <div
+                        className="absolute top-0 bottom-0 w-px bg-border/80"
+                        style={{ left: `${todayPos}%` }}
+                    />
+                )}
+
                 {/* Week vertical lines */}
                 {weekMarkers.map((marker, i) => (
                     <div
