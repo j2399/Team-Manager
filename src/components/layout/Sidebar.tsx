@@ -146,6 +146,7 @@ type ProjectRowProps = {
     isAdmin: boolean
     warmState: ProjectWarmState
     warmPulseStep: number
+    taskCount: number
     onPrefetchProject: (projectId: string, options?: { subscriptionMs?: number }) => Promise<void>
     onOpenProject: (projectId: string) => void
     setEditingProject: (project: Project) => void
@@ -153,37 +154,11 @@ type ProjectRowProps = {
     onToggleArchive: (project: Project) => void
 }
 
-function ProjectWarmDots({
-    projectColor,
-    warmState,
-    warmPulseStep,
-}: {
-    projectColor: string
-    warmState: ProjectWarmState
-    warmPulseStep: number
-}) {
-    const activeRows = warmState === "ready"
-        ? 3
-        : warmState === "warming"
-            ? warmPulseStep + 1
-            : 0
-
+function ProjectTaskBadge({ count }: { count: number }) {
+    if (count === 0) return <span className="h-4 w-4 shrink-0" />
     return (
-        <span className="grid shrink-0 grid-cols-2 grid-rows-3 gap-[2px]">
-            {[3, 3, 2, 2, 1, 1].map((requiredRows, index) => {
-                const isActive = activeRows >= requiredRows
-
-                return (
-                    <span
-                        key={index}
-                        className={cn(
-                            "h-[3px] w-[3px] rounded-full transition-colors duration-150",
-                            !isActive && "bg-muted-foreground/30"
-                        )}
-                        style={isActive ? { backgroundColor: projectColor } : undefined}
-                    />
-                )
-            })}
+        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold leading-none text-white">
+            {count > 99 ? "99" : count}
         </span>
     )
 }
@@ -193,8 +168,7 @@ function ProjectRowInner({
     pathname,
     navigatingTo,
     isAdmin,
-    warmState,
-    warmPulseStep,
+    taskCount,
     onPrefetchProject,
     onOpenProject,
     setEditingProject,
@@ -211,9 +185,6 @@ function ProjectRowInner({
     const href = `/dashboard/projects/${project.id}`
     const isPending = navigatingTo === href
     const isActive = pathname === href || isPending
-    const projectColor = project.archivedAt
-        ? ARCHIVED_PROJECT_DOT_COLOR
-        : project.color || "#3b82f6"
 
     return (
         <div
@@ -238,11 +209,7 @@ function ProjectRowInner({
             />
             {dragHandle ?? (
                 <div className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center">
-                    <ProjectWarmDots
-                        projectColor={projectColor}
-                        warmState={warmState}
-                        warmPulseStep={warmPulseStep}
-                    />
+                    <ProjectTaskBadge count={taskCount} />
                 </div>
             )}
             <Link
@@ -328,7 +295,7 @@ function ProjectRowInner({
 }
 
 const SortableProjectRow = React.memo((props: ProjectRowProps) => {
-    const { project, warmState, warmPulseStep } = props
+    const { project, taskCount } = props
     const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: project.id })
     const projectColor = project.color || "#3b82f6"
     const style: React.CSSProperties & { '--project-active-bg': string } = {
@@ -346,17 +313,13 @@ const SortableProjectRow = React.memo((props: ProjectRowProps) => {
             dragHandle={(
                 <button
                     type="button"
-                    className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-md cursor-grab active:cursor-grabbing opacity-70 group-hover:opacity-100"
+                    className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-md cursor-grab active:cursor-grabbing"
                     onClick={(e) => e.preventDefault()}
                     {...attributes}
                     {...listeners}
                     title="Reorder"
                 >
-                    <ProjectWarmDots
-                        projectColor={projectColor}
-                        warmState={warmState}
-                        warmPulseStep={warmPulseStep}
-                    />
+                    <ProjectTaskBadge count={taskCount} />
                 </button>
             )}
         />
@@ -513,6 +476,12 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
             : "skip"
     )
     const reorderProjects = useMutation(api.projectsAdmin.reorderProjects)
+    const assignedTaskCounts = useQuery(
+        api.tasks.getAssignedTaskCountsByProject,
+        initialUserId && initialWorkspaceId
+            ? { userId: initialUserId, workspaceId: initialWorkspaceId }
+            : "skip"
+    )
     const dashboardUser = useDashboardUser()
 
     const currentUserRecord = workspaceUsersResult?.users.find((candidate) => candidate.id === initialUserId)
@@ -1262,6 +1231,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                                         isAdmin={isAdmin}
                                                         warmState={projectWarmStates[project.id] ?? "idle"}
                                                         warmPulseStep={warmPulseStep}
+                                                        taskCount={assignedTaskCounts?.[project.id] ?? 0}
                                                         onPrefetchProject={prefetchProject}
                                                         onOpenProject={openProject}
                                                         setEditingProject={setEditingProject}
@@ -1291,6 +1261,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                                     isAdmin={isAdmin}
                                                     warmState={projectWarmStates[project.id] ?? "idle"}
                                                     warmPulseStep={warmPulseStep}
+                                                    taskCount={assignedTaskCounts?.[project.id] ?? 0}
                                                     onPrefetchProject={prefetchProject}
                                                     onOpenProject={openProject}
                                                     setEditingProject={setEditingProject}

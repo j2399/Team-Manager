@@ -280,3 +280,93 @@ export const getOverdueTasks = query({
         return result
     },
 })
+
+export const getAssignedTaskCountsByProject = query({
+    args: {
+        userId: v.string(),
+        workspaceId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        // Get all active projects in workspace
+        const projects = await ctx.db
+            .query("projects")
+            .withIndex("by_workspaceId", (q) => q.eq("workspaceId", args.workspaceId))
+            .collect()
+        const activeProjectIds = new Set(
+            projects.filter((p) => !p.archivedAt).map((p) => p.id)
+        )
+
+        // Build column -> board -> project maps
+        const boards = await Promise.all(
+            Array.from(activeProjectIds).map((projectId) =>
+                ctx.db
+                    .query("boards")
+                    .withIndex("by_projectId", (q) => q.eq("projectId", projectId))
+                    .unique()
+            )
+        )
+        const boardProjectMap = new Map<string, string>()
+        const columnBoardMap = new Map<string, string>()
+        const columnNameMap = new Map<string, string>()
+        for (const board of boards) {
+            if (!board) continue
+            boardProjectMap.set(board.id, board.projectId)
+            const cols = await ctx.db
+                .query("columns")
+                .withIndex("by_boardId", (q) => q.eq("boardId", board.id))
+                .collect()
+            for (const col of cols) {
+                columnBoardMap.set(col.id, col.boardId)
+                columnNameMap.set(col.id, col.name)
+            }
+        }
+
+        // Get tasks assigned via primary assigneeId
+        const primaryTasks = await ctx.db
+            .query("tasks")
+            .withIndex("by_assigneeId", (q) => q.eq("assigneeId", args.userId))
+            .collect()
+
+        // Get tasks assigned via taskAssignees table
+        const sharedAssignments = await ctx.db
+            .query("taskAssignees")
+            .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+            .collect()
+        const sharedTaskIds = new Set(sharedAssignments.map((a) => a.taskId))
+        const sharedTasks = sharedTaskIds.size > 0
+            ? await Promise.all(
+                Array.from(sharedTaskIds).map((taskId) =>
+                    ctx.db.query("tasks").withIndex("by_legacy_id", (q) => q.eq("id", taskId)).unique()
+                )
+            ).then((tasks) => tasks.filter((t): t is NonNullable<typeof t> => t !== null))
+            : []
+
+        // Merge, deduplicate
+        const taskMap = new Map<string, typeof primaryTasks[0]>()
+        for (const task of [...primaryTasks, ...sharedTasks]) {
+            taskMap.set(task.id, task)
+        }
+
+        // Count tasks per project, excluding Done columns
+        const counts: Record<string, number> = {}
+        for (const task of taskMap.values()) {
+            if (task.columnId) {
+                if (columnNameMap.get(task.columnId) === 'Done') continue
+                const boardId = columnBoardMap.get(task.columnId)
+                if (!boardId) continue
+                const projectId = boardProjectMap.get(boardId)
+                if (!projectId || !activeProjectIds.has(projectId)) continue
+                counts[projectId] = (counts[projectId] ?? 0) + 1
+            } else if (task.pushId) {
+                const push = await ctx.db
+                    .query("pushes")
+                    .withIndex("by_legacy_id", (q) => q.eq("id", task.pushId!))
+                    .unique()
+                if (!push || !activeProjectIds.has(push.projectId)) continue
+                counts[push.projectId] = (counts[push.projectId] ?? 0) + 1
+            }
+        }
+
+        return counts
+    },
+})
