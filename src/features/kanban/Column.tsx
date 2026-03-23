@@ -3,7 +3,7 @@
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { useDroppable } from "@dnd-kit/core"
 import { TaskCard } from "./TaskCard"
-import { Lock } from "lucide-react"
+import { Lock, Plus } from "lucide-react"
 
 type Task = {
     id: string
@@ -44,9 +44,10 @@ type ColumnProps = {
     isFlashing?: boolean
     highlightTaskId?: string | null
     currentUserId?: string | null
+    onAddTask?: () => void
 }
 
-export function Column({ column, projectId, users, onEditTask, isDoneColumn, isReviewColumn, userRole, isFlashing, pushId, highlightTaskId, currentUserId }: ColumnProps) {
+export function Column({ column, projectId, users, onEditTask, isDoneColumn, isReviewColumn, userRole, isFlashing, pushId, highlightTaskId, currentUserId, onAddTask }: ColumnProps) {
     const isAdmin = userRole === 'Admin' || userRole === 'Team Lead'
     const validAssigneeUserIds = users.map((user) => user.id)
     // Members can drop INTO Review, but only Done is fully restricted for non-admins
@@ -80,6 +81,16 @@ export function Column({ column, projectId, users, onEditTask, isDoneColumn, isR
                 <h3 className={`font-medium text-sm ${isDoneColumn ? 'text-emerald-700 dark:text-emerald-400' : ''}`}>{column.name}</h3>
                 <span className={`text-xs ${isDoneColumn ? 'text-emerald-600 dark:text-emerald-500/80' : 'text-muted-foreground'}`}>{column.tasks.length}</span>
                 {isDropDisabled && <Lock className="w-3 h-3 text-muted-foreground" />}
+                {onAddTask && isAdmin && (
+                    <button
+                        type="button"
+                        onClick={onAddTask}
+                        className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Add task</span>
+                    </button>
+                )}
             </div>
 
             <div className="space-y-2 px-2 pb-2 pt-1">

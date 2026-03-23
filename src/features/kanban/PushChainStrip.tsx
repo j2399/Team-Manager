@@ -1,8 +1,10 @@
 "use client"
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react"
-import { cn } from "@/lib/utils"
-import { ChevronDown, Pencil, Plus, Lock, Check } from "lucide-react"
+import { cn, getInitials } from "@/lib/utils"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Plus } from "lucide-react"
+import { ChevronDown, Pencil, Lock, Check } from "lucide-react"
 
 function lightenColor(hex: string, amount: number) {
     const n = (hex || '#3b82f6').trim().replace(/^#/, "")
@@ -32,7 +34,8 @@ type PushChainStripProps = {
     isAllDone: (pushId: string) => boolean
     isAdmin: boolean
     onEditPush: (e: React.MouseEvent, push: PushType) => void
-    onAddTask: (push: PushType) => void
+    getAssignees?: (pushId: string) => { id: string; name: string }[]
+    onAddTask?: (push: PushType) => void
     onMarkComplete: (push: PushType) => void
     onUnmarkComplete: (push: PushType) => void
     loadPushTasks: (pushId: string) => void
@@ -56,6 +59,7 @@ export function PushChainStrip({
     isAllDone,
     isAdmin,
     onEditPush,
+    getAssignees,
     onAddTask,
     onMarkComplete,
     onUnmarkComplete,
@@ -427,29 +431,42 @@ export function PushChainStrip({
                                             {push.name}
                                         </span>
 
-                                        {/* Add Task: fades in when push expands (admin only) */}
-                                        {isAdmin && (
-                                            <div style={{ maxWidth: isContentOpen ? '100px' : '0', overflow: 'hidden', flexShrink: 0 }}>
-                                                <div
-                                                    role="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation()
-                                                        onAddTask(push)
-                                                    }}
-                                                    className="flex items-center gap-1 rounded-md border text-xs whitespace-nowrap cursor-pointer"
-                                                    style={{
-                                                        height: '28px',
-                                                        padding: '0 8px',
-                                                        opacity: isContentOpen ? (pushIsComplete ? 0.5 : 1) : 0,
-                                                        pointerEvents: isContentOpen ? 'auto' : 'none',
-                                                        transition: 'opacity 0.2s ease',
-                                                    }}
-                                                >
-                                                    <Plus className="h-3.5 w-3.5 shrink-0" />
-                                                    <span className="hidden sm:inline">Add Task</span>
+                                        {/* Assignee avatars + add task shortcut */}
+                                        {(() => {
+                                            const assignees = getAssignees?.(push.id) ?? []
+                                            const canAdd = isAdmin && onAddTask && !pushIsComplete
+                                            if (assignees.length === 0 && !canAdd) return null
+                                            const maxVisible = 10
+                                            const visible = assignees.slice(0, maxVisible)
+                                            return (
+                                                <div className="flex items-center -space-x-[5px] shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                    {canAdd && (
+                                                        <Avatar
+                                                            className="relative h-6 w-6 shrink-0 bg-background text-[10px] ring-2 ring-background cursor-pointer hover:ring-primary/30 transition-all"
+                                                            style={{ zIndex: maxVisible + 1 }}
+                                                            title="Add task"
+                                                            onClick={() => onAddTask!(push)}
+                                                        >
+                                                            <AvatarFallback className="bg-muted/60 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors">
+                                                                <Plus className="h-3 w-3" />
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                    )}
+                                                    {visible.map((a, i) => (
+                                                        <Avatar
+                                                            key={a.id}
+                                                            className="relative h-6 w-6 shrink-0 bg-background text-[10px] ring-2 ring-background"
+                                                            title={a.name}
+                                                            style={{ zIndex: maxVisible - i }}
+                                                        >
+                                                            <AvatarFallback className="bg-primary/5 text-primary">
+                                                                {getInitials(a.name)}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                    ))}
                                                 </div>
-                                            </div>
-                                        )}
+                                            )
+                                        })()}
                                     </div>
 
                                     <div className="flex items-center gap-1.5 md:gap-2 shrink-0">

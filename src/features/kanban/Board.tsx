@@ -13,7 +13,7 @@ import {
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useAction, useConvex } from "convex/react"
 import { api } from "@convex/_generated/api"
-import { cn } from "@/lib/utils"
+import { cn, getInitials } from "@/lib/utils"
 import { createPortal } from "react-dom"
 import { Plus, ChevronDown, Check, Pencil, Lock } from "lucide-react"
 
@@ -37,6 +37,7 @@ function lightenColor(hex: string, amount: number) {
     return `rgb(${r},${g},${b})`
 }
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 import { PushDialog } from "@/features/pushes/PushDialog"
 import { useToast } from "@/components/ui/use-toast"
@@ -911,26 +912,52 @@ export function Board({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 items-stretch">
                 {pushColumns
                     .sort((a, b) => a.order - b.order)
-                    .map((col) => (
-                        <div key={`${pushId || 'backlog'}-${col.id}`} className="min-w-0 h-full">
-                            <Column
-                                column={col}
-                                projectId={projectId}
-                                users={users}
-                                onEditTask={setPreviewingTask}
-                                isDoneColumn={col.name === 'Done'}
-                                isReviewColumn={col.name === 'Review'}
-                                userRole={userRole}
-                                isFlashing={flashingColumnId === `${pushId || 'backlog'}::${col.id}`}
-                                pushId={pushId}
-                                highlightTaskId={highlightTaskId}
-                                currentUserId={userId}
-                            />
-                        </div>
-                    ))}
+                    .map((col) => {
+                        const isTodo = col.name === 'Todo' || col.name === 'To Do'
+                        return (
+                            <div key={`${pushId || 'backlog'}-${col.id}`} className="min-w-0 h-full">
+                                <Column
+                                    column={col}
+                                    projectId={projectId}
+                                    users={users}
+                                    onEditTask={setPreviewingTask}
+                                    isDoneColumn={col.name === 'Done'}
+                                    isReviewColumn={col.name === 'Review'}
+                                    userRole={userRole}
+                                    isFlashing={flashingColumnId === `${pushId || 'backlog'}::${col.id}`}
+                                    pushId={pushId}
+                                    highlightTaskId={highlightTaskId}
+                                    currentUserId={userId}
+                                    onAddTask={isAdmin && isTodo && pushId ? () => {
+                                        setCreatingColumnId(col.id)
+                                        setCreatingPushId(pushId)
+                                    } : undefined}
+                                />
+                            </div>
+                        )
+                    })}
             </div>
         </div>
     )
+
+    const getPushAssignees = (pushCols: ColumnData[]) => {
+        const seen = new Set<string>()
+        const result: { id: string; name: string }[] = []
+        for (const col of pushCols) {
+            for (const task of col.tasks) {
+                if (task.assignees) {
+                    for (const a of task.assignees) {
+                        if (!seen.has(a.user.id)) { seen.add(a.user.id); result.push(a.user) }
+                    }
+                }
+                if (task.assigneeId && task.assignee?.name && !seen.has(task.assigneeId)) {
+                    seen.add(task.assigneeId)
+                    result.push({ id: task.assigneeId, name: task.assignee.name })
+                }
+            }
+        }
+        return result
+    }
 
     const handleTaskCreated = (newTask: Task) => {
         setColumns(prev => applyCreatedTask(prev, newTask))
@@ -1046,13 +1073,11 @@ export function Board({
                                         onUnmarkComplete={(push) => setPushStatus(push.id, 'Active')}
                                         isAdmin={isAdmin}
                                         onEditPush={handleEditPush}
-                                        onAddTask={(push) => {
-                                            const todoColumn = columns.find(c => c.name === 'Todo' || c.name === 'To Do')
-                                            if (todoColumn) {
-                                                setCreatingColumnId(todoColumn.id)
-                                                setCreatingPushId(push.id)
-                                            }
-                                        }}
+                                        getAssignees={(pushId) => getPushAssignees(getPushTasks(pushId))}
+                                    onAddTask={(push) => {
+                                        const todoColumn = columns.find(c => c.name === 'Todo' || c.name === 'To Do')
+                                        if (todoColumn) { setCreatingColumnId(todoColumn.id); setCreatingPushId(push.id) }
+                                    }}
                                         loadPushTasks={loadPushTasks}
                                         loadedPushes={loadedPushes}
                                         loadingPushes={loadingPushes}
@@ -1136,48 +1161,43 @@ export function Board({
                                                 <Lock className="h-3 w-3 text-muted-foreground/50 shrink-0" />
                                             )}
 
-                                            {/* Add Task: fades in when push expands (admin only) */}
-                                            {isAdmin && (
-                                                <div style={{ maxWidth: isOpen ? '100px' : '0', overflow: 'hidden', flexShrink: 0 }}>
-                                                    <div
-                                                        role="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation()
-                                                            if (isLocked) return
-
-                                                            // Expand push if collapsed
-                                                            if (collapsedPushes.has(push.id)) {
-                                                                setCollapsedPushes(prev => {
-                                                                    const next = new Set(prev)
-                                                                    next.delete(push.id)
-                                                                    return next
-                                                                })
-                                                                loadPushTasks(push.id)
-                                                            }
-                                                            const todoColumn = columns.find(c => c.name === 'Todo' || c.name === 'To Do')
-                                                            if (todoColumn) {
-                                                                setCreatingColumnId(todoColumn.id)
-                                                                setCreatingPushId(push.id)
-                                                            }
-                                                        }}
-                                                        className={cn(
-                                                            "flex items-center gap-1 rounded-md border text-xs whitespace-nowrap",
-                                                            isLocked ? "cursor-not-allowed" : "cursor-pointer"
+                                            {/* Assignee avatars + add task shortcut */}
+                                            {(() => {
+                                                const assignees = getPushAssignees(pushColumns)
+                                                const todoCol = columns.find(c => c.name === 'Todo' || c.name === 'To Do')
+                                                const canAdd = isAdmin && todoCol && !isLocked
+                                                if (assignees.length === 0 && !canAdd) return null
+                                                const maxVisible = 10
+                                                const visible = assignees.slice(0, maxVisible)
+                                                return (
+                                                    <div className="flex items-center -space-x-[5px] shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                        {canAdd && (
+                                                            <Avatar
+                                                                className="relative h-6 w-6 shrink-0 bg-background text-[10px] ring-2 ring-background cursor-pointer hover:ring-primary/30 transition-all"
+                                                                style={{ zIndex: maxVisible + 1 }}
+                                                                title="Add task"
+                                                                onClick={() => { setCreatingColumnId(todoCol!.id); setCreatingPushId(push.id) }}
+                                                            >
+                                                                <AvatarFallback className="bg-muted/60 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors">
+                                                                    <Plus className="h-3 w-3" />
+                                                                </AvatarFallback>
+                                                            </Avatar>
                                                         )}
-                                                        style={{
-                                                            height: '28px',
-                                                            padding: '0 8px',
-                                                            opacity: isOpen ? (isLocked ? 0.5 : 1) : 0,
-                                                            pointerEvents: isOpen ? 'auto' : 'none',
-                                                            color: isComplete ? 'hsl(var(--muted-foreground) / 0.5)' : undefined,
-                                                            transition: 'opacity 0.2s ease',
-                                                        }}
-                                                    >
-                                                        <Plus className="h-3.5 w-3.5 shrink-0" />
-                                                        <span className="hidden sm:inline">Add Task</span>
+                                                        {visible.map((a, i) => (
+                                                            <Avatar
+                                                                key={a.id}
+                                                                className="relative h-6 w-6 shrink-0 bg-background text-[10px] ring-2 ring-background"
+                                                                title={a.name}
+                                                                style={{ zIndex: maxVisible - i }}
+                                                            >
+                                                                <AvatarFallback className="bg-primary/5 text-primary">
+                                                                    {getInitials(a.name)}
+                                                                </AvatarFallback>
+                                                            </Avatar>
+                                                        ))}
                                                     </div>
-                                                </div>
-                                            )}
+                                                )
+                                            })()}
                                         </div>
 
                                         <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
