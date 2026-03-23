@@ -10,7 +10,7 @@ import {
     DragStartEvent,
     DragOverEvent,
 } from "@dnd-kit/core"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useAction, useConvex } from "convex/react"
 import { api } from "@convex/_generated/api"
 import { cn } from "@/lib/utils"
@@ -122,6 +122,12 @@ type BoardProps = {
     initialPushId?: string | null
 }
 
+function isTaskAssignedToUser(task: Task, userId: string | null) {
+    if (!userId) return false
+    if (task.assigneeId === userId) return true
+    return task.assignees?.some((assignee) => assignee.user.id === userId) ?? false
+}
+
 export function Board({
     board,
     projectId,
@@ -145,9 +151,7 @@ export function Board({
     const [editingTask, setEditingTask] = useState<Task | null>(null)
     const [isDragging, setIsDragging] = useState(false)
     const [flashingColumnId, setFlashingColumnId] = useState<string | null>(null)
-    const [collapsedPushes, setCollapsedPushes] = useState<Set<string>>(() =>
-        new Set(pushes.filter(p => p.id !== expandPushId).map(p => p.id))
-    )
+    const [collapsedPushes, setCollapsedPushes] = useState<Set<string>>(() => new Set())
     const [loadingPushes, setLoadingPushes] = useState<Record<string, true>>({})
     const [loadedPushes, setLoadedPushes] = useState<Record<string, true>>(() =>
         inferLoadedPushes(board.columns, pushes)
@@ -191,6 +195,22 @@ export function Board({
     const isAdmin = userRole === 'Admin' || userRole === 'Team Lead'
     const { triggerConfetti } = useConfetti()
     const createOverdueNotifications = useAction(api.notifications.createOverdueTaskNotifications)
+    const myActivePushTaskCounts = useMemo(() => {
+        if (!userId) return {} as Record<string, number>
+
+        const counts: Record<string, number> = {}
+        for (const column of columns) {
+            if (column.name === 'Done') continue
+
+            for (const task of column.tasks) {
+                const pushId = task.push?.id
+                if (!pushId || !isTaskAssignedToUser(task, userId)) continue
+                counts[pushId] = (counts[pushId] ?? 0) + 1
+            }
+        }
+
+        return counts
+    }, [columns, userId])
 
     // Handle initial new task creation from URL
     useEffect(() => {
@@ -207,6 +227,10 @@ export function Board({
             window.history.replaceState({}, '', url.pathname + url.search)
         }
     }, [initialNewTask, columns, initialPushId, creatingColumnId, mounted])
+
+    useEffect(() => {
+        window.dispatchEvent(new CustomEvent('cupi:board-ready', { detail: { projectId } }))
+    }, [projectId])
 
     useEffect(() => {
         setMounted(true)
@@ -390,20 +414,24 @@ export function Board({
             return changed ? next : prev
         })
 
-        // Ensure new pushes start collapsed
+        // Preserve manual collapses across live updates. New pushes default open.
         setCollapsedPushes(prev => {
-            const next = new Set(prev)
-            let changed = false
-            pushes.forEach(p => {
-                // If it's a new push (not in prev) and not explicitly requested to expand
-                if (!prev.has(p.id) && p.id !== expandPushId && !loadedPushes[p.id]) {
-                    next.add(p.id)
-                    changed = true
+            const activePushIds = new Set(pushes.map((push) => push.id))
+            const next = new Set<string>()
+
+            prev.forEach((pushId) => {
+                if (pushId !== expandPushId && activePushIds.has(pushId)) {
+                    next.add(pushId)
                 }
             })
-            return changed ? next : prev
+
+            if (next.size === prev.size && [...next].every((pushId) => prev.has(pushId))) {
+                return prev
+            }
+
+            return next
         })
-    }, [board.columns, pushes, expandPushId, loadedPushes])
+    }, [board.columns, pushes, expandPushId])
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -974,6 +1002,19 @@ export function Board({
                         }
 
                         return chains.sort((a, b) => {
+                            const aMyTaskCount = a.reduce((sum, push) => sum + (myActivePushTaskCounts[push.id] ?? 0), 0)
+                            const bMyTaskCount = b.reduce((sum, push) => sum + (myActivePushTaskCounts[push.id] ?? 0), 0)
+                            const aHasMyTasks = aMyTaskCount > 0
+                            const bHasMyTasks = bMyTaskCount > 0
+
+                            if (aHasMyTasks !== bHasMyTasks) {
+                                return aHasMyTasks ? -1 : 1
+                            }
+
+                            if (aMyTaskCount !== bMyTaskCount) {
+                                return bMyTaskCount - aMyTaskCount
+                            }
+
                             const aComplete = a.every((push) => isPushMarkedComplete(push.id))
                             const bComplete = b.every((push) => isPushMarkedComplete(push.id))
 
@@ -1011,7 +1052,7 @@ export function Board({
                                         loadPushTasks={loadPushTasks}
                                         loadedPushes={loadedPushes}
                                         loadingPushes={loadingPushes}
-                                        myTaskCounts={userId ? Object.fromEntries(chain.map(p => [p.id, columns.flatMap(c => c.tasks).filter(t => t.push?.id === p.id && (t.assigneeId === userId || t.assignees?.some(a => a.user.id === userId))).length])) : {}}
+                                        myTaskCounts={myActivePushTaskCounts}
                                         projectColor={projectColor}
                                         renderPushBoard={(pushId) => {
                                             const pushColumns = getPushTasks(pushId)
@@ -1034,15 +1075,7 @@ export function Board({
                         const completionPercent = push.taskCount > 0 ? (push.completedCount / push.taskCount) * 100 : 0
                         const showMarkCompleteAction = isAdmin && (isComplete || allTasksDone)
                         const pushDateLabel = `${new Date(push.startDate).toLocaleDateString([], { month: 'short', day: 'numeric' })} - ${push.endDate ? new Date(push.endDate).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Ongoing'}`
-                        const myPushTaskCount = userId
-                            ? columns.reduce((sum, col) => {
-                                if (col.name === 'Done') return sum
-                                return sum + col.tasks.filter(t =>
-                                    t.push?.id === push.id &&
-                                    (t.assigneeId === userId || t.assignees?.some(a => a.user.id === userId))
-                                ).length
-                            }, 0)
-                            : 0
+                        const myPushTaskCount = myActivePushTaskCounts[push.id] ?? 0
 
                         return (
                             <div key={push.id} className="relative group/push-container">
@@ -1062,8 +1095,8 @@ export function Board({
                                             background: `linear-gradient(135deg, ${lightenColor(projectColor || '#3b82f6', 0.85)}, ${lightenColor(projectColor || '#3b82f6', 0.62)})`,
                                             border: `1px solid ${lightenColor(projectColor || '#3b82f6', 0.42)}`,
                                             color: 'rgba(0,0,0,0.8)',
-                                            transform: myPushTaskCount > 0 ? 'scale(1)' : 'scale(0)',
-                                            opacity: myPushTaskCount > 0 ? 1 : 0,
+                                            transform: (mounted && myPushTaskCount > 0) ? 'scale(1)' : 'scale(0)',
+                                            opacity: (mounted && myPushTaskCount > 0) ? 1 : 0,
                                             transition: myPushTaskCount > 0
                                                 ? 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.15s ease'
                                                 : 'transform 0.18s ease-in, opacity 0.15s ease',

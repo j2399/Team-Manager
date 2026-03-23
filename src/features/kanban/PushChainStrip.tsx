@@ -83,7 +83,7 @@ export function PushChainStrip({
     }, [isComplete])
 
     const [userSelectedPushId, setUserSelectedPushId] = useState<string | null>(null)
-    const [isContentOpen, setIsContentOpen] = useState(false)
+    const [isContentOpen, setIsContentOpen] = useState(true)
     const [hoveredId, setHoveredId] = useState<string | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
 
@@ -221,6 +221,11 @@ export function PushChainStrip({
             loadPushTasks(pushId)
         }
     }, [loadedPushes, loadPushTasks])
+
+    useEffect(() => {
+        if (!isContentOpen || !expandedPushId) return
+        ensureTasksLoaded(expandedPushId)
+    }, [ensureTasksLoaded, expandedPushId, isContentOpen])
 
     const handlePushClick = useCallback((push: PushType) => {
         if (isLocked(push)) return
