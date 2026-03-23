@@ -228,9 +228,16 @@ export function Board({
         }
     }, [initialNewTask, columns, initialPushId, creatingColumnId, mounted])
 
+    // rAF ensures browser paints scale(0) before the transition to scale(1) fires
     useEffect(() => {
-        setMounted(true)
-        window.dispatchEvent(new CustomEvent('cupi:board-ready', { detail: { projectId } }))
+        const raf = requestAnimationFrame(() => {
+            setMounted(true)
+            window.dispatchEvent(new CustomEvent('cupi:board-ready', { detail: { projectId } }))
+        })
+        return () => cancelAnimationFrame(raf)
+    }, [projectId])
+
+    useEffect(() => {
         if (!userId || !workspaceId) return
 
         void createOverdueNotifications({
@@ -240,7 +247,7 @@ export function Board({
         }).catch((error) => {
             console.error('Failed to check overdue tasks:', error)
         })
-    }, [createOverdueNotifications, projectId, userId, workspaceId])
+    }, [createOverdueNotifications, userId, workspaceId])
 
     useEffect(() => {
         setColumns(board.columns)
@@ -1101,15 +1108,17 @@ export function Board({
                                     >
                                         {myPushTaskCount > 99 ? '99' : myPushTaskCount || ''}
                                     </span>
-                                    <button
-                                        type="button"
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
                                         aria-expanded={isOpen}
                                         aria-controls={contentId}
                                         onClick={() => !isLocked && togglePushCollapse(push.id)}
+                                        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && !isLocked && togglePushCollapse(push.id)}
                                         className={cn(
                                             "w-full flex items-center justify-between p-3 md:p-4 transition-colors relative overflow-hidden",
                                             isOpen ? "rounded-t-lg" : "rounded-lg",
-                                            isLocked ? "cursor-not-allowed bg-muted/30" : "hover:bg-accent/50 dark:hover:bg-accent/20"
+                                            isLocked ? "cursor-not-allowed bg-muted/30" : "hover:bg-accent/50 dark:hover:bg-accent/20 cursor-pointer"
                                         )}
                                     >
                                         <div className="flex items-center gap-2 md:gap-3 min-w-0">
@@ -1248,7 +1257,7 @@ export function Board({
                                                 <ChevronDown className={`h-4 w-4 md:h-5 md:w-5 text-muted-foreground transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
                                             </div>
                                         </div>
-                                    </button>
+                                    </div>
 
                                     <div
                                         id={contentId}
