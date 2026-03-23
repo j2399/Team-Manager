@@ -285,6 +285,7 @@ export function ProjectContent({ project, board, users, pushes = [] }: ProjectCo
                     boardState ? (
                         <Suspense fallback={<ProjectBoardSkeleton />}>
                             <Board
+                                key={project.id}
                                 board={boardState}
                                 projectId={project.id}
                                 projectColor={projectColor}

@@ -229,11 +229,8 @@ export function Board({
     }, [initialNewTask, columns, initialPushId, creatingColumnId, mounted])
 
     useEffect(() => {
-        window.dispatchEvent(new CustomEvent('cupi:board-ready', { detail: { projectId } }))
-    }, [projectId])
-
-    useEffect(() => {
         setMounted(true)
+        window.dispatchEvent(new CustomEvent('cupi:board-ready', { detail: { projectId } }))
         if (!userId || !workspaceId) return
 
         void createOverdueNotifications({
@@ -243,7 +240,7 @@ export function Board({
         }).catch((error) => {
             console.error('Failed to check overdue tasks:', error)
         })
-    }, [createOverdueNotifications, userId, workspaceId])
+    }, [createOverdueNotifications, projectId, userId, workspaceId])
 
     useEffect(() => {
         setColumns(board.columns)

@@ -63,6 +63,7 @@ import { preloadBoardModule } from "@/lib/board-module"
 import { preloadDashboardHomeModule, preloadMyBoardModule } from "@/lib/dashboard-route-modules"
 import { deleteProject, updateProjectDetails } from "@/app/actions/projects"
 import { useDashboardUser } from "@/components/DashboardUserProvider"
+import { dispatchDashboardRouteTransitionStart } from "@/lib/dashboard-route-transition"
 
 type Project = {
     id: string
@@ -156,6 +157,7 @@ type ProjectRowProps = {
     warmState: ProjectWarmState
     warmPulseStep: number
     taskCount: number
+    boardReadyId?: string | null
     onPrefetchProject: (projectId: string, options?: { subscriptionMs?: number }) => Promise<void>
     onOpenProject: (projectId: string) => void
     setEditingProject: (project: Project) => void
@@ -163,7 +165,7 @@ type ProjectRowProps = {
     onToggleArchive: (project: Project) => void
 }
 
-function ProjectTaskBadge({ count, color, isActive }: { count: number; color?: string | null; isActive?: boolean }) {
+function ProjectTaskBadge({ count, color, isCurrentPage }: { count: number; color?: string | null; isCurrentPage?: boolean }) {
     if (count === 0) return <span className="h-4 w-4 shrink-0" />
     const c = color || '#3b82f6'
     return (
@@ -173,9 +175,11 @@ function ProjectTaskBadge({ count, color, isActive }: { count: number; color?: s
                 background: `linear-gradient(135deg, ${lightenColor(c, 0.85)}, ${lightenColor(c, 0.62)})`,
                 border: `1px solid ${lightenColor(c, 0.42)}`,
                 color: 'rgba(0,0,0,0.8)',
-                transform: isActive ? 'scale(0)' : 'scale(1)',
-                opacity: isActive ? 0 : 1,
-                transition: 'transform 0.25s cubic-bezier(0.34,1.56,0.64,1), opacity 0.15s ease',
+                transform: isCurrentPage ? 'scale(0)' : 'scale(1)',
+                opacity: isCurrentPage ? 0 : 1,
+                transition: isCurrentPage
+                    ? 'transform 0.2s ease-in, opacity 0.15s ease'
+                    : 'transform 0.25s cubic-bezier(0.34,1.56,0.64,1), opacity 0.15s ease',
             }}
         >
             {count > 99 ? "99" : count}
@@ -189,6 +193,7 @@ function ProjectRowInner({
     navigatingTo,
     isAdmin,
     taskCount,
+    boardReadyId,
     onPrefetchProject,
     onOpenProject,
     setEditingProject,
@@ -204,7 +209,7 @@ function ProjectRowInner({
 }) {
     const href = `/dashboard/projects/${project.id}`
     const isPending = navigatingTo === href
-    const isActive = pathname === href || isPending
+    const isActive = navigatingTo ? isPending : pathname === href
 
     return (
         <div
@@ -229,7 +234,7 @@ function ProjectRowInner({
             />
             {dragHandle ?? (
                 <div className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center">
-                    <ProjectTaskBadge count={taskCount} color={project.archivedAt ? null : project.color} isActive={isActive} />
+                    <ProjectTaskBadge count={taskCount} color={project.archivedAt ? null : project.color} isCurrentPage={boardReadyId === project.id} />
                 </div>
             )}
             <Link
@@ -315,7 +320,7 @@ function ProjectRowInner({
 }
 
 const SortableProjectRow = React.memo((props: ProjectRowProps) => {
-    const { project, taskCount, pathname, navigatingTo } = props
+    const { project, taskCount, pathname, navigatingTo, boardReadyId } = props
     const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({ id: project.id })
     const href = `/dashboard/projects/${project.id}`
     const isActive = pathname === href || navigatingTo === href
@@ -341,7 +346,7 @@ const SortableProjectRow = React.memo((props: ProjectRowProps) => {
                     {...listeners}
                     title="Reorder"
                 >
-                    <ProjectTaskBadge count={taskCount} color={project.archivedAt ? null : project.color} isActive={isActive} />
+                    <ProjectTaskBadge count={taskCount} color={project.archivedAt ? null : project.color} isCurrentPage={boardReadyId === project.id} />
                 </button>
             )}
         />
@@ -380,6 +385,23 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     const shellWarmStartedRef = React.useRef(false)
     const projectWarmEntriesRef = React.useRef<Map<string, ProjectWarmEntry>>(new Map())
     const shellWarmEntriesRef = React.useRef<Map<ShellWarmKey, ProjectWarmEntry>>(new Map())
+    const [boardReadyId, setBoardReadyId] = React.useState<string | null>(null)
+
+    // Listen for board mount event to sync badge exit with corner badge enter
+    React.useLayoutEffect(() => {
+        const handler = (e: Event) => {
+            setBoardReadyId((e as CustomEvent<{ projectId: string }>).detail.projectId)
+        }
+        window.addEventListener('cupi:board-ready', handler)
+        return () => window.removeEventListener('cupi:board-ready', handler)
+    }, [])
+
+    // Clear board-ready flag when navigating away from that project
+    React.useEffect(() => {
+        if (boardReadyId && pathname !== `/dashboard/projects/${boardReadyId}`) {
+            setBoardReadyId(null)
+        }
+    }, [pathname, boardReadyId])
 
     // Track previous path for settings toggle
     React.useEffect(() => {
@@ -528,6 +550,17 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
 
     const isAdmin = userData.role === 'Admin' || userData.role === 'Team Lead'
     const convex = useConvex()
+    const navigate = React.useCallback((href: string) => {
+        const targetPath = href.split("?")[0]?.split("#")[0] ?? href
+        setBoardReadyId((current) => {
+            if (!current) return current
+            return targetPath === `/dashboard/projects/${current}` ? current : null
+        })
+        dispatchDashboardRouteTransitionStart(href)
+        React.startTransition(() => {
+            router.push(href)
+        })
+    }, [router])
     const setProjectWarmState = React.useCallback((projectId: string, nextState: ProjectWarmState) => {
         setProjectWarmStates((current) => {
             if (current[projectId] === nextState) {
@@ -866,24 +899,24 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
 
         setNavigatingTo(href)
         void prefetchProject(projectId, { subscriptionMs: 180_000 })
-        router.push(href)
-    }, [pathname, prefetchProject, router])
+        navigate(href)
+    }, [navigate, pathname, prefetchProject])
     const openDashboardHome = React.useCallback(() => {
         const href = "/dashboard"
         if (pathname === href) return
 
         setNavigatingTo(href)
         void prefetchDashboardHome({ subscriptionMs: 180_000 })
-        router.push(href)
-    }, [pathname, prefetchDashboardHome, router])
+        navigate(href)
+    }, [navigate, pathname, prefetchDashboardHome])
     const openMyBoard = React.useCallback(() => {
         const href = "/dashboard/my-board"
         if (pathname === href) return
 
         setNavigatingTo(href)
         void prefetchMyBoard({ subscriptionMs: 180_000 })
-        router.push(href)
-    }, [pathname, prefetchMyBoard, router])
+        navigate(href)
+    }, [navigate, pathname, prefetchMyBoard])
 
     React.useEffect(() => {
         if (!projectListResult) return
@@ -1094,7 +1127,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
             if (!result?.error) {
                 setDeleteConfirm(null)
                 setDeleteConfirmName("")
-                router.push('/dashboard')
+                navigate('/dashboard')
             } else {
                 alert(result.error || 'Failed to delete division')
             }
@@ -1105,9 +1138,9 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
     }
 
     const dashboardHref = "/dashboard"
-    const isDashboardActive = pathname === dashboardHref || navigatingTo === dashboardHref
+    const isDashboardActive = navigatingTo ? navigatingTo === dashboardHref : pathname === dashboardHref
     const myBoardHref = "/dashboard/my-board"
-    const isMyBoardActive = pathname === myBoardHref || navigatingTo === myBoardHref
+    const isMyBoardActive = navigatingTo ? navigatingTo === myBoardHref : pathname === myBoardHref
 
     return (
         <div className="flex h-full w-64 min-w-64 shrink-0 flex-col overflow-hidden border-r bg-background">
@@ -1135,9 +1168,9 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                             setSettingsSpinNonce((n) => n + 1)
                             if (pathname === '/dashboard/settings') {
                                 // Toggle back to previous page
-                                router.push(previousPathRef.current)
+                                navigate(previousPathRef.current)
                             } else {
-                                router.push('/dashboard/settings')
+                                navigate('/dashboard/settings')
                             }
                         }}
                     >
@@ -1254,6 +1287,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                                         warmState={projectWarmStates[project.id] ?? "idle"}
                                                         warmPulseStep={warmPulseStep}
                                                         taskCount={assignedTaskCounts?.[project.id] ?? 0}
+                                                        boardReadyId={boardReadyId}
                                                         onPrefetchProject={prefetchProject}
                                                         onOpenProject={openProject}
                                                         setEditingProject={setEditingProject}
@@ -1284,6 +1318,7 @@ export function Sidebar({ initialUserData, isMobileSheet = false }: { initialUse
                                                     warmState={projectWarmStates[project.id] ?? "idle"}
                                                     warmPulseStep={warmPulseStep}
                                                     taskCount={assignedTaskCounts?.[project.id] ?? 0}
+                                                    boardReadyId={boardReadyId}
                                                     onPrefetchProject={prefetchProject}
                                                     onOpenProject={openProject}
                                                     setEditingProject={setEditingProject}

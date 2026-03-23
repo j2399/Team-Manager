@@ -1,15 +1,17 @@
 "use client"
 
-import { useCallback } from "react"
+import { startTransition, useCallback } from "react"
 import { useConvex } from "convex/react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { api } from "@convex/_generated/api"
 import { useDashboardUser } from "@/components/DashboardUserProvider"
 import { preloadBoardModule } from "@/lib/board-module"
+import { dispatchDashboardRouteTransitionStart } from "@/lib/dashboard-route-transition"
 
 export function useProjectRoute() {
     const convex = useConvex()
     const router = useRouter()
+    const pathname = usePathname()
     const dashboardUser = useDashboardUser()
     const workspaceId = dashboardUser?.workspaceId ?? null
 
@@ -30,8 +32,14 @@ export function useProjectRoute() {
 
     const pushProjectRoute = useCallback((href: string, projectId: string) => {
         prefetchProjectRoute(projectId)
-        router.push(href)
-    }, [prefetchProjectRoute, router])
+        const projectPath = `/dashboard/projects/${projectId}`
+        if (pathname !== projectPath) {
+            dispatchDashboardRouteTransitionStart(href)
+        }
+        startTransition(() => {
+            router.push(href)
+        })
+    }, [pathname, prefetchProjectRoute, router])
 
     return {
         prefetchProjectRoute,
