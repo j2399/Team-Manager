@@ -15,7 +15,7 @@ import {
     useDraggable,
 } from "@dnd-kit/core"
 import {
-    Clock, Filter, AlertTriangle, CheckCircle2
+    Clock, Filter, CheckCircle2
 } from "lucide-react"
 import { cn, getInitials } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -390,8 +390,6 @@ export function PersonalKanban({ columns: initialColumns, projects, userName }: 
         }))
     }, [columns, selectedProjects, showOverdueOnly])
 
-    const totalTasks = columns.reduce((acc, col) => acc + col.tasks.length, 0)
-    const filteredTotalTasks = filteredColumns.reduce((acc, col) => acc + col.tasks.length, 0)
     const overdueCount = columns.flatMap(c => c.tasks).filter(t => t.columnName !== 'Done' && getDueInfo(t.dueDate).isOverdue).length
 
     const toggleProject = (projectId: string) => {
@@ -407,6 +405,10 @@ export function PersonalKanban({ columns: initialColumns, projects, userName }: 
         setSelectedProjects(new Set())
         setShowOverdueOnly(false)
     }
+
+    const keepFilterMenuOpen = useCallback((event: Event) => {
+        event.preventDefault()
+    }, [])
 
     const handleTaskClick = useCallback((task: Task) => {
         let url = `/dashboard/projects/${task.projectId}?highlight=${task.id}`
@@ -539,9 +541,6 @@ export function PersonalKanban({ columns: initialColumns, projects, userName }: 
                     <div className="flex items-center justify-between gap-3">
                         <div>
                             <h1 className="text-lg font-semibold">{`${userName}'s Board`}</h1>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                                {filteredTotalTasks} tasks across {projects.length} divisions
-                            </p>
                         </div>
 
                         <DropdownMenu>
@@ -568,6 +567,7 @@ export function PersonalKanban({ columns: initialColumns, projects, userName }: 
                                 <DropdownMenuCheckboxItem
                                     checked={showOverdueOnly}
                                     onCheckedChange={setShowOverdueOnly}
+                                    onSelect={keepFilterMenuOpen}
                                     className="text-xs"
                                 >
                                     <Clock className="h-3 w-3 mr-2 text-red-500" />
@@ -583,6 +583,7 @@ export function PersonalKanban({ columns: initialColumns, projects, userName }: 
                                                 key={project.id}
                                                 checked={selectedProjects.has(project.id)}
                                                 onCheckedChange={() => toggleProject(project.id)}
+                                                onSelect={keepFilterMenuOpen}
                                                 className="text-xs"
                                             >
                                                 <div

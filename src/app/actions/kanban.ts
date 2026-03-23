@@ -4,7 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { sendDiscordNotification } from '@/lib/discord'
 import { getCurrentUser } from '@/lib/auth'
 import { getProjectContext, getWorkspaceUserIds } from '@/lib/access'
+import { resolveProjectColumnId } from '@/lib/kanban-columns'
 import { driveConfigTableExists, getDriveFolderCache, isFolderWithinRoot } from '@/lib/googleDrive'
+import { getWorkspaceProjectColumns } from '@/lib/convex/projects'
 import { differenceInCalendarDays } from 'date-fns'
 import {
     createTaskInConvex,
@@ -73,6 +75,23 @@ async function getWorkspaceDriveConfig(workspaceId: string) {
 
 async function getHydratedTask(taskId: string) {
     return fetchQuery(api.tasks.getById, { taskId })
+}
+
+async function resolveTaskStatusColumnId(
+    columnId: string,
+    projectId: string,
+    workspaceId: string
+) {
+    if (!columnId || columnId.startsWith("column_")) {
+        return columnId
+    }
+
+    const projectColumns = await getWorkspaceProjectColumns(projectId, workspaceId)
+    if (!projectColumns || projectColumns.length === 0) {
+        return columnId
+    }
+
+    return resolveProjectColumnId(columnId, projectColumns) ?? columnId
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -220,9 +239,11 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
             return { error: 'Unauthorized: No workspace', success: false as const, task: null }
         }
 
+        const resolvedColumnId = await resolveTaskStatusColumnId(columnId, projectId, user.workspaceId)
+
         const result = await updateTaskStatusInConvex(
             taskId,
-            columnId,
+            resolvedColumnId,
             user.workspaceId,
             user.role,
             user.id,
@@ -250,6 +271,7 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
         }
 
         revalidatePath(`/dashboard/projects/${r.projectId}`)
+        revalidatePath('/dashboard/my-board')
 
         // Discord: ping when task moved into Review
         if (r.targetColumnName === 'Review' && r.workspaceDiscordChannelId && r.leadDiscordIds && r.leadDiscordIds.length > 0) {
@@ -270,7 +292,7 @@ export async function updateTaskStatus(taskId: string, columnId: string, project
 
         return {
             success: true as const,
-            task: hydratedTask ?? { id: taskId, title: r.taskTitle, columnId },
+            task: hydratedTask ?? { id: taskId, title: r.taskTitle, columnId: resolvedColumnId },
         }
     } catch (e) {
         console.error("Update task error:", e)
