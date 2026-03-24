@@ -856,26 +856,13 @@ export function DashboardHeatmap({
                                 </div>
                             </div>
 
-                            {/* Task stack visual with Add button */}
-                            <div className="relative flex items-center justify-between gap-1">
+                            {/* Task stack visual */}
+                            <div className="relative flex items-center gap-1">
                                 <TaskStack count={user.activeTasks} />
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-5 w-8 rounded-sm p-0 border border-dashed border-muted-foreground/30 hover:border-primary/50 hover:bg-primary/5 transition-opacity shrink-0"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setQuickAddSelection(null)
-                                        setQuickAddRequireManualContinue(false)
-                                        setQuickAddTaskUser(user);
-                                    }}
-                                >
-                                    <Plus className="h-3.5 w-3.5 text-muted-foreground" />
-                                </Button>
                             </div>
 
                             {/* Status */}
-                            <div className="relative flex items-center mt-2 pt-2 border-t border-border/50">
+                            <div className="relative flex items-center justify-between mt-2 pt-2 border-t border-border/50">
                                 <span
                                     className="text-[9px] font-medium px-1.5 py-0.5 rounded-sm border tag-shimmer"
                                     style={{
@@ -899,6 +886,19 @@ export function DashboardHeatmap({
                                 >
                                     {status === 'struggling' ? 'Struggling' : status === 'available' ? 'Available' : 'On track'}
                                 </span>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-5 w-5 rounded-sm p-0 border border-dashed border-muted-foreground/30 hover:border-primary/50 hover:bg-primary/5 transition-opacity shrink-0"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setQuickAddSelection(null)
+                                        setQuickAddRequireManualContinue(false)
+                                        setQuickAddTaskUser(user);
+                                    }}
+                                >
+                                    <Plus className="h-3 w-3 text-muted-foreground" />
+                                </Button>
                             </div>
                         </div>
                     )
