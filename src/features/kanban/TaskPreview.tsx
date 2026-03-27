@@ -17,9 +17,10 @@ import { acceptReviewTask, denyReviewTask } from "@/app/actions/kanban"
 import { createTaskComment, deleteTaskComment } from "@/app/actions/task-comments"
 import { deleteTaskAttachment, uploadTaskAttachment } from "@/app/actions/task-attachments"
 import {
-    Pencil, Calendar, User, Clock,
+    Pencil, Calendar, Clock,
     Send, FileText, Upload, Reply, X, Download, Maximize2, Trash2, CheckCircle, XCircle, ListChecks
 } from "lucide-react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { getInitials } from "@/lib/utils"
 import { MAX_ATTACHMENT_SIZE } from "@/lib/attachments"
 import { TaskChecklist } from "@/components/TaskChecklist"
@@ -682,6 +683,12 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
     const isReviewColumn = task.column?.name === 'Review'
     const isAdminOrLead = userRole === 'Admin' || userRole === 'Team Lead'
     const showReviewButtons = isReviewColumn && isAdminOrLead
+    const assigneeUsers =
+        task.assignees && task.assignees.length > 0
+            ? task.assignees.map(a => a.user)
+            : task.assignee?.name
+                ? [{ id: task.assignee.id ?? 'legacy', name: task.assignee.name }]
+                : []
 
     const handleAccept = async () => {
         if (!projectId) return
@@ -753,7 +760,6 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                     onDrop={handleDrop}
                 >
                     {/* Header */}
-                    {/* Header */}
                     <DialogHeader className="px-3 py-2 border-b shrink-0">
                         <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 flex-1">
@@ -763,6 +769,31 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                         <span className="text-[9px] text-muted-foreground/50 shrink-0">{task.column.name}</span>
                                     )}
                                     {isOverdue && <Badge variant="destructive" className="text-[9px] h-4">Overdue</Badge>}
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-1.5">
+                                    {assigneeUsers.length > 0 ? (
+                                        <>
+                                            <div className="flex -space-x-[5px]">
+                                                {assigneeUsers.map((u, i) => (
+                                                    <Avatar
+                                                        key={u.id}
+                                                        className="relative h-6 w-6 shrink-0 bg-background text-[10px] ring-2 ring-background"
+                                                        title={u.name}
+                                                        style={{ zIndex: 30 - i }}
+                                                    >
+                                                        <AvatarFallback className="bg-primary/5 text-primary">
+                                                            {getInitials(u.name)}
+                                                        </AvatarFallback>
+                                                    </Avatar>
+                                                ))}
+                                            </div>
+                                            <span className="text-[10px] text-muted-foreground truncate">
+                                                {assigneeUsers.map(u => u.name).join(', ')}
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <span className="text-[10px] text-muted-foreground">Unassigned</span>
+                                    )}
                                 </div>
                             </div>
                             <Button variant="ghost" size="icon" onClick={onEdit} className="shrink-0 h-6 w-6 border-0">
@@ -1164,15 +1195,6 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                             <span className="flex items-center gap-1" suppressHydrationWarning>
                                 <Calendar className="h-2.5 w-2.5" />
                                 {formatDate(task.startDate)} → {formatDate(task.endDate)}
-                            </span>
-                            <span className="text-muted-foreground/30">•</span>
-                            <span className="flex items-center gap-1">
-                                <User className="h-2.5 w-2.5 shrink-0" />
-                                <span className="truncate max-w-[120px]">
-                                    {task.assignees && task.assignees.length > 0
-                                        ? task.assignees.map(a => a?.user?.name || 'Unknown').join(', ')
-                                        : (task.assignee?.name || 'Unassigned task')}
-                                </span>
                             </span>
                             {showReviewButtons && (
                                 <>

@@ -6,7 +6,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ArrowLeft, ArrowRight, Clock, CalendarDays, CheckCircle2, Plus } from "lucide-react"
 import { cn, getInitials } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { useMemo, useRef } from "react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { updateTaskDetails } from "@/app/actions/kanban"
+import { useMemo, useRef, useState } from "react"
 
 type TaskCardProps = {
     task: {
@@ -100,6 +102,21 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
     const maxVisibleAssignees = 3
     const visibleAssignees = assigneeUsers.slice(0, maxVisibleAssignees)
     const extraAssigneeCount = Math.max(assigneeUsers.length - visibleAssignees.length, 0)
+
+    const [assignPopoverOpen, setAssignPopoverOpen] = useState(false)
+    const [isAssigning, setIsAssigning] = useState(false)
+
+    const handleAssignSelf = async (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (!currentUserId) return
+        setIsAssigning(true)
+        try {
+            await updateTaskDetails(task.id, { assigneeIds: [currentUserId] })
+        } finally {
+            setIsAssigning(false)
+            setAssignPopoverOpen(false)
+        }
+    }
 
     // Render Overlay Card (Action of dragging)
     if (overlay) {
@@ -265,14 +282,31 @@ export function TaskCard({ task, overlay, onClick, isReviewColumn, isDoneColumn,
                             </Avatar>
                         )}
                         {assigneeUsers.length === 0 && (
-                            <div className="flex items-center gap-1.5" title="Unassigned task">
-                                <span className="text-[10px] font-medium text-muted-foreground whitespace-nowrap">
-                                    Unassigned task
-                                </span>
-                                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-dashed border-border bg-muted/40 text-muted-foreground">
-                                    <Plus className="h-3 w-3" />
-                                </span>
-                            </div>
+                            <Popover open={assignPopoverOpen} onOpenChange={setAssignPopoverOpen}>
+                                <PopoverTrigger asChild>
+                                    <button
+                                        className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/5 text-primary ring-2 ring-background hover:bg-primary/15 transition-colors cursor-pointer"
+                                        title="Unassigned — click to assign yourself"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <Plus className="h-3 w-3" />
+                                    </button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    className="w-auto p-2"
+                                    onClick={(e) => e.stopPropagation()}
+                                    align="end"
+                                >
+                                    <button
+                                        onClick={handleAssignSelf}
+                                        disabled={isAssigning || !currentUserId}
+                                        className="flex items-center gap-1.5 text-[11px] font-medium text-foreground hover:text-primary transition-colors disabled:opacity-50 px-1.5 py-1 rounded hover:bg-muted w-full whitespace-nowrap"
+                                    >
+                                        <Plus className="h-3 w-3 shrink-0" />
+                                        Assign to me
+                                    </button>
+                                </PopoverContent>
+                            </Popover>
                         )}
                     </div>
                 </div>
