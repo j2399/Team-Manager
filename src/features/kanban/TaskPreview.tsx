@@ -304,7 +304,6 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
     const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
     const deleteTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map())
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-    const [isDeletingTask, setIsDeletingTask] = useState(false)
     const [folderTree, setFolderTree] = useState<DriveFolderNode[]>([])
     const [uploadsPath, setUploadsPath] = useState<string>("")
     const liveComments = useQuery(
@@ -650,23 +649,12 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
         }
     }
 
-    async function handleConfirmDeleteTask() {
-        setIsDeletingTask(true)
-        try {
-            const result = await deleteTask(task.id, projectId)
-            if (result?.error) {
-                setCommentError(result.error)
-            } else {
-                setShowDeleteConfirm(false)
-                onOpenChange(false)
-                onTaskDeleted?.(task.id)
-            }
-        } catch (err) {
+    function handleConfirmDeleteTask() {
+        onOpenChange(false)
+        onTaskDeleted?.(task.id)
+        deleteTask(task.id, projectId).catch((err) => {
             console.error("Delete task error:", err)
-            setCommentError("Failed to delete task")
-        } finally {
-            setIsDeletingTask(false)
-        }
+        })
     }
 
     // Force download helper (works with cross-origin URLs like Vercel Blob)
@@ -825,10 +813,9 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                             {showDeleteConfirm && (
                                 <button
                                     onClick={handleConfirmDeleteTask}
-                                    disabled={isDeletingTask}
                                     className="shrink-0 h-6 px-2 rounded text-[10px] font-medium text-destructive bg-destructive/10 hover:bg-destructive/20 transition-colors border-0 cursor-pointer"
                                 >
-                                    {isDeletingTask ? '...' : 'Confirm?'}
+                                    Confirm?
                                 </button>
                             )}
                             <Button
