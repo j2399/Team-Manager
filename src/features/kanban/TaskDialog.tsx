@@ -218,6 +218,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const [checklistItems, setChecklistItems] = useState<string[]>([])
     const [newChecklistItem, setNewChecklistItem] = useState("")
     const [seriesTasks, setSeriesTasks] = useState<SeriesTaskDraft[]>([])
+    const [activeSeriesTaskIndex, setActiveSeriesTaskIndex] = useState(0)
 
     // Reset form when task changes or dialog opens
     useEffect(() => {
@@ -262,6 +263,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 }
                 setInstructionsFile(null)
                 setSeriesTasks([])
+                setActiveSeriesTaskIndex(0)
             } else {
                 setInstructionsFile(null)
                 setExistingInstructionsFile(null)
@@ -278,7 +280,8 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 setEnableChecklist(false)
                 setChecklistItems([])
                 setNewChecklistItem("")
-                setSeriesTasks([])
+                setSeriesTasks([createSeriesTaskDraft()])
+                setActiveSeriesTaskIndex(0)
             }
         }
     }, [task, today, open, sanitizeAssigneeIds])
@@ -523,25 +526,90 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         setChecklistItems(prev => prev.filter((_, i) => i !== index))
     }
 
-    const addSeriesTask = () => {
-        setSeriesTasks((prev) => [...prev, createSeriesTaskDraft()])
-    }
+    const getSeriesTaskDraftsWithCurrentStep = useCallback(() => {
+        if (task) return []
 
-    const updateSeriesTask = (
-        seriesTaskId: string,
-        patch: Partial<Omit<SeriesTaskDraft, "id">>
-    ) => {
-        setSeriesTasks((prev) =>
-            prev.map((seriesTask) =>
-                seriesTask.id === seriesTaskId
-                    ? { ...seriesTask, ...patch }
-                    : seriesTask
-            )
+        const nextDraft = {
+            id: seriesTasks[activeSeriesTaskIndex]?.id ?? createSeriesTaskDraft().id,
+            title,
+            description,
+            startDate,
+            endDate,
+        }
+
+        if (seriesTasks.length === 0) {
+            return [nextDraft]
+        }
+
+        return seriesTasks.map((seriesTask, index) => (
+            index === activeSeriesTaskIndex
+                ? nextDraft
+                : seriesTask
+        ))
+    }, [activeSeriesTaskIndex, description, endDate, seriesTasks, startDate, task, title])
+
+    const loadSeriesTaskDraft = useCallback((seriesTask: SeriesTaskDraft) => {
+        setTitle(seriesTask.title)
+        setDescription(seriesTask.description)
+        setStartDate(seriesTask.startDate)
+        setEndDate(seriesTask.endDate)
+    }, [])
+
+    const isSeriesTaskDescriptionValid = useCallback((seriesTask: SeriesTaskDraft, index: number) => {
+        if (seriesTask.description.trim().length > 0) return true
+        return index === 0 && (!!instructionsFile || !!existingInstructionsFile)
+    }, [existingInstructionsFile, instructionsFile])
+
+    const isSeriesTaskValid = useCallback((seriesTask: SeriesTaskDraft, index: number) => {
+        return (
+            seriesTask.title.trim().length > 0 &&
+            isSeriesTaskDescriptionValid(seriesTask, index) &&
+            seriesTask.startDate !== "" &&
+            seriesTask.endDate !== ""
         )
+    }, [isSeriesTaskDescriptionValid])
+
+    const goToSeriesTask = useCallback((index: number) => {
+        if (task) return
+
+        const nextDrafts = getSeriesTaskDraftsWithCurrentStep()
+        const targetTask = nextDrafts[index]
+        if (!targetTask) return
+
+        setSeriesTasks(nextDrafts)
+        setActiveSeriesTaskIndex(index)
+        loadSeriesTaskDraft(targetTask)
+        setError(null)
+    }, [getSeriesTaskDraftsWithCurrentStep, loadSeriesTaskDraft, task])
+
+    const addSeriesTask = () => {
+        const nextDrafts = getSeriesTaskDraftsWithCurrentStep()
+        const currentTask = nextDrafts[activeSeriesTaskIndex]
+
+        if (!currentTask || !isSeriesTaskValid(currentTask, activeSeriesTaskIndex)) {
+            setError("Complete this task's required fields before adding the next task in series.")
+            return
+        }
+
+        const newSeriesTask = createSeriesTaskDraft()
+        const appendedDrafts = [...nextDrafts, newSeriesTask]
+        setSeriesTasks(appendedDrafts)
+        setActiveSeriesTaskIndex(appendedDrafts.length - 1)
+        loadSeriesTaskDraft(newSeriesTask)
+        setError(null)
     }
 
-    const removeSeriesTask = (seriesTaskId: string) => {
-        setSeriesTasks((prev) => prev.filter((seriesTask) => seriesTask.id !== seriesTaskId))
+    const removeActiveSeriesTask = () => {
+        if (task || activeSeriesTaskIndex === 0) return
+
+        const nextDrafts = getSeriesTaskDraftsWithCurrentStep().filter((_, index) => index !== activeSeriesTaskIndex)
+        const nextIndex = Math.max(0, activeSeriesTaskIndex - 1)
+        const nextTask = nextDrafts[nextIndex] ?? createSeriesTaskDraft()
+
+        setSeriesTasks(nextDrafts.length > 0 ? nextDrafts : [nextTask])
+        setActiveSeriesTaskIndex(nextIndex)
+        loadSeriesTaskDraft(nextTask)
+        setError(null)
     }
 
     const [isLoading, setIsLoading] = useState(false)
@@ -550,6 +618,10 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const hasDescriptionValue = description.trim().length > 0 || !!instructionsFile || !!existingInstructionsFile
     const isDescriptionSatisfied = hasDescriptionValue || isDraggingFile
     const hasDateRange = startDate !== "" && endDate !== ""
+    const isPrimarySeriesStep = !task && activeSeriesTaskIndex === 0
+    const canUseInstructionsForCurrentStep = !!task || isPrimarySeriesStep
+    const currentSeriesTaskCount = task ? 1 : Math.max(seriesTasks.length, 1)
+    const currentSeriesStepNumber = task ? (task.series?.position ?? 1) : activeSeriesTaskIndex + 1
 
     const requiredTagClass = (met: boolean) =>
         `text-[10px] font-normal text-destructive transition-all duration-200 overflow-hidden whitespace-nowrap pointer-events-none select-none ${met ? "opacity-0 max-w-0 ml-0" : "opacity-100 max-w-[80px] ml-0"}`
@@ -578,17 +650,17 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
     // Validation - assignees are optional
     const isValid = useMemo(() => {
+        if (!task) {
+            const completeSeriesTasks = getSeriesTaskDraftsWithCurrentStep()
+            return completeSeriesTasks.length > 0 && completeSeriesTasks.every((seriesTask, index) => isSeriesTaskValid(seriesTask, index))
+        }
+
         return (
             hasTitle &&
             hasDescriptionValue &&
-            hasDateRange &&
-            seriesTasks.every((seriesTask) => (
-                seriesTask.title.trim().length > 0 &&
-                seriesTask.startDate !== "" &&
-                seriesTask.endDate !== ""
-            ))
+            hasDateRange
         )
-    }, [hasTitle, hasDescriptionValue, hasDateRange, seriesTasks])
+    }, [getSeriesTaskDraftsWithCurrentStep, hasDateRange, hasDescriptionValue, hasTitle, isSeriesTaskValid, task])
 
     useEffect(() => {
         if (!open) return
@@ -601,6 +673,15 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 ? prev.filter(id => id !== userId)
                 : [...prev, userId]
         )
+    }
+
+    const handleHeaderBack = () => {
+        if (!task && activeSeriesTaskIndex > 0) {
+            goToSeriesTask(activeSeriesTaskIndex - 1)
+            return
+        }
+
+        onBack?.()
     }
 
     function handleClose() {
@@ -698,6 +779,14 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
                 handleClose()
             } else {
+                const completeSeriesTasks = getSeriesTaskDraftsWithCurrentStep()
+                const primaryTask = completeSeriesTasks[0]
+                if (!primaryTask) {
+                    setError("Add at least one task before creating the series.")
+                    setIsLoading(false)
+                    return
+                }
+
                 const attachmentFolderPayload = (driveConfig?.connected && rootId)
                     ? {
                         attachmentFolderId: selectedFolder?.id || null,
@@ -705,18 +794,18 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                     }
                     : {}
                 const result = await createTask({
-                    title: title.trim(),
-                    description: description.trim(),
+                    title: primaryTask.title.trim(),
+                    description: primaryTask.description.trim(),
                     assigneeId: sanitizedAssigneeIds[0],
                     assigneeIds: sanitizedAssigneeIds,
-                    startDate,
-                    endDate,
+                    startDate: primaryTask.startDate,
+                    endDate: primaryTask.endDate,
                     requireAttachment,
                     enableProgress,
                     columnId: columnId!,
                     projectId,
                     pushId: pushId || undefined,
-                    seriesTasks: seriesTasks.map((seriesTask) => ({
+                    seriesTasks: completeSeriesTasks.slice(1).map((seriesTask) => ({
                         title: seriesTask.title.trim(),
                         description: seriesTask.description.trim() || undefined,
                         startDate: seriesTask.startDate,
@@ -785,7 +874,8 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 setEnableChecklist(false)
                 setChecklistItems([])
                 setNewChecklistItem("")
-                setSeriesTasks([])
+                setSeriesTasks([createSeriesTaskDraft()])
+                setActiveSeriesTaskIndex(0)
 
                 if (createdTasks.length > 0 && onTaskCreated) {
                     onTaskCreated(createdTasks)
@@ -827,6 +917,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault()
         e.stopPropagation()
+        if (!canUseInstructionsForCurrentStep) return
         const item = e.dataTransfer.items?.[0]
         const file = item && item.kind === "file" ? item.getAsFile() : e.dataTransfer.files?.[0]
         if (file?.name) setDragFileName(file.name)
@@ -836,6 +927,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const handleDragLeave = (e: React.DragEvent) => {
         e.preventDefault()
         e.stopPropagation()
+        if (!canUseInstructionsForCurrentStep) return
         // Only reset if we're leaving the form entirely
         if (!e.currentTarget.contains(e.relatedTarget as Node)) {
             setIsDraggingFile(false)
@@ -846,6 +938,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault()
         e.stopPropagation()
+        if (!canUseInstructionsForCurrentStep) return
         setIsDraggingFile(false)
         setDragFileName(null)
 
@@ -874,21 +967,30 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                         className="flex flex-col h-full max-h-[85vh]"
                     >
                         <DialogHeader className="p-6 pb-2">
-                            {onBack && (
+                            {((!task && activeSeriesTaskIndex > 0) || onBack) ? (
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    onClick={onBack}
+                                    onClick={handleHeaderBack}
                                     className="w-fit -ml-2 mb-1 h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                                 >
                                     <ArrowLeft className="h-3.5 w-3.5 mr-1" />
-                                    Back
+                                    {!task && activeSeriesTaskIndex > 0 ? "Previous task" : "Back"}
                                 </Button>
-                            )}
-                            <DialogTitle className="text-xl font-semibold tracking-tight">
-                                {task ? "Edit Task" : "Create New Task"}
-                            </DialogTitle>
+                            ) : null}
+                            <div className="space-y-1">
+                                <DialogTitle className="text-xl font-semibold tracking-tight">
+                                    {task ? "Edit Task" : "Create New Task"}
+                                </DialogTitle>
+                                {!task && (
+                                    <DialogDescription className="text-sm text-muted-foreground">
+                                        {currentSeriesTaskCount > 1
+                                            ? `Task ${currentSeriesStepNumber} of ${currentSeriesTaskCount} in this series.`
+                                            : "Create a single task or add another task in series from the footer."}
+                                    </DialogDescription>
+                                )}
+                            </div>
                         </DialogHeader>
 
                         <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-6">
@@ -927,6 +1029,44 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                     </div>
                                 </div>
                             )}
+                            {!task && currentSeriesTaskCount > 1 && (
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                                        {getSeriesTaskDraftsWithCurrentStep().map((seriesTask, index) => {
+                                            const isActive = index === activeSeriesTaskIndex
+                                            const label = seriesTask.title.trim() || `Task ${index + 1}`
+
+                                            return (
+                                                <button
+                                                    key={seriesTask.id}
+                                                    type="button"
+                                                    onClick={() => goToSeriesTask(index)}
+                                                    className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${isActive
+                                                        ? "border-foreground/20 bg-foreground text-background"
+                                                        : "border-border bg-background text-muted-foreground hover:text-foreground"
+                                                        }`}
+                                                >
+                                                    {label}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                    {activeSeriesTaskIndex > 0 && (
+                                        <div className="flex justify-end">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 px-2 text-[11px] text-muted-foreground hover:text-destructive"
+                                                onClick={removeActiveSeriesTask}
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                                Remove this task
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="space-y-4">
                                 <div className="space-y-1">
@@ -960,22 +1100,24 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                             value={description}
                                             onChange={(e) => setDescription(e.target.value)}
                                             autoComplete="off"
-                                            placeholder={(instructionsFile || existingInstructionsFile) && description.trim() === ""
-                                                ? "Type Description"
-                                                : "Type Description or Drag Files"}
+                                            placeholder={canUseInstructionsForCurrentStep
+                                                ? (instructionsFile || existingInstructionsFile) && description.trim() === ""
+                                                    ? "Type Description"
+                                                    : "Type Description or Drag Files"
+                                                : "Type Description"}
                                             className={`min-h-[120px] resize-none overflow-hidden pr-24 ${isDraggingFile ? "ring-1 ring-primary/40" : ""}`}
                                         />
                                         <div
                                             className={`absolute top-2 ${instructionsFile || existingInstructionsFile ? "right-8" : "right-2"} flex items-center gap-2 text-[11px] text-muted-foreground pointer-events-none`}
                                         >
-                                            <span className={requiredTagClass(isDescriptionSatisfied)}>Required</span>
-                                            {(isDraggingFile ? dragFileName : (instructionsFile?.name || existingInstructionsFile?.name)) && (
+                                            <span className={requiredTagClass(canUseInstructionsForCurrentStep ? isDescriptionSatisfied : description.trim().length > 0)}>Required</span>
+                                            {canUseInstructionsForCurrentStep && (isDraggingFile ? dragFileName : (instructionsFile?.name || existingInstructionsFile?.name)) && (
                                                 <span className="max-w-[160px] truncate pointer-events-none">
                                                     {isDraggingFile ? dragFileName : (instructionsFile?.name || existingInstructionsFile?.name)}
                                                 </span>
                                             )}
                                         </div>
-                                        {(instructionsFile || existingInstructionsFile) && (
+                                        {canUseInstructionsForCurrentStep && (instructionsFile || existingInstructionsFile) && (
                                             <button
                                                 type="button"
                                                 className="absolute top-2.5 right-3 text-muted-foreground hover:text-foreground transition-colors"
@@ -988,6 +1130,11 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                             </button>
                                         )}
                                     </div>
+                                    {!task && !isPrimarySeriesStep && (instructionsFile || existingInstructionsFile || enableChecklist) && (
+                                        <p className="text-[11px] text-muted-foreground">
+                                            Instructions and checklist settings stay attached to Task 1 in the series.
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
@@ -1260,7 +1407,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 </div>
 
                                 {/* Checklist Option - Only show when creating new task */}
-                                {!task && (
+                                {!task && isPrimarySeriesStep && (
                                     <div className="border p-3 rounded-lg bg-muted/20">
                                         <div className="flex items-center space-x-2">
                                             <Checkbox
@@ -1335,119 +1482,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 )}
                             </div>
 
-                            {!task && (
-                                <div className="space-y-3 pt-2">
-                                    {seriesTasks.length > 0 && (
-                                        <div className="rounded-xl border bg-muted/20 p-4 space-y-3">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="space-y-1">
-                                                    <p className="text-sm font-medium">Task series</p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        Step 1 uses the main form above. Each follow-up task unlocks only after the step before it reaches Done. Extra steps inherit assignees, completion rules, push, and upload folder.
-                                                    </p>
-                                                </div>
-                                                <span className="rounded-full border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground shrink-0">
-                                                    {seriesTasks.length + 1} steps
-                                                </span>
-                                            </div>
-
-                                            <div className="space-y-3">
-                                                {seriesTasks.map((seriesTask, index) => {
-                                                    const hasSeriesTitle = seriesTask.title.trim().length > 0
-                                                    const hasSeriesDateRange = seriesTask.startDate !== "" && seriesTask.endDate !== ""
-
-                                                    return (
-                                                        <div key={seriesTask.id} className="rounded-lg border bg-background p-3 space-y-3">
-                                                            <div className="flex items-center justify-between gap-3">
-                                                                <div>
-                                                                    <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                                                                        Step {index + 2}
-                                                                    </p>
-                                                                    <p className="text-sm font-medium text-foreground">
-                                                                        {hasSeriesTitle ? seriesTask.title.trim() : "Untitled follow-up task"}
-                                                                    </p>
-                                                                </div>
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                                                    onClick={() => removeSeriesTask(seriesTask.id)}
-                                                                >
-                                                                    <Trash2 className="h-4 w-4" />
-                                                                </Button>
-                                                            </div>
-
-                                                            <div className="space-y-1">
-                                                                <Label htmlFor={`series-title-${seriesTask.id}`} className="text-xs font-medium text-muted-foreground">
-                                                                    Task title
-                                                                </Label>
-                                                                <div className="relative">
-                                                                    <Input
-                                                                        id={`series-title-${seriesTask.id}`}
-                                                                        value={seriesTask.title}
-                                                                        onChange={(e) => updateSeriesTask(seriesTask.id, { title: e.target.value })}
-                                                                        autoComplete="off"
-                                                                        placeholder="Next task title"
-                                                                        className="h-10 pr-16"
-                                                                    />
-                                                                    <span className={`absolute right-3 top-1/2 -translate-y-1/2 ${requiredTagClass(hasSeriesTitle)}`}>
-                                                                        Required
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="space-y-1">
-                                                                <Label htmlFor={`series-description-${seriesTask.id}`} className="text-xs font-medium text-muted-foreground">
-                                                                    Notes
-                                                                </Label>
-                                                                <Textarea
-                                                                    id={`series-description-${seriesTask.id}`}
-                                                                    value={seriesTask.description}
-                                                                    onChange={(e) => updateSeriesTask(seriesTask.id, { description: e.target.value })}
-                                                                    placeholder="Optional context for this follow-up step"
-                                                                    className="min-h-[90px] resize-none"
-                                                                />
-                                                            </div>
-
-                                                            <div className="space-y-1">
-                                                                <Label htmlFor={`series-dates-${seriesTask.id}`} className="text-xs font-medium text-muted-foreground">
-                                                                    Dates
-                                                                </Label>
-                                                                <div className="relative">
-                                                                    <DateRangePicker
-                                                                        id={`series-dates-${seriesTask.id}`}
-                                                                        startDate={seriesTask.startDate}
-                                                                        endDate={seriesTask.endDate}
-                                                                        onChange={(start, end) => updateSeriesTask(seriesTask.id, { startDate: start, endDate: end })}
-                                                                        className="h-10 pr-16"
-                                                                        placeholder="Select Days"
-                                                                        quickActions={[]}
-                                                                    />
-                                                                    <span className={`absolute right-3 top-1/2 -translate-y-1/2 ${requiredTagClass(hasSeriesDateRange)}`}>
-                                                                        Required
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="w-full border-dashed"
-                                        onClick={addSeriesTask}
-                                    >
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        {seriesTasks.length > 0 ? "Add another task in series" : "Add task in series"}
-                                    </Button>
-                                </div>
-                            )}
-
                         </div>
 
                         <div className="p-6 pt-2 border-t mt-auto bg-background rounded-b-lg">
@@ -1469,13 +1503,24 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 </div>
                                 <div className="flex gap-2 shrink-0">
                                     <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
+                                    {!task && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={addSeriesTask}
+                                            disabled={isLoading}
+                                        >
+                                            <Plus className="h-4 w-4 mr-2" />
+                                            Add task in series
+                                        </Button>
+                                    )}
                                     <Button type="submit" disabled={isLoading || !isValid}>
                                         {isLoading
                                             ? 'Saving...'
                                             : task
                                                 ? "Save Changes"
-                                                : seriesTasks.length > 0
-                                                    ? `Create ${seriesTasks.length + 1} Tasks`
+                                                : currentSeriesTaskCount > 1
+                                                    ? `Create ${currentSeriesTaskCount} Tasks`
                                                     : "Create Task"}
                                     </Button>
                                 </div>
