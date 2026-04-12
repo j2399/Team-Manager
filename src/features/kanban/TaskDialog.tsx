@@ -587,7 +587,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         const currentTask = nextDrafts[activeSeriesTaskIndex]
 
         if (!currentTask || !isSeriesTaskValid(currentTask, activeSeriesTaskIndex)) {
-            setError("Complete this task's required fields before adding the next task in series.")
             return
         }
 
@@ -622,6 +621,10 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const canUseInstructionsForCurrentStep = !!task || isPrimarySeriesStep
     const currentSeriesTaskCount = task ? 1 : Math.max(seriesTasks.length, 1)
     const currentSeriesStepNumber = task ? (task.series?.position ?? 1) : activeSeriesTaskIndex + 1
+    const currentSeriesTaskDraft = !task
+        ? getSeriesTaskDraftsWithCurrentStep()[activeSeriesTaskIndex] ?? null
+        : null
+    const canAddSeriesTask = !task && !!currentSeriesTaskDraft && isSeriesTaskValid(currentSeriesTaskDraft, activeSeriesTaskIndex)
 
     const requiredTagClass = (met: boolean) =>
         `text-[10px] font-normal text-destructive transition-all duration-200 overflow-hidden whitespace-nowrap pointer-events-none select-none ${met ? "opacity-0 max-w-0 ml-0" : "opacity-100 max-w-[80px] ml-0"}`
@@ -1506,11 +1509,9 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                     {!task && (
                                         <Button
                                             type="button"
-                                            variant="outline"
                                             onClick={addSeriesTask}
-                                            disabled={isLoading}
+                                            disabled={isLoading || !canAddSeriesTask}
                                         >
-                                            <Plus className="h-4 w-4 mr-2" />
                                             Add task in series
                                         </Button>
                                     )}
@@ -1519,9 +1520,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                             ? 'Saving...'
                                             : task
                                                 ? "Save Changes"
-                                                : currentSeriesTaskCount > 1
-                                                    ? `Create ${currentSeriesTaskCount} Tasks`
-                                                    : "Create Task"}
+                                                : "Done"}
                                     </Button>
                                 </div>
                             </DialogFooter>
