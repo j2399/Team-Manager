@@ -101,14 +101,7 @@ export async function getProjectTasks(
             if (pushId === null) return !task.pushId
             return task.pushId === pushId
         })
-        .sort((a, b) => {
-            if (a.seriesId && b.seriesId && a.seriesId === b.seriesId) {
-                const bySeriesPosition = (a.seriesPosition ?? 0) - (b.seriesPosition ?? 0)
-                if (bySeriesPosition !== 0) return bySeriesPosition
-            }
-
-            return compareTasksByUpdatedAtDesc(a, b)
-        })
+        .sort((a, b) => compareTasksByUpdatedAtDesc(a, b))
 }
 
 export function compareTasksByUpdatedAtDesc(a: BoardTaskDoc, b: BoardTaskDoc) {
@@ -301,81 +294,6 @@ async function buildAttachmentMap(ctx: QueryCtx, tasks: BoardTaskDoc[], latestOn
     )
 }
 
-type BoardTaskSeriesMeta = {
-    id: string
-    position: number
-    totalCount: number
-    isBlocked: boolean
-    previousTaskId: string | null
-    previousTaskTitle: string | null
-}
-
-function compareSeriesTasksByPosition(a: BoardTaskDoc, b: BoardTaskDoc) {
-    const byPosition = (a.seriesPosition ?? 0) - (b.seriesPosition ?? 0)
-    if (byPosition !== 0) return byPosition
-
-    const byCreatedAt = (a.createdAt ?? 0) - (b.createdAt ?? 0)
-    if (byCreatedAt !== 0) return byCreatedAt
-
-    return a.id.localeCompare(b.id)
-}
-
-async function buildTaskSeriesMap(ctx: QueryCtx, tasks: BoardTaskDoc[]) {
-    const seriesIds = Array.from(
-        new Set(tasks.map((task) => task.seriesId).filter((seriesId): seriesId is string => Boolean(seriesId)))
-    )
-
-    if (seriesIds.length === 0) {
-        return new Map<string, BoardTaskSeriesMeta>()
-    }
-
-    const taskSeries = await Promise.all(
-        seriesIds.map((seriesId) =>
-            ctx.db
-                .query("tasks")
-                .withIndex("by_seriesId", (q) => q.eq("seriesId", seriesId))
-                .collect()
-        )
-    )
-
-    const seriesTasks = taskSeries.flat()
-    const columnIds = Array.from(
-        new Set(seriesTasks.map((task) => task.columnId).filter((columnId): columnId is string => Boolean(columnId)))
-    )
-    const columns = await Promise.all(columnIds.map((columnId) => getByLegacyId(ctx, "columns", columnId)))
-    const columnNameMap = new Map(
-        columns
-            .filter((column): column is NonNullable<typeof column> => column !== null)
-            .map((column) => [column.id, column.name] as const)
-    )
-
-    const seriesMetaMap = new Map<string, BoardTaskSeriesMeta>()
-
-    taskSeries.forEach((seriesRows, index) => {
-        const seriesId = seriesIds[index]
-        const sortedSeries = seriesRows.slice().sort(compareSeriesTasksByPosition)
-        const totalCount = sortedSeries.length
-
-        sortedSeries.forEach((seriesTask, positionIndex) => {
-            const previousTask = positionIndex > 0 ? sortedSeries[positionIndex - 1] ?? null : null
-            const previousTaskColumnName = previousTask?.columnId
-                ? columnNameMap.get(previousTask.columnId) ?? null
-                : null
-
-            seriesMetaMap.set(seriesTask.id, {
-                id: seriesId,
-                position: seriesTask.seriesPosition ?? positionIndex + 1,
-                totalCount,
-                isBlocked: !!previousTask && previousTaskColumnName !== "Done",
-                previousTaskId: previousTask?.id ?? null,
-                previousTaskTitle: previousTask?.title ?? null,
-            })
-        })
-    })
-
-    return seriesMetaMap
-}
-
 export async function buildBoardTasks(
     ctx: QueryCtx,
     tasks: BoardTaskDoc[],
@@ -389,14 +307,13 @@ export async function buildBoardTasks(
         new Set(tasks.map((task) => task.pushId).filter((pushId): pushId is string => Boolean(pushId)))
     )
 
-    const [directAssignees, pushes, taskAssignees, latestDoneLogs, latestComments, attachments, taskSeries] = await Promise.all([
+    const [directAssignees, pushes, taskAssignees, latestDoneLogs, latestComments, attachments] = await Promise.all([
         Promise.all(directAssigneeIds.map((userId) => getUserByLegacyId(ctx, userId))),
         Promise.all(pushIds.map((pushId) => getByLegacyId(ctx, "pushes", pushId))),
         buildTaskAssigneeMap(ctx, tasks),
         buildLatestDoneLogMap(ctx, tasks),
         buildLatestCommentMap(ctx, tasks),
         buildAttachmentMap(ctx, tasks, latestAttachmentsOnly),
-        buildTaskSeriesMap(ctx, tasks),
     ])
 
     const directAssigneeMap = new Map(
@@ -443,7 +360,6 @@ export async function buildBoardTasks(
             activityLogs: latestDoneLogs.get(task.id) ?? [],
             comments: latestComments.get(task.id) ?? [],
             attachments: attachments.get(task.id) ?? [],
-            series: taskSeries.get(task.id) ?? null,
             push: push
                 ? {
                     id: push.id,
@@ -645,7 +561,6 @@ export async function buildProjectSyncData(
             updatedAt: task.updatedAt,
             assignee: task.assignee,
             assignees: task.assignees,
-            series: task.series,
             push: task.push,
             requireAttachment: task.requireAttachment,
         attachmentFolderId: task.attachmentFolderId,

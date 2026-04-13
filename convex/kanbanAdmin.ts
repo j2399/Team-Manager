@@ -41,66 +41,6 @@ async function getColumnBoardProject(db: any, columnId: string) {
     return { column, board, project }
 }
 
-function compareSeriesTasksByPosition(a: any, b: any) {
-    const byPosition = (a.seriesPosition ?? 0) - (b.seriesPosition ?? 0)
-    if (byPosition !== 0) return byPosition
-
-    const byCreatedAt = (a.createdAt ?? 0) - (b.createdAt ?? 0)
-    if (byCreatedAt !== 0) return byCreatedAt
-
-    return String(a.id ?? "").localeCompare(String(b.id ?? ""))
-}
-
-async function getDoneColumnForBoard(db: any, boardId: string) {
-    const columns = await db
-        .query("columns")
-        .withIndex("by_boardId", (q: any) => q.eq("boardId", boardId))
-        .collect()
-
-    return (columns as any[]).find((column) => column.name === "Done") ?? null
-}
-
-async function getSeriesTasks(db: any, seriesId: string) {
-    const tasks = await db
-        .query("tasks")
-        .withIndex("by_seriesId", (q: any) => q.eq("seriesId", seriesId))
-        .collect()
-
-    return (tasks as any[]).slice().sort(compareSeriesTasksByPosition)
-}
-
-async function getTaskSeriesState(
-    db: any,
-    task: { seriesId?: string; seriesPosition?: number },
-    boardId: string
-) {
-    if (!task.seriesId || !task.seriesPosition || task.seriesPosition <= 1) {
-        return {
-            previousTask: null,
-            isBlocked: false,
-        }
-    }
-
-    const seriesTasks = await getSeriesTasks(db, task.seriesId)
-    const previousTask = seriesTasks
-        .filter((seriesTask) => (seriesTask.seriesPosition ?? 0) < task.seriesPosition!)
-        .at(-1) ?? null
-
-    if (!previousTask) {
-        return {
-            previousTask: null,
-            isBlocked: false,
-        }
-    }
-
-    const doneColumn = await getDoneColumnForBoard(db, boardId)
-
-    return {
-        previousTask,
-        isBlocked: !doneColumn || previousTask.columnId !== doneColumn.id,
-    }
-}
-
 async function insertActivityLog(
     db: any,
     data: {
@@ -151,11 +91,6 @@ export const createTask = mutation({
         pushId: v.optional(v.string()),
         attachmentFolderId: v.optional(v.union(v.string(), v.null())),
         attachmentFolderName: v.optional(v.union(v.string(), v.null())),
-        seriesTasks: v.optional(v.array(v.object({
-            taskId: v.string(),
-            title: v.string(),
-            description: v.optional(v.string()),
-        }))),
         now: v.number(),
         createdBy: v.string(),
         createdByName: v.string(),
@@ -196,28 +131,6 @@ export const createTask = mutation({
             }
         }
 
-        const normalizedSeriesTasks = (args.seriesTasks ?? []).map((seriesTask) => ({
-            ...seriesTask,
-            title: seriesTask.title.trim(),
-            description: seriesTask.description?.trim() || undefined,
-        }))
-
-        const invalidSeriesTaskIndex = normalizedSeriesTasks.findIndex((seriesTask) => seriesTask.title.length === 0)
-        if (invalidSeriesTaskIndex !== -1) {
-            return { error: `Series task ${invalidSeriesTaskIndex + 2} title is required` }
-        }
-
-        const taskDefinitions = [
-            {
-                taskId: args.taskId,
-                title: primaryTitle,
-                description: args.description?.trim() || undefined,
-            },
-            ...normalizedSeriesTasks,
-        ]
-
-        const seriesId = taskDefinitions.length > 1 ? createLegacyId("task_series") : undefined
-
         // Create taskAssignee rows for all unique assignee IDs
         const allAssigneeIds = Array.from(
             new Set([
@@ -226,60 +139,42 @@ export const createTask = mutation({
             ])
         ).filter((id) => id.trim().length > 0)
 
-        const createdTasks: Array<{
-            id: string
-            columnId: string
-            assigneeIds: string[]
-        }> = []
+        await ctx.db.insert("tasks", {
+            id: args.taskId,
+            title: primaryTitle,
+            description: args.description?.trim() || undefined,
+            status: "Todo",
+            priority: "Medium",
+            columnId: targetColumnId,
+            assigneeId: args.assigneeId && args.assigneeId !== "" ? args.assigneeId : undefined,
+            pushId: args.pushId,
+            requireAttachment: args.requireAttachment,
+            enableProgress: args.enableProgress,
+            progress: args.progress,
+            attachmentFolderId: args.attachmentFolderId ?? undefined,
+            attachmentFolderName: args.attachmentFolderName ?? undefined,
+            createdAt: args.now,
+            updatedAt: args.now,
+        })
 
-        for (const [index, taskDefinition] of taskDefinitions.entries()) {
-            await ctx.db.insert("tasks", {
-                id: taskDefinition.taskId,
-                title: taskDefinition.title,
-                description: taskDefinition.description,
-                status: "Todo",
-                priority: "Medium",
-                columnId: targetColumnId,
-                assigneeId: args.assigneeId && args.assigneeId !== "" ? args.assigneeId : undefined,
-                pushId: args.pushId,
-                requireAttachment: args.requireAttachment,
-                enableProgress: args.enableProgress,
-                progress: args.progress,
-                attachmentFolderId: args.attachmentFolderId ?? undefined,
-                attachmentFolderName: args.attachmentFolderName ?? undefined,
-                seriesId,
-                seriesPosition: seriesId ? index + 1 : undefined,
+        for (const userId of allAssigneeIds) {
+            await ctx.db.insert("taskAssignees", {
+                id: createLegacyId("task_assignee"),
+                taskId: args.taskId,
+                userId,
                 createdAt: args.now,
-                updatedAt: args.now,
-            })
-
-            for (const userId of allAssigneeIds) {
-                await ctx.db.insert("taskAssignees", {
-                    id: createLegacyId("task_assignee"),
-                    taskId: taskDefinition.taskId,
-                    userId,
-                    createdAt: args.now,
-                })
-            }
-
-            await insertActivityLog(ctx.db, {
-                taskId: taskDefinition.taskId,
-                taskTitle: taskDefinition.title,
-                action: "created",
-                changedBy: args.createdBy,
-                changedByName: args.createdByName,
-                details: seriesId
-                    ? `Task "${taskDefinition.title}" was created as step ${index + 1} of ${taskDefinitions.length}`
-                    : `Task "${taskDefinition.title}" was created`,
-                createdAt: args.now,
-            })
-
-            createdTasks.push({
-                id: taskDefinition.taskId,
-                columnId: targetColumnId,
-                assigneeIds: allAssigneeIds,
             })
         }
+
+        await insertActivityLog(ctx.db, {
+            taskId: args.taskId,
+            taskTitle: primaryTitle,
+            action: "created",
+            changedBy: args.createdBy,
+            changedByName: args.createdByName,
+            details: `Task "${primaryTitle}" was created`,
+            createdAt: args.now,
+        })
 
         // Get workspace discordChannelId for Discord notifications
         const workspace = await ctx.db
@@ -289,8 +184,7 @@ export const createTask = mutation({
 
         return {
             success: true as const,
-            task: createdTasks[0],
-            tasks: createdTasks,
+            task: { id: args.taskId, columnId: targetColumnId, assigneeIds: allAssigneeIds },
             projectName: project.name as string,
             workspaceDiscordChannelId: workspace?.discordChannelId ?? null,
         }
@@ -336,16 +230,6 @@ export const updateTaskStatus = mutation({
         const sourceColumnName = sourceCtx.column.name as string
         const targetColumnName = targetColCtx.column.name as string
         const projectId = sourceCtx.board.projectId as string
-
-        const seriesState = await getTaskSeriesState(ctx.db, task, sourceCtx.board.id as string)
-        if (seriesState.isBlocked) {
-            return {
-                error: "SERIES_TASK_BLOCKED" as const,
-                message: seriesState.previousTask?.title
-                    ? `Complete "${seriesState.previousTask.title}" before moving this task.`
-                    : "Complete the previous task in this series before moving this task.",
-            }
-        }
 
         // RBAC: Members cannot move to Done
         if (args.userRole === "Member" && targetColumnName === "Done") {
@@ -864,15 +748,6 @@ export const updateTaskProgress = mutation({
 
         if (!isAssignee && args.userRole !== "Admin") {
             return { error: "Only assignees can update progress" }
-        }
-
-        const seriesState = await getTaskSeriesState(ctx.db, task, colCtx.board.id as string)
-        if (seriesState.isBlocked) {
-            return {
-                error: seriesState.previousTask?.title
-                    ? `Complete "${seriesState.previousTask.title}" before updating this task.`
-                    : "Complete the previous task in this series before updating this task.",
-            }
         }
 
         // Handle force-move to Review if progress is 100

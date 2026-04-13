@@ -135,8 +135,6 @@ export default defineSchema({
         dueDate: v.optional(v.number()),
         submittedAt: v.optional(v.number()),
         approvedAt: v.optional(v.number()),
-        seriesId: v.optional(v.string()),
-        seriesPosition: v.optional(v.number()),
         createdAt: v.number(),
         updatedAt: v.number(),
     })
@@ -144,8 +142,6 @@ export default defineSchema({
         .index("by_columnId", ["columnId"])
         .index("by_pushId", ["pushId"])
         .index("by_assigneeId", ["assigneeId"])
-        .index("by_seriesId", ["seriesId"])
-        .index("by_seriesId_position", ["seriesId", "seriesPosition"])
         .index("by_updatedAt", ["updatedAt"]),
 
     taskDeletions: defineTable({

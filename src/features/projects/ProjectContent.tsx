@@ -67,14 +67,6 @@ type TaskType = {
     comments?: { createdAt: Date | string }[]
     attachments?: { id: string; createdAt: Date | string }[]
     push?: { id: string; name: string; color: string; status: string } | null
-    series?: {
-        id: string
-        position: number
-        totalCount: number
-        isBlocked: boolean
-        previousTaskId: string | null
-        previousTaskTitle: string | null
-    } | null
 }
 
 type ProjectContentProps = {

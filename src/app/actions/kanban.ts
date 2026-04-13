@@ -30,10 +30,6 @@ type CreateTaskInput = {
     pushId?: string
     attachmentFolderId?: string | null
     attachmentFolderName?: string | null
-    seriesTasks?: Array<{
-        title: string
-        description?: string
-    }>
 }
 
 async function getWorkspaceDriveConfig(workspaceId: string) {
@@ -115,18 +111,6 @@ export async function createTask(input: CreateTaskInput) {
             attachmentFolderName = null
         }
 
-        const seriesTasks = (input.seriesTasks ?? []).map((seriesTask, index) => {
-            const nextTitle = seriesTask.title.trim()
-            if (!nextTitle) {
-                throw new Error(`Series task ${index + 2} title is required`)
-            }
-
-            return {
-                title: nextTitle,
-                description: seriesTask.description?.trim() || undefined,
-            }
-        })
-
         const result = await createTaskInConvex({
             title: title.trim(),
             projectId,
@@ -141,7 +125,6 @@ export async function createTask(input: CreateTaskInput) {
             pushId: pushId,
             attachmentFolderId,
             attachmentFolderName,
-            seriesTasks,
             createdBy: user.id,
             createdByName: user.name || 'Unknown',
         })
@@ -153,14 +136,12 @@ export async function createTask(input: CreateTaskInput) {
         const taskResult = result as {
             success: true
             task: { id: string; columnId: string; assigneeIds: string[] }
-            tasks?: Array<{ id: string; columnId: string; assigneeIds: string[] }>
             projectName: string
             workspaceDiscordChannelId: string | null
         }
 
         // Discord: ping only when someone is assigned
-        const createdTaskRefs = taskResult.tasks?.length ? taskResult.tasks : [taskResult.task]
-        const assignedIds = createdTaskRefs[0]?.assigneeIds ?? []
+        const assignedIds = taskResult.task.assigneeIds ?? []
         const webhookUrl = taskResult.workspaceDiscordChannelId ?? null
         if (assignedIds.length > 0 && webhookUrl) {
             const assignedUsers = await fetchQuery(api.auth.getUserDiscordIds, { userIds: assignedIds })
@@ -168,14 +149,11 @@ export async function createTask(input: CreateTaskInput) {
             if (assignedUsers.length > 0) {
                 const mentions = assignedUsers.map((u) => `<@${u.discordId}>`).join(" ")
                 if (mentions) {
-                    const createdTaskCount = createdTaskRefs.length
                     await sendDiscordNotification(
                         "",
                         [{
-                            title: createdTaskCount > 1 ? "📚 Task Series Assignment" : "📌 Task Assignment",
-                            description: createdTaskCount > 1
-                                ? `${mentions}, you have been assigned a ${createdTaskCount}-task series starting with **${title.trim()}** in project **${taskResult.projectName}**`
-                                : `${mentions}, you have been assigned **${title.trim()}** in project **${taskResult.projectName}**`,
+                            title: "📌 Task Assignment",
+                            description: `${mentions}, you have been assigned **${title.trim()}** in project **${taskResult.projectName}**`,
                             color: 0x5865F2,
                             timestamp: new Date().toISOString(),
                         }],
@@ -186,10 +164,7 @@ export async function createTask(input: CreateTaskInput) {
         }
 
         revalidatePath(`/dashboard/projects/${projectId}`)
-        const hydratedTasks = await Promise.all(
-            createdTaskRefs.map(async (taskRef) => getHydratedTask(taskRef.id))
-        )
-        const resolvedTasks = hydratedTasks.filter((task): task is NonNullable<typeof task> => task !== null)
+        const hydratedTask = await getHydratedTask(taskResult.task.id)
         const fallbackTask = {
             id: taskResult.task.id,
             title: title.trim(),
@@ -203,8 +178,7 @@ export async function createTask(input: CreateTaskInput) {
 
         return {
             success: true,
-            task: resolvedTasks[0] ?? fallbackTask,
-            tasks: resolvedTasks.length > 0 ? resolvedTasks : [fallbackTask],
+            task: hydratedTask ?? fallbackTask,
         }
     } catch (error) {
         console.error("Create task error:", error)

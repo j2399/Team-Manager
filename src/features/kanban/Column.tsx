@@ -26,14 +26,6 @@ type Task = {
     activityLogs?: { changedByName: string; createdAt: Date | string }[]
     comments?: { createdAt: Date | string }[]
     attachments?: { id: string; createdAt: Date | string }[]
-    series?: {
-        id: string
-        position: number
-        totalCount: number
-        isBlocked: boolean
-        previousTaskId: string | null
-        previousTaskTitle: string | null
-    } | null
 }
 
 type ColumnProps = {

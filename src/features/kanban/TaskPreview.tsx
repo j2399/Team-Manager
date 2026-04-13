@@ -18,7 +18,7 @@ import { createTaskComment, deleteTaskComment } from "@/app/actions/task-comment
 import { deleteTaskAttachment, uploadTaskAttachment } from "@/app/actions/task-attachments"
 import {
     Pencil, Clock,
-    Send, FileText, Upload, Reply, X, Download, Maximize2, Trash2, CheckCircle, XCircle, ListChecks, Lock
+    Send, FileText, Upload, Reply, X, Download, Maximize2, Trash2, CheckCircle, XCircle, ListChecks
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { getInitials } from "@/lib/utils"
@@ -43,14 +43,6 @@ type Task = {
     createdAt?: Date | string | null
     updatedAt?: Date | string | null
     assignees?: { user: { id: string; name: string } }[]
-    series?: {
-        id: string
-        position: number
-        totalCount: number
-        isBlocked: boolean
-        previousTaskId: string | null
-        previousTaskTitle: string | null
-    } | null
 }
 
 type ReplyTo = {
@@ -778,23 +770,7 @@ export function TaskPreview({ task, open, onOpenChange, onEdit, projectId, onTas
                                     {task.column?.name && (
                                         <span className="text-[9px] text-muted-foreground/50 shrink-0">{task.column.name}</span>
                                     )}
-                                    {task.series && (
-                                        <Badge variant="outline" className="h-4 text-[9px]">
-                                            Step {task.series.position}/{task.series.totalCount}
-                                        </Badge>
-                                    )}
-                                    {task.series?.isBlocked && (
-                                        <Badge variant="outline" className="h-4 gap-1 border-amber-200 bg-amber-50 text-[9px] text-amber-700">
-                                            <Lock className="h-2.5 w-2.5" />
-                                            Blocked
-                                        </Badge>
-                                    )}
                                 </div>
-                                {task.series?.isBlocked && task.series.previousTaskTitle && (
-                                    <p className="mt-1 text-[10px] text-amber-700/90">
-                                        Complete &ldquo;{task.series.previousTaskTitle}&rdquo; before starting this step.
-                                    </p>
-                                )}
                                 <div className="flex items-center gap-1.5 mt-1.5">
                                     {assigneeUsers.length > 0 ? (
                                         <>

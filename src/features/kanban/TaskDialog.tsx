@@ -12,13 +12,11 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Plus, Trash2, X, ListChecks, Folder, ChevronRight, Loader2, ArrowLeft, AlertCircle } from "lucide-react"
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
-import { cn } from "@/lib/utils"
 import { useQuery } from "convex/react"
 import { api } from "@convex/_generated/api"
 import { createTask, updateTaskDetails, deleteTask } from "@/app/actions/kanban"
@@ -39,14 +37,6 @@ type TaskType = {
     attachmentFolderName?: string | null
     instructionsFileUrl?: string | null
     instructionsFileName?: string | null
-    series?: {
-        id: string
-        position: number
-        totalCount: number
-        isBlocked: boolean
-        previousTaskId: string | null
-        previousTaskTitle: string | null
-    } | null
 }
 
 type TaskDialogResultTask = TaskType & {
@@ -72,12 +62,6 @@ type FolderNode = {
     modifiedTime?: string | null
 }
 
-type SeriesTaskDraft = {
-    id: string
-    title: string
-    description: string
-}
-
 import {
     AlertDialog,
     AlertDialogAction,
@@ -88,15 +72,6 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-
-function createSeriesTaskDraft(): SeriesTaskDraft {
-    const randomPart = Math.random().toString(36).slice(2, 8)
-    return {
-        id: `series-${Date.now()}-${randomPart}`,
-        title: "",
-        description: "",
-    }
-}
 
 export function TaskDialog({ columnId, projectId, pushId, users, task, open: externalOpen, onOpenChange, onTaskCreated, onTaskUpdated, onTaskDeleted, initialAssigneeIds, onBack, showOverlay = true }: {
     columnId?: string
@@ -201,8 +176,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const [enableChecklist, setEnableChecklist] = useState(false)
     const [checklistItems, setChecklistItems] = useState<string[]>([])
     const [newChecklistItem, setNewChecklistItem] = useState("")
-    const [seriesTasks, setSeriesTasks] = useState<SeriesTaskDraft[]>([])
-    const [activeSeriesTaskIndex, setActiveSeriesTaskIndex] = useState(0)
 
     // Reset form when task changes or dialog opens
     useEffect(() => {
@@ -244,8 +217,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                     setExistingInstructionsFile(null)
                 }
                 setInstructionsFile(null)
-                setSeriesTasks([])
-                setActiveSeriesTaskIndex(0)
             } else {
                 setInstructionsFile(null)
                 setExistingInstructionsFile(null)
@@ -260,8 +231,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 setEnableChecklist(false)
                 setChecklistItems([])
                 setNewChecklistItem("")
-                setSeriesTasks([createSeriesTaskDraft()])
-                setActiveSeriesTaskIndex(0)
             }
         }
     }, [task, open, sanitizeAssigneeIds])
@@ -506,121 +475,11 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         setChecklistItems(prev => prev.filter((_, i) => i !== index))
     }
 
-    const getSeriesTaskDraftsWithCurrentStep = useCallback(() => {
-        if (task) return []
-
-        const nextDraft = {
-            id: seriesTasks[activeSeriesTaskIndex]?.id ?? createSeriesTaskDraft().id,
-            title,
-            description,
-        }
-
-        if (seriesTasks.length === 0) {
-            return [nextDraft]
-        }
-
-        return seriesTasks.map((seriesTask, index) => (
-            index === activeSeriesTaskIndex
-                ? nextDraft
-                : seriesTask
-        ))
-    }, [activeSeriesTaskIndex, description, seriesTasks, task, title])
-
-    const loadSeriesTaskDraft = useCallback((seriesTask: SeriesTaskDraft) => {
-        setTitle(seriesTask.title)
-        setDescription(seriesTask.description)
-    }, [])
-
-    const isSeriesTaskDescriptionValid = useCallback((seriesTask: SeriesTaskDraft, index: number) => {
-        if (seriesTask.description.trim().length > 0) return true
-        return index === 0 && (!!instructionsFile || !!existingInstructionsFile)
-    }, [existingInstructionsFile, instructionsFile])
-
-    const isSeriesTaskValid = useCallback((seriesTask: SeriesTaskDraft, index: number) => {
-        return (
-            seriesTask.title.trim().length > 0 &&
-            isSeriesTaskDescriptionValid(seriesTask, index)
-        )
-    }, [isSeriesTaskDescriptionValid])
-
-    const isSeriesTaskEmpty = useCallback((seriesTask: SeriesTaskDraft) => {
-        return (
-            seriesTask.title.trim().length === 0 &&
-            seriesTask.description.trim().length === 0
-        )
-    }, [])
-
-    const goToSeriesTask = useCallback((index: number) => {
-        if (task) return
-
-        const nextDrafts = getSeriesTaskDraftsWithCurrentStep()
-        const targetTask = nextDrafts[index]
-        if (!targetTask) return
-
-        setSeriesTasks(nextDrafts)
-        setActiveSeriesTaskIndex(index)
-        loadSeriesTaskDraft(targetTask)
-        setError(null)
-    }, [getSeriesTaskDraftsWithCurrentStep, loadSeriesTaskDraft, task])
-
-    const addSeriesTask = () => {
-        const nextDrafts = getSeriesTaskDraftsWithCurrentStep()
-        const currentTask = nextDrafts[activeSeriesTaskIndex]
-
-        if (!currentTask || !isSeriesTaskValid(currentTask, activeSeriesTaskIndex)) {
-            return
-        }
-
-        const newSeriesTask = createSeriesTaskDraft()
-        const appendedDrafts = [...nextDrafts, newSeriesTask]
-        setSeriesTasks(appendedDrafts)
-        setActiveSeriesTaskIndex(appendedDrafts.length - 1)
-        loadSeriesTaskDraft(newSeriesTask)
-        setError(null)
-    }
-
-    const removeSeriesTask = useCallback((index: number) => {
-        if (index === 0) return
-        const nextDrafts = getSeriesTaskDraftsWithCurrentStep()
-        const filtered = nextDrafts.filter((_, i) => i !== index)
-        let nextActiveIndex = activeSeriesTaskIndex
-        if (activeSeriesTaskIndex >= filtered.length) {
-            nextActiveIndex = filtered.length - 1
-        } else if (activeSeriesTaskIndex > index) {
-            nextActiveIndex = activeSeriesTaskIndex - 1
-        }
-        setSeriesTasks(filtered)
-        setActiveSeriesTaskIndex(nextActiveIndex)
-        loadSeriesTaskDraft(filtered[nextActiveIndex])
-    }, [activeSeriesTaskIndex, getSeriesTaskDraftsWithCurrentStep, loadSeriesTaskDraft])
-
     const [isLoading, setIsLoading] = useState(false)
 
     const hasTitle = title.trim().length > 0
     const hasDescriptionValue = description.trim().length > 0 || !!instructionsFile || !!existingInstructionsFile
     const isDescriptionSatisfied = hasDescriptionValue || isDraggingFile
-    const isPrimarySeriesStep = !task && activeSeriesTaskIndex === 0
-    const canUseInstructionsForCurrentStep = !!task || isPrimarySeriesStep
-    const seriesTaskDrafts = useMemo(
-        () => (task ? [] : getSeriesTaskDraftsWithCurrentStep()),
-        [getSeriesTaskDraftsWithCurrentStep, task]
-    )
-    const submittableSeriesTaskDrafts = useMemo(() => {
-        if (task) return []
-        if (seriesTaskDrafts.length <= 1) return seriesTaskDrafts
-
-        const trailingTask = seriesTaskDrafts[seriesTaskDrafts.length - 1]
-        if (trailingTask && isSeriesTaskEmpty(trailingTask)) {
-            return seriesTaskDrafts.slice(0, -1)
-        }
-
-        return seriesTaskDrafts
-    }, [isSeriesTaskEmpty, seriesTaskDrafts, task])
-    const currentSeriesTaskDraft = !task
-        ? seriesTaskDrafts[activeSeriesTaskIndex] ?? null
-        : null
-    const canAddSeriesTask = !task && !!currentSeriesTaskDraft && isSeriesTaskValid(currentSeriesTaskDraft, activeSeriesTaskIndex)
-    const isCreatingSeries = !task && seriesTaskDrafts.length > 1
 
     const requiredTagClass = (met: boolean) =>
         `text-[10px] font-normal text-destructive transition-all duration-200 overflow-hidden whitespace-nowrap pointer-events-none select-none ${met ? "opacity-0 max-w-0 ml-0" : "opacity-100 max-w-[80px] ml-0"}`
@@ -632,20 +491,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         el.style.height = `${el.scrollHeight}px`
     }
 
-    // Validation - assignees are optional
-    const isValid = useMemo(() => {
-        if (!task) {
-            return (
-                submittableSeriesTaskDrafts.length > 0 &&
-                submittableSeriesTaskDrafts.every((seriesTask, index) => isSeriesTaskValid(seriesTask, index))
-            )
-        }
-
-        return (
-            hasTitle &&
-            hasDescriptionValue
-        )
-    }, [hasDescriptionValue, hasTitle, isSeriesTaskValid, submittableSeriesTaskDrafts, task])
+    const isValid = hasTitle && hasDescriptionValue
 
     useEffect(() => {
         if (!open) return
@@ -753,14 +599,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
 
                 handleClose()
             } else {
-                const completeSeriesTasks = submittableSeriesTaskDrafts
-                const primaryTask = completeSeriesTasks[0]
-                if (!primaryTask) {
-                    setError("Add at least one task before creating the series.")
-                    setIsLoading(false)
-                    return
-                }
-
                 const attachmentFolderPayload = (driveConfig?.connected && rootId)
                     ? {
                         attachmentFolderId: selectedFolder?.id || null,
@@ -768,8 +606,8 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                     }
                     : {}
                 const result = await createTask({
-                    title: primaryTask.title.trim(),
-                    description: primaryTask.description.trim(),
+                    title: title.trim(),
+                    description: description.trim(),
                     assigneeId: sanitizedAssigneeIds[0],
                     assigneeIds: sanitizedAssigneeIds,
                     requireAttachment,
@@ -777,10 +615,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                     columnId: columnId!,
                     projectId,
                     pushId: pushId || undefined,
-                    seriesTasks: completeSeriesTasks.slice(1).map((seriesTask) => ({
-                        title: seriesTask.title.trim(),
-                        description: seriesTask.description.trim() || undefined,
-                    })),
                     ...attachmentFolderPayload
                 })
 
@@ -805,19 +639,14 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                     return
                 }
 
-                // Upload instructions file for new task
-                const createdTasks = Array.isArray(result.tasks) && result.tasks.length > 0
-                    ? result.tasks as TaskDialogResultTask[]
-                    : result.task
-                        ? [result.task as TaskDialogResultTask]
-                        : []
-                const primaryCreatedTask = createdTasks[0] ?? null
+                const createdTask = result.task as TaskDialogResultTask | null
 
-                if (instructionsFile && primaryCreatedTask?.id) {
+                // Upload instructions file for new task
+                if (instructionsFile && createdTask?.id) {
                     setIsUploadingInstructions(true)
                     const formData = new FormData()
                     formData.append('file', instructionsFile)
-                    const uploadResult = await uploadTaskInstructions(primaryCreatedTask.id, formData)
+                    const uploadResult = await uploadTaskInstructions(createdTask.id, formData)
 
                     if (uploadResult?.error) {
                         console.error('Failed to upload instructions file:', uploadResult.error)
@@ -826,9 +655,9 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 }
 
                 // Create checklist items for new task
-                if (enableChecklist && checklistItems.length > 0 && primaryCreatedTask?.id) {
+                if (enableChecklist && checklistItems.length > 0 && createdTask?.id) {
                     for (let i = 0; i < checklistItems.length; i++) {
-                        await createChecklistItem(primaryCreatedTask.id, checklistItems[i], i)
+                        await createChecklistItem(createdTask.id, checklistItems[i], i)
                     }
                 }
 
@@ -842,11 +671,9 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 setEnableChecklist(false)
                 setChecklistItems([])
                 setNewChecklistItem("")
-                setSeriesTasks([createSeriesTaskDraft()])
-                setActiveSeriesTaskIndex(0)
 
-                if (createdTasks.length > 0 && onTaskCreated) {
-                    onTaskCreated(createdTasks)
+                if (createdTask && onTaskCreated) {
+                    onTaskCreated([createdTask])
                 }
 
                 handleClose()
@@ -885,7 +712,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault()
         e.stopPropagation()
-        if (!canUseInstructionsForCurrentStep) return
         const item = e.dataTransfer.items?.[0]
         const file = item && item.kind === "file" ? item.getAsFile() : e.dataTransfer.files?.[0]
         if (file?.name) setDragFileName(file.name)
@@ -895,7 +721,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const handleDragLeave = (e: React.DragEvent) => {
         e.preventDefault()
         e.stopPropagation()
-        if (!canUseInstructionsForCurrentStep) return
         // Only reset if we're leaving the form entirely
         if (!e.currentTarget.contains(e.relatedTarget as Node)) {
             setIsDraggingFile(false)
@@ -906,7 +731,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault()
         e.stopPropagation()
-        if (!canUseInstructionsForCurrentStep) return
         setIsDraggingFile(false)
         setDragFileName(null)
 
@@ -947,44 +771,9 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                     Back
                                 </Button>
                             )}
-                            <div className="flex items-center justify-between gap-4">
-                                <DialogTitle className="text-xl font-semibold tracking-tight">
-                                    {task ? "Edit Task" : isCreatingSeries ? "Create Series of Tasks" : "Create New Task"}
-                                </DialogTitle>
-                                {/* Series step indicator – connected dots */}
-                                {isCreatingSeries && (
-                                    <div className="flex items-center shrink-0">
-                                        {seriesTaskDrafts.map((draft, i) => (
-                                            <div key={draft.id} className="flex items-center">
-                                                {i > 0 && (
-                                                    <div className="w-3 h-px bg-border" />
-                                                )}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => goToSeriesTask(i)}
-                                                    title={draft.title.trim() || `Step ${i + 1}`}
-                                                    className={cn(
-                                                        "group relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-all",
-                                                        i === activeSeriesTaskIndex
-                                                            ? "bg-foreground text-background ring-2 ring-foreground/20"
-                                                            : "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
-                                                    )}
-                                                >
-                                                    {i + 1}
-                                                    {i > 0 && (
-                                                        <span
-                                                            onClick={(e) => { e.stopPropagation(); removeSeriesTask(i) }}
-                                                            className="absolute -top-1 -right-1 hidden group-hover:flex h-3.5 w-3.5 items-center justify-center rounded-full bg-muted-foreground/40 text-background cursor-pointer"
-                                                        >
-                                                            <X className="h-2 w-2" />
-                                                        </span>
-                                                    )}
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                            <DialogTitle className="text-xl font-semibold tracking-tight">
+                                {task ? "Edit Task" : "Create New Task"}
+                            </DialogTitle>
                         </DialogHeader>
 
                         <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-6">
@@ -1002,25 +791,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                             : `${removedAssigneeNotice.removedCount} previous assignees were removed from this workspace and have been unassigned.`}
                                         {" "}You can leave it open or add a replacement assignee.
                                     </span>
-                                </div>
-                            )}
-                            {task?.series && (
-                                <div className="rounded-lg border bg-muted/30 px-3 py-2">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <div>
-                                            <p className="text-sm font-medium">
-                                                Step {task.series.position} of {task.series.totalCount}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {task.series.isBlocked && task.series.previousTaskTitle
-                                                    ? `Blocked until "${task.series.previousTaskTitle}" reaches Done.`
-                                                    : "This task is part of a sequential task series."}
-                                            </p>
-                                        </div>
-                                        <span className="rounded-full border bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                            Series
-                                        </span>
-                                    </div>
                                 </div>
                             )}
                             <div className="space-y-4">
@@ -1055,24 +825,22 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                             value={description}
                                             onChange={(e) => setDescription(e.target.value)}
                                             autoComplete="off"
-                                            placeholder={canUseInstructionsForCurrentStep
-                                                ? (instructionsFile || existingInstructionsFile) && description.trim() === ""
-                                                    ? "Type Description"
-                                                    : "Type Description or Drag Files"
-                                                : "Type Description"}
+                                            placeholder={(instructionsFile || existingInstructionsFile) && description.trim() === ""
+                                                ? "Type Description"
+                                                : "Type Description or Drag Files"}
                                             className={`min-h-[120px] resize-none overflow-hidden pr-24 ${isDraggingFile ? "ring-1 ring-primary/40" : ""}`}
                                         />
                                         <div
                                             className={`absolute top-2 ${instructionsFile || existingInstructionsFile ? "right-8" : "right-2"} flex items-center gap-2 text-[11px] text-muted-foreground pointer-events-none`}
                                         >
-                                            <span className={requiredTagClass(canUseInstructionsForCurrentStep ? isDescriptionSatisfied : description.trim().length > 0)}>Required</span>
-                                            {canUseInstructionsForCurrentStep && (isDraggingFile ? dragFileName : (instructionsFile?.name || existingInstructionsFile?.name)) && (
+                                            <span className={requiredTagClass(isDescriptionSatisfied)}>Required</span>
+                                            {(isDraggingFile ? dragFileName : (instructionsFile?.name || existingInstructionsFile?.name)) && (
                                                 <span className="max-w-[160px] truncate pointer-events-none">
                                                     {isDraggingFile ? dragFileName : (instructionsFile?.name || existingInstructionsFile?.name)}
                                                 </span>
                                             )}
                                         </div>
-                                        {canUseInstructionsForCurrentStep && (instructionsFile || existingInstructionsFile) && (
+                                        {(instructionsFile || existingInstructionsFile) && (
                                             <button
                                                 type="button"
                                                 className="absolute top-2.5 right-3 text-muted-foreground hover:text-foreground transition-colors"
@@ -1314,7 +1082,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 </div>
 
                                 {/* Checklist Option - Only show when creating new task */}
-                                {!task && isPrimarySeriesStep && (
+                                {!task && (
                                     <div className="border p-3 rounded-lg bg-muted/20">
                                         <div className="flex items-center space-x-2">
                                             <Checkbox
@@ -1410,25 +1178,8 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 </div>
                                 <div className="flex gap-2 shrink-0">
                                     <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
-                                    {!task && (
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={addSeriesTask}
-                                            disabled={isLoading || !canAddSeriesTask}
-                                        >
-                                            <Plus className="h-3.5 w-3.5 mr-1.5" />
-                                            Add Step
-                                        </Button>
-                                    )}
                                     <Button type="submit" disabled={isLoading || !isValid}>
-                                        {isLoading
-                                            ? 'Saving...'
-                                            : task
-                                                ? "Save Changes"
-                                                : isCreatingSeries
-                                                    ? `Create ${submittableSeriesTaskDrafts.length} Tasks`
-                                                    : "Create Task"}
+                                        {isLoading ? 'Saving...' : task ? "Save Changes" : "Create Task"}
                                     </Button>
                                 </div>
                             </DialogFooter>
