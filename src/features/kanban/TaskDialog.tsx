@@ -951,42 +951,37 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 <DialogTitle className="text-xl font-semibold tracking-tight">
                                     {task ? "Edit Task" : isCreatingSeries ? "Create Series of Tasks" : "Create New Task"}
                                 </DialogTitle>
-                                {/* Series step navigator – top right */}
+                                {/* Series step indicator – connected dots */}
                                 {isCreatingSeries && (
-                                    <div className="flex items-center gap-1 shrink-0">
+                                    <div className="flex items-center shrink-0">
                                         {seriesTaskDrafts.map((draft, i) => (
-                                            <button
-                                                key={draft.id}
-                                                type="button"
-                                                onClick={() => goToSeriesTask(i)}
-                                                title={draft.title.trim() || `Step ${i + 1}`}
-                                                className={cn(
-                                                    "group relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-all",
-                                                    i === activeSeriesTaskIndex
-                                                        ? "bg-foreground text-background ring-2 ring-foreground/20"
-                                                        : "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
-                                                )}
-                                            >
-                                                {i + 1}
+                                            <div key={draft.id} className="flex items-center">
                                                 {i > 0 && (
-                                                    <span
-                                                        onClick={(e) => { e.stopPropagation(); removeSeriesTask(i) }}
-                                                        className="absolute -top-1 -right-1 hidden group-hover:flex h-3.5 w-3.5 items-center justify-center rounded-full bg-destructive text-destructive-foreground cursor-pointer"
-                                                    >
-                                                        <X className="h-2 w-2" />
-                                                    </span>
+                                                    <div className="w-3 h-px bg-border" />
                                                 )}
-                                            </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => goToSeriesTask(i)}
+                                                    title={draft.title.trim() || `Step ${i + 1}`}
+                                                    className={cn(
+                                                        "group relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-all",
+                                                        i === activeSeriesTaskIndex
+                                                            ? "bg-foreground text-background ring-2 ring-foreground/20"
+                                                            : "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
+                                                    )}
+                                                >
+                                                    {i + 1}
+                                                    {i > 0 && (
+                                                        <span
+                                                            onClick={(e) => { e.stopPropagation(); removeSeriesTask(i) }}
+                                                            className="absolute -top-1 -right-1 hidden group-hover:flex h-3.5 w-3.5 items-center justify-center rounded-full bg-muted-foreground/40 text-background cursor-pointer"
+                                                        >
+                                                            <X className="h-2 w-2" />
+                                                        </span>
+                                                    )}
+                                                </button>
+                                            </div>
                                         ))}
-                                        <button
-                                            type="button"
-                                            onClick={addSeriesTask}
-                                            disabled={!canAddSeriesTask}
-                                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-dashed text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                            title="Add another step"
-                                        >
-                                            <Plus className="h-3 w-3" />
-                                        </button>
                                     </div>
                                 )}
                             </div>
@@ -1415,7 +1410,7 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 </div>
                                 <div className="flex gap-2 shrink-0">
                                     <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
-                                    {!task && !isCreatingSeries && (
+                                    {!task && (
                                         <Button
                                             type="button"
                                             variant="outline"
