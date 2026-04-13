@@ -18,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Plus, Trash2, X, ListChecks, Folder, ChevronRight, Loader2, ArrowLeft, AlertCircle } from "lucide-react"
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
+import { cn } from "@/lib/utils"
 import { useQuery } from "convex/react"
 import { api } from "@convex/_generated/api"
 import { createTask, updateTaskDetails, deleteTask } from "@/app/actions/kanban"
@@ -578,6 +579,21 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         setError(null)
     }
 
+    const removeSeriesTask = useCallback((index: number) => {
+        if (index === 0) return
+        const nextDrafts = getSeriesTaskDraftsWithCurrentStep()
+        const filtered = nextDrafts.filter((_, i) => i !== index)
+        let nextActiveIndex = activeSeriesTaskIndex
+        if (activeSeriesTaskIndex >= filtered.length) {
+            nextActiveIndex = filtered.length - 1
+        } else if (activeSeriesTaskIndex > index) {
+            nextActiveIndex = activeSeriesTaskIndex - 1
+        }
+        setSeriesTasks(filtered)
+        setActiveSeriesTaskIndex(nextActiveIndex)
+        loadSeriesTaskDraft(filtered[nextActiveIndex])
+    }, [activeSeriesTaskIndex, getSeriesTaskDraftsWithCurrentStep, loadSeriesTaskDraft])
+
     const [isLoading, setIsLoading] = useState(false)
 
     const hasTitle = title.trim().length > 0
@@ -604,6 +620,8 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
         ? seriesTaskDrafts[activeSeriesTaskIndex] ?? null
         : null
     const canAddSeriesTask = !task && !!currentSeriesTaskDraft && isSeriesTaskValid(currentSeriesTaskDraft, activeSeriesTaskIndex)
+    const isCreatingSeries = !task && seriesTaskDrafts.length > 1
+    const stackLayerCount = Math.min(seriesTaskDrafts.length - 1, 3)
 
     const requiredTagClass = (met: boolean) =>
         `text-[10px] font-normal text-destructive transition-all duration-200 overflow-hidden whitespace-nowrap pointer-events-none select-none ${met ? "opacity-0 max-w-0 ml-0" : "opacity-100 max-w-[80px] ml-0"}`
@@ -641,15 +659,6 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                 ? prev.filter(id => id !== userId)
                 : [...prev, userId]
         )
-    }
-
-    const handleHeaderBack = () => {
-        if (!task && activeSeriesTaskIndex > 0) {
-            goToSeriesTask(activeSeriesTaskIndex - 1)
-            return
-        }
-
-        onBack?.()
     }
 
     function handleClose() {
@@ -921,30 +930,105 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                         </Button>
                     </DialogTrigger>
                 )}
-                <DialogContent ref={dialogContentRef} className="sm:max-w-[600px] p-0" showOverlay={showOverlay}>
+                <DialogContent ref={dialogContentRef} className={cn("sm:max-w-[600px] p-0", isCreatingSeries && "!overflow-visible")} showOverlay={showOverlay}>
+                    {/* Stacked card layers behind the form */}
+                    {isCreatingSeries && Array.from({ length: stackLayerCount }, (_, i) => (
+                        <div
+                            key={i}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-0 rounded-lg border bg-background shadow-sm transition-all duration-300"
+                            style={{
+                                transform: `translate(${-10 * (stackLayerCount - i)}px, ${-7 * (stackLayerCount - i)}px)`,
+                                opacity: 0.4 + (i * 0.2),
+                            }}
+                        />
+                    ))}
                     <form
                         onSubmit={handleSubmit}
-                        className="flex h-full max-h-[85vh] flex-col rounded-[inherit] bg-background"
+                        className="relative z-10 flex h-full max-h-[85vh] flex-col rounded-[inherit] bg-background"
                     >
                         <DialogHeader className="p-6 pb-2">
-                            {((!task && activeSeriesTaskIndex > 0) || onBack) ? (
+                            {onBack && (
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    onClick={handleHeaderBack}
+                                    onClick={onBack}
                                     className="w-fit -ml-2 mb-1 h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                                 >
                                     <ArrowLeft className="h-3.5 w-3.5 mr-1" />
-                                    {!task && activeSeriesTaskIndex > 0 ? "Previous task" : "Back"}
+                                    Back
                                 </Button>
-                            ) : null}
+                            )}
                             <div className="space-y-1">
                                 <DialogTitle className="text-xl font-semibold tracking-tight">
-                                    {task ? "Edit Task" : "Create New Task"}
+                                    {task ? "Edit Task" : isCreatingSeries ? "Create Task Series" : "Create New Task"}
                                 </DialogTitle>
+                                {isCreatingSeries && (
+                                    <p className="text-sm text-muted-foreground font-normal">
+                                        Editing step {activeSeriesTaskIndex + 1} of {seriesTaskDrafts.length}
+                                    </p>
+                                )}
                             </div>
                         </DialogHeader>
+
+                        {/* Series step navigator */}
+                        {isCreatingSeries && (
+                            <div className="px-6 pb-1">
+                                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mb-1">
+                                    {seriesTaskDrafts.map((draft, i) => (
+                                        <button
+                                            key={draft.id}
+                                            type="button"
+                                            onClick={() => goToSeriesTask(i)}
+                                            className={cn(
+                                                "group relative flex-shrink-0 rounded-md border px-3 py-1.5 text-left transition-all",
+                                                "min-w-[80px] max-w-[140px]",
+                                                i === activeSeriesTaskIndex
+                                                    ? "border-primary/60 bg-primary/5 ring-1 ring-primary/20 shadow-sm"
+                                                    : isSeriesTaskValid(draft, i)
+                                                        ? "border-border bg-muted/30 hover:bg-muted/50"
+                                                        : "border-amber-300/50 bg-amber-50/30 dark:border-amber-500/30 dark:bg-amber-950/20"
+                                            )}
+                                        >
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                <span className={cn(
+                                                    "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+                                                    i === activeSeriesTaskIndex
+                                                        ? "bg-primary text-primary-foreground"
+                                                        : isSeriesTaskValid(draft, i)
+                                                            ? "bg-muted-foreground/20 text-muted-foreground"
+                                                            : "bg-amber-200/60 text-amber-700 dark:bg-amber-800/40 dark:text-amber-400"
+                                                )}>
+                                                    {i + 1}
+                                                </span>
+                                                <span className="text-xs font-medium truncate">
+                                                    {draft.title.trim() || "Untitled"}
+                                                </span>
+                                            </div>
+                                            {i > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); removeSeriesTask(i) }}
+                                                    className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm transition-colors"
+                                                >
+                                                    <X className="h-2.5 w-2.5" />
+                                                </button>
+                                            )}
+                                        </button>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={addSeriesTask}
+                                        disabled={!canAddSeriesTask}
+                                        className="flex-shrink-0 rounded-md border border-dashed h-[38px] w-[38px] flex items-center justify-center text-muted-foreground hover:bg-muted/30 hover:text-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                                        title="Add another step"
+                                    >
+                                        <Plus className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-6">
                             {error && (
@@ -1369,13 +1453,15 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                 </div>
                                 <div className="flex gap-2 shrink-0">
                                     <Button type="button" variant="outline" onClick={handleClose}>Cancel</Button>
-                                    {!task && (
+                                    {!task && !isCreatingSeries && (
                                         <Button
                                             type="button"
+                                            variant="outline"
                                             onClick={addSeriesTask}
                                             disabled={isLoading || !canAddSeriesTask}
                                         >
-                                            Add task in series
+                                            <Plus className="h-3.5 w-3.5 mr-1.5" />
+                                            Add Step
                                         </Button>
                                     )}
                                     <Button type="submit" disabled={isLoading || !isValid}>
@@ -1383,7 +1469,9 @@ export function TaskDialog({ columnId, projectId, pushId, users, task, open: ext
                                             ? 'Saving...'
                                             : task
                                                 ? "Save Changes"
-                                                : "Done"}
+                                                : isCreatingSeries
+                                                    ? `Create ${submittableSeriesTaskDrafts.length} Tasks`
+                                                    : "Create Task"}
                                     </Button>
                                 </div>
                             </DialogFooter>
