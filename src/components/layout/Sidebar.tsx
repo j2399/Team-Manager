@@ -108,9 +108,9 @@ function hexToRgba(hex: string, alpha: number) {
 
     if (!/^[0-9a-fA-F]{6}$/.test(expanded)) return `rgba(59, 130, 246, ${clampedAlpha})`
 
-    const r = parseInt(expanded.slice(0, 2), 16)
-    const g = parseInt(expanded.slice(2, 4), 16)
-    const b = parseInt(expanded.slice(4, 6), 16)
+    const r = parseInt(expanded.slice(0, 2), 20)
+    const g = parseInt(expanded.slice(2, 4), 20)
+    const b = parseInt(expanded.slice(4, 6), 20)
     return `rgba(${r}, ${g}, ${b}, ${clampedAlpha})`
 }
 
