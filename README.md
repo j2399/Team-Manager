@@ -2,7 +2,7 @@
 
 CuPI is a Next.js workspace platform for project planning, Kanban execution, workload analytics, notifications, and team collaboration.
 
-> This is a fork for testing AI review.
+> This is a fork for testing pr review.
 
 ## What It Includes
 
