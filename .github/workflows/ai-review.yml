@@ -1,0 +1,30 @@
+name: AI Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get PR diff
+        run: |
+          gh pr diff ${{ github.event.pull_request.number }} > pr_diff.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Call AI for review (Groq - free, no key needed)
+        run: |
+          DIFF=$(cat pr_diff.txt)
+          RESPONSE=$(curl -s https://api.groq.com/openai/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -d '{
+              "model": "llama-3.1-70b-versatile",
+              "messages": [
+                {"role": "system", "content": "You are a code reviewer for Team-Manager (Next.js 16, Convex backend, TypeScript, Tailwind). Review PR changes. Check for bugs, security, types, missing error handling. Be concise. Format:\n\n## Review\n- [issue or suggestion]"},
+                {"role": "user", "content": "Review this PR:\n\n'"$DIFF"'"}
+              ],
+              "max_tokens": 800
+            }')
+          COMMENT=$(echo $RESPONSE | jq -r '.choices[0].message.content // .error.message')
+          gh pr comment ${{ github.event.pull_request.number }} --body "$COMMENT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
